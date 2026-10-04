@@ -32,7 +32,7 @@ class FakeServer {
     switch (path) {
       case '/auth/verify':
         verifiedWithInvite = (jsonDecode(request.body) as Map<String, dynamic>)['inviteCode'] as String?;
-        return json(AuthResponse(token: 't', user: UserDto(id: 'u1', displayName: name), isNewUser: true).toJson());
+        return json(AuthResponse(token: 't', user: AccountDto(id: 'u1', displayName: name), isNewUser: true).toJson());
       case '/users/me':
         name = (jsonDecode(request.body) as Map<String, dynamic>)['displayName'] as String;
         return json(UserDto(id: 'u1', displayName: name).toJson());

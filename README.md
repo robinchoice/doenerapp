@@ -32,12 +32,14 @@ Google erlaubt, Laden-Details höchstens 30 Tage zu speichern (nur die Place ID 
 - Pins: orange, besuchte Läden grün, Favoriten pink; fremde Geschäfts-POIs sind ausgeblendet
 - Lupe oben rechts: Suche in allen Läden, die die App schon kennt; daneben der Favoriten-Filter per Herz
 - „Laden fehlt?“ oben links schickt eine Meldung samt Kartenposition an den Server
+- Mit Ernährung „Vegan“ verschwinden Läden, in denen die Mehrheit nichts Veganes gefunden hat. Bei Vegetarisch und Vegan sind Läden blass, von denen noch niemand Passendes bewertet hat
+- Angekündigte Eröffnungen (Google-Status `FUTURE_OPENING`) zeigt die Karte noch nicht. Der tägliche Job prüft ab dem angekündigten Tag, ob der Laden offen ist, und merkt sich dann das Eröffnungsdatum
 
 ### Check-In
 
 Eingecheckt wird nur vor Ort, über den 🥙-Knopf in der Mitte der Tab-Leiste. Er ist orange, sobald ein Laden höchstens 150 m entfernt ist, sonst grau. Dafür lädt die App die Läden rund um den Standort und verfolgt ihn, solange sie offen ist. Ein Tipp auf den grauen Knopf fragt nach dem Standort, falls er noch nicht freigegeben ist, und lädt die Läden in der Nähe neu. Den Abstand prüft nur die App: Koordinaten ließen sich ohnehin fälschen, deshalb verzichtet der Server darauf, solange keine Fakes auftauchen.
 
-Danach kommt ein Drehrad mit 6 Essenstypen (Döner, Yufka, Lahmacun, Teller, Pommes, Falafel), das oberste Symbol ist ausgewählt. Stehen mehrere Läden nebeneinander, wählt man vorher den richtigen aus. Nach dem Check-in regnet es Emojis des gewählten Essens. Einen Kommentar gibt es nicht.
+Danach kommt ein Drehrad mit den Essenstypen, die zur Ernährung passen (Döner, Yufka, Lahmacun, Teller, Pommes, Falafel, veganer Döner, Halloumi, Pizza, Pide, Seele), das oberste Symbol ist ausgewählt. Stehen mehrere Läden nebeneinander, wählt man vorher den richtigen aus. Nach dem Check-in regnet es Emojis des gewählten Essens. Einen Kommentar gibt es nicht.
 
 - Check-ins werden sofort lokal gespeichert und über eine Sync-Queue an den Server geschickt
 - Die ID erzeugt der Client, deshalb entstehen bei Wiederholungen keine doppelten Besuche
@@ -45,12 +47,25 @@ Danach kommt ein Drehrad mit 6 Essenstypen (Döner, Yufka, Lahmacun, Teller, Pom
 
 ### Bewertungen
 
-Ein Gesamtrating (1–5) plus drei optionale Dimensionen: Soße, Fleisch, Brot. Das Gesamtrating ist automatisch der Durchschnitt der Dimensionen und kann manuell überschrieben werden.
+Ein Bogen, alle Punkte 1–5 und optional. Oben der Döner mit Soße, Fleisch und Brot. Die Gesamtnote ist ihr Durchschnitt, ohne manuelles Überschreiben. Sie zählt erst, wenn Soße oder Fleisch benotet ist, Brot allein ist keine Döner-Note. Darunter:
 
-- Eine Bewertung pro Nutzer und Laden – eine neue ersetzt die alte
-- „Was macht den Laden besonders?“ gehört zur eigenen Bewertung; der Laden zeigt die jüngste solche Notiz
-- Durchschnitt und Anzahl berechnet der Server beim Lesen, nichts wird doppelt gespeichert
-- In der Laden-Ansicht: eigene Bewertung, Community-Zusammenfassung und Bewertungen anderer
+- „Was gab's noch?“: Falafel, Halloumi, Pizza, Pide, Lahmacun, Seele. Ein Tipp öffnet die Zeile, jedes Gericht hat eine eigene Rangliste und zählt nicht in die Gesamtnote
+- „Vegane Optionen?“ (Ja/Nein/Weiß nicht): Bei Ja lassen sich veganer Döner (Seitan oder Soja), vegane Soße und Hummus bewerten. „Nein“ zeigt der Laden als „Nichts Veganes“
+- „Selbstgemachter Ayran?“: Bewertet wird nur selbstgemachter, „gekauft“ steht trotzdem am Laden
+- Expertenmodus (Einstellungen): fragt ab, was in „mit allem“ steckt (Salat, Besonderheiten wie Granatapfelkerne oder Mais, Soßen), dazu Fleisch, Spieß (selbst gesteckt oder Fertigspieß) und Brot. Vorausgefüllt mit dem, was andere angegeben haben
+- Eine Bewertung pro Nutzer und Laden, eine neue ersetzt die alte. Die Angaben (vegan, Ayran, Zutaten) hängen an der Bewertung, pro Laden zählt die Mehrheit
+- Durchschnitt und Anzahl berechnet der Server beim Lesen. Die Noten einer Bewertung (Döner, ohne Fleisch, vegan) leitet er beim Speichern aus den Punkten ab (`Diet.score` in `packages/doener_models`)
+- In der Laden-Ansicht: Chips für vegane Optionen, Ayran und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Expertenmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen
+
+### Ernährung
+
+In den Einstellungen: Alles, Vegetarisch oder Vegan. Gespeichert am Account, gilt also auch in der Web-App. Bewertung, Laden, Ranking, Start, Karte und Check-in zeigen dann nur, was zur Ernährung passt. Statt der Gesamtnote zählt eine eigene Note:
+
+| Ernährung | Note | Durchschnitt aus | zählt, sobald bewertet ist |
+|---|---|---|---|
+| Alles | Gesamt | Soße, Fleisch, Brot | Soße oder Fleisch |
+| Vegetarisch | Ohne Fleisch | Falafel, Halloumi, veganer Döner, Soße, Brot | Falafel, Halloumi oder veganer Döner |
+| Vegan | Vegan | Falafel, veganer Döner, vegane Soße, Hummus, Brot | eines davon außer Brot |
 
 ### Profil & Stempelkarte
 
@@ -93,13 +108,14 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 
 - Ganz oben die Freunde, die gerade essen
 - Startaufgaben, bis sie erledigt sind: „Bewerte deinen Stammladen“ (führt zur Karte) und „Hol deine Freunde per QR-Code“
-- „Top 3 hier“: nach gewichtetem Schnitt wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
+- „Neu in [Stadt]“: Läden, die in den letzten 30 Tagen aufgemacht haben, und Eröffnungen, die Google angekündigt hat („Bald: … Laut Google am 15. Oktober“)
+- „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
 - „Gerade im Trend“: meiste Check-ins und Bewertungen der letzten 7 Tage, Check-ins zählen anonym
 - Feed: Check-ins und Bewertungen der Freunde (orange hinterlegt) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Freunde. Der Filter „Nur Freunde“ blendet die anderen aus, die eigene Aktivität steht im Profil
 
 ### Ranking
 
-Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens im Umkreis von 20 km. Gerankt wird der Laden, umschaltbar nach Gesamt, Soße, Fleisch und Brot.
+Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens im Umkreis von 20 km. Gerankt wird der Laden, umschaltbar per Chips: zuerst die Note zur Ernährung, dann einzelne Punkte (bei „Alles“ Soße, Fleisch, Brot, Falafel, Halloumi, Vegan, Pizza, Pide, Lahmacun, Seele, Ayran).
 
 - Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit drei Bewertungen in Höhe des Stadtschnitts (`weightedRating` in `packages/doener_models`). So schlägt eine einzelne 5 nicht viele 4,5er
 - Angezeigt werden echter Schnitt und Anzahl, dazu die Freunde, die den Laden bewertet haben, mit ihrer Note
@@ -125,13 +141,13 @@ app/                          Flutter-App (iOS, Android, Web)
 └── lib/src/ui/               Theme und gemeinsame Widgets
 server/                       Dart-API + Auslieferung der Web-App
 ├── lib/src/auth.dart         Magic-Link-Login, Sitzungen, Account
-├── lib/src/places.dart       Läden, Bewertungen, Besuche, Top und Trend im Umkreis
+├── lib/src/places.dart       Läden, Bewertungen, Besuche, Top, Trend und Neueröffnungen im Umkreis
 ├── lib/src/ranking.dart      Ranking pro Stadt
 ├── lib/src/social.dart       Feed, Live-Status, Freunde, Feedback, Ladenmeldungen
 ├── lib/src/google_places.dart
 ├── lib/src/db.dart           SQL-Migrationen (nur anhängen, nie ändern)
 └── tool/seed_dev.dart        Test-Läden in Freiburg für Entwicklung ohne Google-Key
-packages/doener_models/       Geteilte DTOs, Validierung, Ranking-Regel, Stempel/Erfolge/Essenstypen
+packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und Ernährung (`menu.dart`), Ranking-Regel, Stempel/Erfolge/Essenstypen
 ```
 
 **Prinzipien:**
@@ -147,16 +163,17 @@ packages/doener_models/       Geteilte DTOs, Validierung, Ranking-Regel, Stempel
 | POST | `/auth/login` | Login-Code + Magic-Link per Mail schicken |
 | POST | `/auth/verify` | Code oder Link-Token einlösen → Sitzung |
 | POST | `/auth/logout` | Sitzung beenden |
-| GET | `/auth/me` | Aktueller User |
-| PATCH | `/users/me` | Anzeigename ändern |
+| GET | `/auth/me` | Aktueller User mit Ernährung und Expertenmodus |
+| PATCH | `/users/me` | Anzeigename, Ernährung oder Expertenmodus ändern |
 | DELETE | `/users/me` | Account löschen |
 | GET | `/places?minLat&minLon&maxLat&maxLon` | Läden im Kartenausschnitt |
-| GET | `/places/top?lat&lon` | Beste im Umkreis von 10 km (gewichtet), mit unbewerteten aufgefüllt |
+| GET | `/places/top?lat&lon[&by]` | Beste im Umkreis von 10 km (gewichtet) nach `overall`, `vegetarian` oder `vegan`, mit unbewerteten aufgefüllt |
+| GET | `/places/new?lat&lon` | Im Umkreis neu eröffnete (30 Tage) und von Google angekündigte Läden |
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
-| GET | `/ranking?lat&lon&by` | Ranking der Stadt nach `overall`, `sauce`, `fleisch` oder `brot`, mit Freunden |
+| GET | `/ranking?lat&lon&by` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden |
 | GET | `/places/:placeId` | Laden (Google Place ID) |
 | GET | `/places/:placeId/reviews` | Bewertungen des Ladens |
-| GET | `/places/:placeId/summary` | Community-Zusammenfassung |
+| GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran und was „mit allem“ heißt |
 | PUT | `/places/:placeId/review` | Eigene Bewertung speichern |
 | POST | `/places/:placeId/visits` | Check-in (idempotent über Client-ID) |
 | GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten |
@@ -288,11 +305,11 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 - **Kern:** Bewertungen und das Ranking der Stadt, nicht Menge oder Spiel.
 - **Zwei Ebenen:** Bewertungen (ab Phase 2 auch Fragen) sieht jeder im Umkreis von 10 km, mit Namen. Check-ins sehen nur Freunde. Freunde verbinden sich per QR-Code oder Einladungslink.
-- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren mit 🤤, 🥙 oder 🙋. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“, als Benachrichtigung oder als Karte im Start. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
-- **Bewertung:** Soße, Fleisch, Brot (je 1–5, Unpassendes weglassen), optional Text und ein Foto. Die Gesamtnote ist der Durchschnitt, ohne manuelles Überschreiben. Bewerten darf jeder. Wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Pro Person und Laden zählt die neueste Bewertung. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
-- **Push:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden), Antworten auf eigene Beiträge und die Bewertungserinnerung. Neue Fragen gehen nur an Kenner (ab 5 bewerteten Läden in der Stadt), höchstens eine am Tag. Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar.
+- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren mit 🤤, 🥙 oder 🙋. Nach etwa 30 Minuten fragt ein Push „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
+- **Bewertung:** optional mit Foto. Bewerten darf jeder, wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
+- **Push nur für Freunde und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar.
 - **Belohnung:** eine Stufe nach bewerteten Läden (bisherige Stufen-Namen) neben dem Namen, ab Phase 2 mit den Upvotes. Wrapped gibt es nur im Dezember.
-- **Fällt weg:** Erfolge, Stempelkarte, Konsum-Statistik, private Notizen und „Was macht den Laden besonders?“.
+- **Fällt weg:** Erfolge, Stempelkarte, Konsum-Statistik und private Notizen.
 - **Profil:** öffentlich mit Name, Stufe und Bewertungen. Freunde sehen zusätzlich die Check-ins.
 - **Texte:** Einladung „Welcher Döner ist der beste in [Stadt]? Die Döner-App weiß es, und du siehst, wo ich gerade esse: [Link]“, App-Store-Untertitel „Der beste Döner deiner Stadt“.
 
@@ -300,7 +317,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 - Neue Bewertung mit Foto und Häkchen „vor Ort“
 - Erinnerung nach dem Check-in („Wie war's bei X?“)
-- Push für Check-ins von Freunden: iOS über APNs, dazu Web Push
+- Push für Check-ins von Freunden, neue Läden und die Erinnerung, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
 - Öffentliches Profil mit Stufe, Wegfallendes entfernen
 - Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
 - Melden und Blockieren (Pflicht für die Stores, spätestens mit den Fotos)
@@ -309,7 +326,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 - Fragen an den Umkreis, Antworten mit verlinktem Laden, Kommentare
 - Up- und Downvotes, ab −5 ausgeblendet, Upvotes neben dem Namen
-- Kenner-Push für neue Fragen, Kenner des Monats 👑 (meiste Upvotes in der Stadt)
+- Kenner des Monats 👑 (meiste Upvotes in der Stadt)
 - Favoriten werden zur Merkliste „Will ich probieren“
 
 ### Messen

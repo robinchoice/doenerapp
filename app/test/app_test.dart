@@ -2,13 +2,55 @@ import 'package:doener_app/src/core/app_data.dart';
 import 'package:doener_app/src/core/session.dart';
 import 'package:doener_app/src/features/place/review_sheet.dart';
 import 'package:doener_app/src/features/profile/profile_screen.dart';
+import 'package:doener_app/src/ui/widgets.dart';
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:sembast/sembast_memory.dart';
+import 'package:sembast/sembast_memory.dart' hide Finder;
 
 const _place = PlaceDto(placeId: 'p1', name: 'Kebap Haus', latitude: 48, longitude: 7.85);
+
+/// The review sheet as the place detail opens it, for [account].
+Future<AppData> _openSheet(WidgetTester tester, AccountDto account, {PlaceSummaryDto? summary}) async {
+  tester.view.physicalSize = const Size(1170, 6000);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+  final data = (await tester.runAsync(_appData))!;
+  data.session.user = account;
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [ChangeNotifierProvider.value(value: data), ChangeNotifierProvider.value(value: data.session)],
+      child: MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showAppSheet(context, (_) => ReviewSheet(place: _place, summary: summary)),
+              child: const Text('Öffnen'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('Öffnen'));
+  await tester.pumpAndSettle();
+  return data;
+}
+
+/// Scrolls the sheet to [finder] (its children are built lazily) and taps it.
+Future<void> _tapInSheet(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 200, scrollable: find.byType(Scrollable).last);
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+/// Taps the [value]th fork in the rating row of [label].
+Future<void> _rate(WidgetTester tester, String label, int value) async {
+  final row = find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
+  await tester.tap(find.descendant(of: row, matching: find.byType(GestureDetector)).at(value - 1));
+  await tester.pumpAndSettle();
+}
 
 Future<AppData> _appData() async {
   final db = await newDatabaseFactoryMemory().openDatabase('test.db');
@@ -58,8 +100,8 @@ void main() {
   testWidgets('overall rating follows the dimension average', (tester) async {
     final data = await tester.runAsync(_appData);
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: data!,
+      MultiProvider(
+        providers: [ChangeNotifierProvider.value(value: data!), ChangeNotifierProvider.value(value: data.session)],
         child: const MaterialApp(home: Scaffold(body: ReviewSheet(place: _place))),
       ),
     );
@@ -72,5 +114,66 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Okay'), findsOneWidget); // (4 + 2) / 2 = 3
+  });
+
+  testWidgets('vegans rate vegan food, without meat or ayran', (tester) async {
+    final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin', diet: Diet.vegan));
+    expect(find.text('🌱 Vegan'), findsOneWidget);
+    expect(find.text('Fleisch'), findsNothing);
+    expect(find.text('🥛 Selbstgemachter Ayran?'), findsNothing);
+
+    await _rate(tester, 'Hummus', 5);
+    await _rate(tester, 'Brot', 3);
+    expect(find.text('Gut'), findsOneWidget, reason: '(5 + 3) / 2 = 4');
+    await _tapInSheet(tester, find.text('Speichern'));
+
+    final review = data.reviews['p1']!.dto;
+    expect(review.ratings, {RatingItem.hummus: 5, RatingItem.brot: 3});
+    expect(review.veganOptions, isTrue, reason: 'rating hummus says the place has vegan food');
+    expect(review.rating, isNull, reason: 'no Döner score without sauce or meat');
+  });
+
+  testWidgets('dishes and homemade ayran get their own rating', (tester) async {
+    final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin'));
+    expect(find.text('Seele'), findsOneWidget);
+    expect(find.text('Ayran'), findsNothing, reason: 'only once it is homemade');
+
+    await _rate(tester, 'Soße', 4);
+    await tester.tap(find.text('Halloumi'));
+    await tester.pumpAndSettle();
+    await _rate(tester, 'Halloumi', 5);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Ja').last);
+    await tester.pumpAndSettle();
+    await _rate(tester, 'Ayran', 2);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Nein').first);
+    await tester.pumpAndSettle();
+    await _tapInSheet(tester, find.text('Speichern'));
+
+    final review = data.reviews['p1']!.dto;
+    expect(review.ratings, {RatingItem.sauce: 4, RatingItem.halloumi: 5, RatingItem.ayran: 2});
+    expect(review.ayranHomemade, isTrue);
+    expect(review.veganOptions, isFalse);
+    expect(review.rating, 4, reason: 'halloumi and ayran stay out of the Döner score');
+    expect(review.ingredients, isNull, reason: 'not asked without expert mode');
+  });
+
+  testWidgets('experts start from what others said "mit allem" means', (tester) async {
+    final data = await _openSheet(
+      tester,
+      const AccountDto(id: 'u1', displayName: 'Robin', expertMode: true),
+      summary: const PlaceSummaryDto(ingredients: [Ingredient.tomate, Ingredient.mais], meat: Meat.kalb, experts: 2),
+    );
+    await tester.scrollUntilVisible(find.widgetWithText(ChoiceChip, 'Kalb'), 200, scrollable: find.byType(Scrollable).last);
+    expect(tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Mais')).selected, isTrue);
+    expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Kalb')).selected, isTrue);
+
+    await _tapInSheet(tester, find.widgetWithText(FilterChip, 'Granatapfelkerne'));
+    await _tapInSheet(tester, find.widgetWithText(ChoiceChip, 'Selbst gesteckt'));
+    await _tapInSheet(tester, find.text('Speichern'));
+
+    final review = data.reviews['p1']!.dto;
+    expect(review.ingredients, [Ingredient.tomate, Ingredient.mais, Ingredient.granatapfel]);
+    expect(review.meat, Meat.kalb);
+    expect(review.skewer, Skewer.homemade);
   });
 }

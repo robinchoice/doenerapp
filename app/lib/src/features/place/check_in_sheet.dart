@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_data.dart';
+import '../../core/session.dart';
 import '../../ui/widgets.dart';
 
 /// Check-ins only count on site.
@@ -21,12 +22,13 @@ class CheckInSheet extends StatefulWidget {
 
 class _CheckInSheetState extends State<CheckInSheet> {
   late PlaceDto _place = widget.places.first;
+  late final _foods = FoodItem.forDiet(context.read<Session>().diet);
   int _selected = 0;
   bool _done = false;
 
   Future<void> _checkIn() async {
     setState(() => _done = true);
-    await context.read<AppData>().checkIn(_place, foodType: FoodItem.all[_selected].id);
+    await context.read<AppData>().checkIn(_place, foodType: _foods[_selected].id);
     await Future<void>.delayed(const Duration(milliseconds: 1800));
     if (mounted) Navigator.of(context).pop();
   }
@@ -58,7 +60,7 @@ class _CheckInSheetState extends State<CheckInSheet> {
                 ],
               ),
             const SizedBox(height: 8),
-            RotaryPicker(selected: _selected, onChanged: (i) => setState(() => _selected = i)),
+            RotaryPicker(items: _foods, selected: _selected, onChanged: (i) => setState(() => _selected = i)),
             Center(
               child: SizedBox.square(
                 dimension: 72,
@@ -71,7 +73,7 @@ class _CheckInSheetState extends State<CheckInSheet> {
             ),
           ],
         ),
-        if (_done) Positioned.fill(child: IgnorePointer(child: Confetti(emoji: FoodItem.all[_selected].emoji))),
+        if (_done) Positioned.fill(child: IgnorePointer(child: Confetti(emoji: _foods[_selected].emoji))),
       ],
     );
   }
@@ -79,30 +81,32 @@ class _CheckInSheetState extends State<CheckInSheet> {
 
 /// Food wheel: drag sideways or tap an item to rotate it to the top.
 class RotaryPicker extends StatefulWidget {
+  final List<FoodItem> items;
   final int selected;
   final ValueChanged<int> onChanged;
-  const RotaryPicker({super.key, required this.selected, required this.onChanged});
+  const RotaryPicker({super.key, required this.items, required this.selected, required this.onChanged});
 
   @override
   State<RotaryPicker> createState() => _RotaryPickerState();
 }
 
 class _RotaryPickerState extends State<RotaryPicker> {
-  static const _radius = 100.0;
   double _drag = 0;
 
-  double get _step => 360 / FoodItem.all.length;
+  /// More food needs a wider wheel, so neighbours don't overlap.
+  double get _radius => math.max(100, 10.0 * widget.items.length);
+  double get _step => 360 / widget.items.length;
 
   void _settle() {
     final steps = (-_drag / _step).round();
-    final count = FoodItem.all.length;
+    final count = widget.items.length;
     widget.onChanged(((widget.selected + steps) % count + count) % count);
     setState(() => _drag = 0);
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = FoodItem.all;
+    final items = widget.items;
     return GestureDetector(
       onHorizontalDragUpdate: (d) => setState(() => _drag += d.delta.dx * 0.5),
       onHorizontalDragEnd: (_) => _settle(),

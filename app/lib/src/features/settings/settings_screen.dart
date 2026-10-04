@@ -60,6 +60,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _updateSettings({Diet? diet, bool? expertMode}) async {
+    try {
+      await context.read<Session>().updateSettings(diet: diet, expertMode: expertMode);
+    } catch (e) {
+      if (mounted) showMessage(context, 'Nicht gespeichert: $e');
+    }
+  }
+
   Future<void> _logout() async {
     final data = context.read<AppData>();
     final pending = data.pendingCount;
@@ -136,6 +144,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: Icon(Icons.delete_forever, color: theme.colorScheme.error),
               title: Text('Account löschen', style: TextStyle(color: theme.colorScheme.error)),
               onTap: _deleteAccount,
+            ),
+          ],
+          if (session.isLoggedIn) ...[
+            header('Ernährung'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentedButton<Diet>(
+                segments: [for (final d in Diet.values) ButtonSegment(value: d, label: Text(d.label))],
+                selected: {session.diet},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => _updateSettings(diet: s.first),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                switch (session.diet) {
+                  Diet.all => 'Du siehst alle Bewertungen und Ranglisten.',
+                  Diet.vegetarian => 'Kein Fleisch in Bewertung, Ranking und Karte. Statt Gesamt zählt die Note ohne Fleisch.',
+                  Diet.vegan => 'Nur Veganes in Bewertung, Ranking und Karte. Läden ohne vegane Optionen verschwinden.',
+                },
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+              ),
+            ),
+            header('Bewerten'),
+            SwitchListTile(
+              title: const Text('Expertenmodus'),
+              subtitle: const Text('Fragt beim Bewerten, was in „mit allem“ steckt, dazu Fleisch, Spieß und Brot. Zeigt am Laden die ganze Zutatenliste.'),
+              value: session.expertMode,
+              onChanged: (value) => _updateSettings(expertMode: value),
             ),
           ],
           header('Synchronisation'),

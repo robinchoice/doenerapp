@@ -150,6 +150,55 @@ final migrations = <List<String>>[
       PRIMARY KEY (user_id, day)
     )''',
   ],
+  [
+    // Diet and expert mode belong to the account, so the web app knows them too.
+    "ALTER TABLE users ADD COLUMN diet text NOT NULL DEFAULT 'all' CHECK (diet IN ('all', 'vegetarian', 'vegan'))",
+    'ALTER TABLE users ADD COLUMN expert_mode boolean NOT NULL DEFAULT false',
+    // The main score per diet is derived from the ratings when a review is
+    // saved (Diet.score). A review about falafel alone has no Döner score.
+    'ALTER TABLE reviews ALTER COLUMN rating DROP NOT NULL',
+    'ALTER TABLE reviews ADD COLUMN vegetarian_rating int CHECK (vegetarian_rating BETWEEN 1 AND 5)',
+    'ALTER TABLE reviews ADD COLUMN vegan_rating int CHECK (vegan_rating BETWEEN 1 AND 5)',
+    // What the reviewer says about the place; per place the majority counts.
+    'ALTER TABLE reviews ADD COLUMN vegan_options boolean',
+    'ALTER TABLE reviews ADD COLUMN ayran_homemade boolean',
+    'ALTER TABLE reviews ADD COLUMN ingredients text[]',
+    'ALTER TABLE reviews ADD COLUMN meat text',
+    'ALTER TABLE reviews ADD COLUMN skewer text',
+    'ALTER TABLE reviews ADD COLUMN bread text',
+    // Ratings beyond sauce, meat and bread: falafel, pizza, ayran …
+    '''CREATE TABLE review_items (
+      review_id uuid NOT NULL REFERENCES reviews (id) ON DELETE CASCADE,
+      item text NOT NULL,
+      rating int NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      PRIMARY KEY (review_id, item)
+    )''',
+    'CREATE INDEX review_items_item ON review_items (item)',
+    // Google announces openings: FUTURE_OPENING with a date ("YYYY-MM-DD", or
+    // "YYYY-MM" without a day), OPERATIONAL once the shop is open.
+    'ALTER TABLE places ADD COLUMN business_status text',
+    'ALTER TABLE places ADD COLUMN opening_date text',
+    'ALTER TABLE places ADD COLUMN opened_on date',
+    // Places that haven't opened yet only show up as announcements.
+    'DROP VIEW place_view',
+    '''CREATE VIEW place_view AS
+      SELECT p.*, s.avg_rating, COALESCE(s.review_count, 0) AS review_count,
+        s.avg_vegetarian, COALESCE(s.vegetarian_count, 0) AS vegetarian_count,
+        s.avg_vegan, COALESCE(s.vegan_count, 0) AS vegan_count, s.vegan_options
+      FROM places p
+      LEFT JOIN (
+        SELECT place_id,
+          avg(rating)::float8 AS avg_rating, count(rating)::int AS review_count,
+          avg(vegetarian_rating)::float8 AS avg_vegetarian, count(vegetarian_rating)::int AS vegetarian_count,
+          avg(vegan_rating)::float8 AS avg_vegan, count(vegan_rating)::int AS vegan_count,
+          CASE WHEN count(*) FILTER (WHERE vegan_options) > count(*) FILTER (WHERE NOT vegan_options) THEN true
+               WHEN count(*) FILTER (WHERE NOT vegan_options) > count(*) FILTER (WHERE vegan_options) THEN false
+          END AS vegan_options
+        FROM reviews GROUP BY place_id
+      ) s ON s.place_id = p.id
+      WHERE p.business_status IS DISTINCT FROM 'FUTURE_OPENING'
+    ''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

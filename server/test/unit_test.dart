@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/google_places.dart';
 import 'package:doener_server/src/http.dart';
@@ -67,6 +68,26 @@ void main() {
     expect(place.openingHours, 'Montag: 11:00–23:00\nDienstag: 11:00–23:00');
     expect(place.looksLikeDoener, isTrue, reason: 'matched by type, not name');
 
+    final announced = GooglePlace.fromJson({
+      'id': 'neu',
+      'displayName': {'text': 'Neuer Grill'},
+      'location': {'latitude': 48.0, 'longitude': 7.8},
+      'businessStatus': 'FUTURE_OPENING',
+      'openingDate': {'year': 2026, 'month': 10, 'day': 5},
+    });
+    expect(announced.openingDate, '2026-10-05');
+    expect(announced.isOpenBusiness, isTrue, reason: 'announced places are kept for the news');
+    expect(
+      GooglePlace.fromJson({
+        'id': 'neu',
+        'displayName': {'text': 'Neuer Grill'},
+        'location': {'latitude': 48.0, 'longitude': 7.8},
+        'openingDate': {'year': 2026, 'month': 11},
+      }).openingDate,
+      '2026-11',
+      reason: 'Google may only know the month',
+    );
+
     GooglePlace named(String name) => GooglePlace(id: 'x', name: name, latitude: 0, longitude: 0);
     expect(named('Mustafas Gemüse Kebap').looksLikeDoener, isTrue);
     expect(named('DÖNER HAUS').looksLikeDoener, isTrue);
@@ -82,20 +103,33 @@ void main() {
     expect(() => decodeCursor('not-a-cursor'), throwsA(isA<ApiException>()));
   });
 
-  test('summary text', () {
-    expect(summarize(const [], null).summaryText, 'Noch keine Bewertungen.');
+  test('community summary of a place', () {
+    expect(summarize(const []).items, isEmpty);
+    Map<String, dynamic> row({int? sauce, int? fleisch, Map<String, int>? items, bool? ayran, List<String>? ingredients, String? meat, String? bread}) => {
+          'sauce_rating': sauce,
+          'fleisch_rating': fleisch,
+          'brot_rating': null,
+          'items': items,
+          'ayran_homemade': ayran,
+          'ingredients': ingredients,
+          'meat': meat,
+          'skewer': null,
+          'bread': bread,
+        };
     final summary = summarize([
-      {'rating': 5, 'sauce_rating': 5, 'fleisch_rating': 3, 'brot_rating': null, 'text': 'Beste Soße der Stadt'},
-      {'rating': 4, 'sauce_rating': 4, 'fleisch_rating': null, 'brot_rating': null, 'text': null},
-    ], 'Knoblauchsoße');
-    expect(summary.reviewCount, 2);
-    expect(summary.avgRating, 4.5);
-    expect(summary.topDimension, 'Soße');
-    expect(summary.avgBrotRating, isNull);
-    expect(
-      summary.summaryText,
-      '2 Bewertungen, insgesamt ausgezeichnet (4.5/5). Soße wird besonders gelobt (4.5/5). '
-      'Bekannt für: Knoblauchsoße. „Beste Soße der Stadt“',
-    );
+      row(sauce: 5, fleisch: 3, items: {'ayran': 5}, ayran: true, ingredients: ['tomate', 'mais', 'granatapfel'], meat: 'kalb', bread: 'homemade'),
+      row(sauce: 4, ayran: false, ingredients: ['tomate', 'mais'], meat: 'kalb'),
+      row(items: {'falafel': 4}, meat: 'rind'),
+    ]);
+    expect(summary.items[RatingItem.sauce]!.average, 4.5);
+    expect(summary.items[RatingItem.sauce]!.count, 2);
+    expect(summary.items[RatingItem.falafel]!.count, 1);
+    expect(summary.items.containsKey(RatingItem.brot), isFalse);
+    expect(summary.ayranHomemade, isNull, reason: 'one says yes, one says no');
+    expect(summary.experts, 2);
+    expect(summary.ingredients, [Ingredient.tomate, Ingredient.mais, Ingredient.granatapfel], reason: 'half of the experts is enough');
+    expect(summary.specials, [Ingredient.mais, Ingredient.granatapfel]);
+    expect(summary.meat, Meat.kalb);
+    expect(summary.bread, Bread.homemade);
   });
 }

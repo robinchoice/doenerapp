@@ -103,14 +103,25 @@ class AppData extends ChangeNotifier {
       ..sort((a, b) => distances[a.placeId]!.compareTo(distances[b.placeId]!));
   }
 
-  Future<List<PlaceDto>> topNearby(double lat, double lon) async =>
-      _cachePlaces(await _api.get('/places/top', query: {'lat': '$lat', 'lon': '$lon', 'limit': '3'}) as List);
+  /// Best around by the main score of [diet].
+  Future<List<PlaceDto>> topNearby(double lat, double lon, Diet diet) async => _cachePlaces(await _api.get(
+        '/places/top',
+        query: {'lat': '$lat', 'lon': '$lon', 'limit': '3', 'by': RankBy.score(diet).key},
+      ) as List);
 
   Future<List<PlaceDto>> trending(double lat, double lon) async =>
       _cachePlaces(await _api.get('/places/trending', query: {'lat': '$lat', 'lon': '$lon'}) as List);
 
-  Future<RankingDto> ranking(double lat, double lon, RatingDimension by) async {
-    final json = await _api.get('/ranking', query: {'lat': '$lat', 'lon': '$lon', 'by': by.name});
+  /// Opened lately around, and openings Google announced. Only the opened
+  /// ones are real places for the map.
+  Future<NewPlacesDto> newPlaces(double lat, double lon) async {
+    final news = NewPlacesDto.fromJson(await _api.get('/places/new', query: {'lat': '$lat', 'lon': '$lon'}) as Map<String, dynamic>);
+    await _storePlaces(news.opened);
+    return news;
+  }
+
+  Future<RankingDto> ranking(double lat, double lon, RankBy by) async {
+    final json = await _api.get('/ranking', query: {'lat': '$lat', 'lon': '$lon', 'by': by.key});
     final ranking = RankingDto.fromJson(json as Map<String, dynamic>);
     await _storePlaces([for (final e in ranking.entries) e.place]);
     return ranking;
@@ -191,12 +202,18 @@ class AppData extends ChangeNotifier {
       userName: user.displayName,
       placeId: place.placeId,
       placeName: place.name,
-      rating: request.rating,
-      sauceRating: request.sauceRating,
-      fleischRating: request.fleischRating,
-      brotRating: request.brotRating,
+      // As on the server: an older overall rating stays until sauce, meat or bread are rated.
+      rating: RatingItem.doenerItems.any((i) => request.ratings.containsKey(i) || (previous?.ratings.containsKey(i) ?? false))
+          ? Diet.all.score(request.ratings)?.round()
+          : previous?.rating,
+      ratings: request.ratings,
+      veganOptions: request.veganOptions,
+      ayranHomemade: request.ayranHomemade,
+      ingredients: request.ingredients,
+      meat: request.meat,
+      skewer: request.skewer,
+      bread: request.bread,
       text: Validation.clean(request.text),
-      specialNote: Validation.clean(request.specialNote),
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
     );

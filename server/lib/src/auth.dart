@@ -24,12 +24,20 @@ String randomToken() =>
 
 String randomCode() => _random.nextInt(1000000).toString().padLeft(6, '0');
 
+AccountDto accountFromRow(Map<String, dynamic> row) => AccountDto(
+      id: row['id'] as String,
+      displayName: row['display_name'] as String,
+      diet: Diet.values.byName(row['diet'] as String),
+      expertMode: row['expert_mode'] as bool,
+    );
+
 class AuthUser {
   final String id;
   final String displayName;
-  const AuthUser(this.id, this.displayName);
-
-  UserDto toDto() => UserDto(id: id, displayName: displayName);
+  final AccountDto account;
+  AuthUser(this.account)
+      : id = account.id,
+        displayName = account.displayName;
 }
 
 Future<AuthUser> requireUser(Deps deps, Request request) async {
@@ -37,12 +45,12 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   if (header == null || !header.startsWith('Bearer ')) throw const ApiException.unauthorized();
   final row = await queryOne(
     deps.db,
-    'SELECT u.id, u.display_name FROM sessions s JOIN users u ON u.id = s.user_id '
+    'SELECT u.id, u.display_name, u.diet, u.expert_mode FROM sessions s JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
     {'hash': hashToken(header.substring(7).trim())},
   );
   if (row == null) throw const ApiException.unauthorized('Sitzung abgelaufen');
-  return AuthUser(row['id'] as String, row['display_name'] as String);
+  return AuthUser(accountFromRow(row));
 }
 
 void mountAuth(Router router, Deps deps) {
@@ -92,7 +100,7 @@ void mountAuth(Router router, Deps deps) {
     final body = await readBody(request, VerifyRequest.fromJson);
     final email = await _consumeLoginRequest(deps, body);
 
-    var user = await queryOne(deps.db, 'SELECT id, display_name FROM users WHERE email = @email', {'email': email});
+    var user = await queryOne(deps.db, 'SELECT id, display_name, diet, expert_mode FROM users WHERE email = @email', {'email': email});
     final isNewUser = user == null;
     user ??= await _createUser(deps, email, Validation.clean(body.inviteCode));
 
@@ -105,13 +113,12 @@ void mountAuth(Router router, Deps deps) {
         'expires': DateTime.now().toUtc().add(sessionTtl),
       },
     );
-    final dto = UserDto(id: user['id'] as String, displayName: user['display_name'] as String);
-    return json(AuthResponse(token: token, user: dto, isNewUser: isNewUser).toJson());
+    return json(AuthResponse(token: token, user: accountFromRow(user), isNewUser: isNewUser).toJson());
   });
 
   router.get('/auth/me', (Request request) async {
     final user = await requireUser(deps, request);
-    return json(user.toDto().toJson());
+    return json(user.account.toJson());
   });
 
   router.post('/auth/logout', (Request request) async {
@@ -121,21 +128,24 @@ void mountAuth(Router router, Deps deps) {
     return noContent();
   });
 
+  // PATCH /users/me — name, diet, expert mode; only what is set changes.
   router.patch('/users/me', (Request request) async {
     final user = await requireUser(deps, request);
     final body = await readBody(request, UpdateMeRequest.fromJson);
-    final error = Validation.displayNameError(body.displayName);
+    final error = body.displayName == null ? null : Validation.displayNameError(body.displayName!);
     if (error != null) throw ApiException.badRequest(error);
-    final name = body.displayName.trim();
     try {
-      await deps.db.execute(
-        Sql.named('UPDATE users SET display_name = @name WHERE id = @id:uuid'),
-        parameters: {'name': name, 'id': user.id},
+      final row = await queryOne(
+        deps.db,
+        'UPDATE users SET display_name = coalesce(@name:text, display_name), diet = coalesce(@diet:text, diet), '
+        'expert_mode = coalesce(@expert:boolean, expert_mode) WHERE id = @id:uuid '
+        'RETURNING id, display_name, diet, expert_mode',
+        {'name': body.displayName?.trim(), 'diet': body.diet?.name, 'expert': body.expertMode, 'id': user.id},
       );
+      return json(accountFromRow(row!).toJson());
     } on UniqueViolationException {
       throw const ApiException.conflict('Der Name ist schon vergeben.');
     }
-    return json(UserDto(id: user.id, displayName: name).toJson());
   });
 
   // Account deletion — required by the App Store for apps with sign-up.
@@ -198,7 +208,8 @@ Future<Map<String, dynamic>> _createUser(Deps deps, String email, String? invite
       return (await queryOne(
         deps.db,
         'INSERT INTO users (email, display_name, invited_by) '
-        'VALUES (@email, @name, (SELECT id FROM users WHERE invite_code = @invite:text)) RETURNING id, display_name',
+        'VALUES (@email, @name, (SELECT id FROM users WHERE invite_code = @invite:text)) '
+        'RETURNING id, display_name, diet, expert_mode',
         {'email': email, 'name': name, 'invite': inviteCode},
       ))!;
     } on UniqueViolationException catch (e) {

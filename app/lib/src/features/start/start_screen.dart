@@ -30,6 +30,7 @@ class StartScreen extends StatefulWidget {
 class _StartScreenState extends State<StartScreen> {
   List<PlaceDto> _top = [];
   List<PlaceDto> _trending = [];
+  NewPlacesDto _news = const NewPlacesDto();
   List<LiveStatusDto> _live = [];
   bool _areaLoaded = false;
   final _items = <FeedItem>[];
@@ -54,14 +55,17 @@ class _StartScreenState extends State<StartScreen> {
   Future<void> _loadArea() async {
     final data = context.read<AppData>();
     final center = _center!;
-    final results = await Future.wait([
-      data.topNearby(center.latitude, center.longitude).catchError((_) => _top),
+    final diet = context.read<Session>().diet;
+    final (top, trending, news) = await (
+      data.topNearby(center.latitude, center.longitude, diet).catchError((_) => _top),
       data.trending(center.latitude, center.longitude).catchError((_) => _trending),
-    ]);
+      data.newPlaces(center.latitude, center.longitude).catchError((_) => _news),
+    ).wait;
     if (!mounted) return;
     setState(() {
-      _top = results[0];
-      _trending = results[1];
+      _top = top;
+      _trending = trending;
+      _news = news;
       _areaLoaded = true;
     });
   }
@@ -115,7 +119,9 @@ class _StartScreenState extends State<StartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<Session>().user!;
+    final session = context.watch<Session>();
+    final user = session.user!;
+    final diet = session.diet;
     final position = context.watch<LocationService>().position;
     final data = context.watch<AppData>();
     final friends = context.watch<Friends>();
@@ -125,8 +131,9 @@ class _StartScreenState extends State<StartScreen> {
         (center == null ||
             Geolocator.distanceBetween(center.latitude, center.longitude, position.latitude, position.longitude) >
                 _reloadDistance);
-    if (_loadedFor != user.id || moved) {
-      _loadedFor = user.id;
+    // Top places depend on the diet, so a new one loads them again.
+    if (_loadedFor != '${user.id}/${diet.name}' || moved) {
+      _loadedFor = '${user.id}/${diet.name}';
       _center = position ?? fallbackLocation;
       WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
     }
@@ -136,7 +143,11 @@ class _StartScreenState extends State<StartScreen> {
         _Task(
           icon: Icons.restaurant,
           title: 'Bewerte deinen Stammladen',
-          message: 'Such ihn auf der Karte und gib Soße, Fleisch und Brot eine Note.',
+          message: switch (diet) {
+            Diet.all => 'Such ihn auf der Karte und gib Soße, Fleisch und Brot eine Note.',
+            Diet.vegetarian => 'Such ihn auf der Karte und bewerte Falafel, Halloumi, Soße und Brot.',
+            Diet.vegan => 'Such ihn auf der Karte und bewerte, was es dort Veganes gibt.',
+          },
           onTap: widget.onOpenMap,
         ),
       if (friends.accepted.isEmpty)
@@ -173,10 +184,14 @@ class _StartScreenState extends State<StartScreen> {
                 const SizedBox(height: 16),
               ],
               for (final task in tasks) Padding(padding: const EdgeInsets.only(bottom: 10), child: task),
+              if (_news.opened.isNotEmpty || _news.upcoming.isNotEmpty) ...[
+                _NewPlacesCard(news: _news),
+                const SizedBox(height: 10),
+              ],
               if (tasks.isNotEmpty) const SizedBox(height: 10),
               SectionTitle(
                 icon: Icons.emoji_events,
-                title: 'Top 3 hier',
+                title: switch (diet) { Diet.all => 'Top 3 hier', Diet.vegetarian => 'Top 3 ohne Fleisch', Diet.vegan => 'Top 3 vegan' },
                 trailing: position == null
                     ? Text('Freiburg', style: TextStyle(color: Theme.of(context).colorScheme.outline))
                     : null,
@@ -190,17 +205,18 @@ class _StartScreenState extends State<StartScreen> {
                 )
               else
                 for (final (i, place) in _top.indexed)
-                  Padding(padding: const EdgeInsets.only(bottom: 10), child: _TopTile(rank: i + 1, place: place)),
-              if (_trending.isNotEmpty) ...[
+                  Padding(padding: const EdgeInsets.only(bottom: 10), child: _TopTile(rank: i + 1, place: place, diet: diet)),
+              if (_trending.where((p) => diet != Diet.vegan || p.veganOptions != false).toList() case final trending
+                  when trending.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 const SectionTitle(icon: Icons.local_fire_department, title: 'Gerade im Trend'),
                 SizedBox(
                   height: 118,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _trending.length,
+                    itemCount: trending.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, i) => SizedBox(width: 170, child: _PlaceCard(place: _trending[i])),
+                    itemBuilder: (context, i) => SizedBox(width: 170, child: _PlaceCard(place: trending[i], diet: diet)),
                   ),
                 ),
               ],
@@ -225,7 +241,9 @@ class _StartScreenState extends State<StartScreen> {
                     title: item.user.displayName,
                     subtitle: '${item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet:'} ${item.place.name}',
                     timestamp: item.timestamp,
-                    rating: item.rating,
+                    score: item.headline(diet),
+                    ratings: item.ratings,
+                    diet: diet,
                     text: item.text,
                     foodType: item.foodType,
                     highlight: item.fromFriend,
@@ -294,11 +312,13 @@ class _Task extends StatelessWidget {
 class _TopTile extends StatelessWidget {
   final int rank;
   final PlaceDto place;
-  const _TopTile({required this.rank, required this.place});
+  final Diet diet;
+  const _TopTile({required this.rank, required this.place, required this.diet});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final score = place.score(diet);
     return GlassCard(
       onTap: () => showPlaceDetail(context, place),
       child: Row(
@@ -314,12 +334,12 @@ class _TopTile extends StatelessWidget {
               ],
             ),
           ),
-          if (place.avgRating == null)
+          if (score.average == null)
             Text('noch unbewertet', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline))
           else
             Column(children: [
-              Text(formatRating(place.avgRating!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 20)),
-              Text('${place.reviewCount} Bew.', style: theme.textTheme.labelSmall),
+              Text(formatRating(score.average!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 20)),
+              Text('${score.count} Bew.', style: theme.textTheme.labelSmall),
             ]),
         ],
       ),
@@ -329,10 +349,13 @@ class _TopTile extends StatelessWidget {
 
 class _PlaceCard extends StatelessWidget {
   final PlaceDto place;
-  const _PlaceCard({required this.place});
+  final Diet diet;
+  const _PlaceCard({required this.place, required this.diet});
 
   @override
-  Widget build(BuildContext context) => GlassCard(
+  Widget build(BuildContext context) {
+    final score = place.score(diet);
+    return GlassCard(
         padding: const EdgeInsets.all(12),
         onTap: () => showPlaceDetail(context, place),
         child: Column(
@@ -341,16 +364,68 @@ class _PlaceCard extends StatelessWidget {
             Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
             if (place.city != null) Text(place.city!, style: Theme.of(context).textTheme.bodySmall),
             const Spacer(),
-            if (place.avgRating != null)
+            if (score.average != null)
               Row(children: [
-                DoenerRating(value: place.avgRating!.round(), size: 12),
+                DoenerRating(value: score.average!.round(), size: 12),
                 const SizedBox(width: 4),
-                Text(formatRating(place.avgRating!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 12)),
-                Text(' (${place.reviewCount})', style: Theme.of(context).textTheme.labelSmall),
+                Text(formatRating(score.average!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(' (${score.count})', style: Theme.of(context).textTheme.labelSmall),
               ]),
           ],
         ),
       );
+  }
+}
+
+/// Places that opened lately around, and openings Google announced.
+class _NewPlacesCard extends StatelessWidget {
+  final NewPlacesDto news;
+  const _NewPlacesCard({required this.news});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final city = (news.opened.isEmpty ? news.upcoming : news.opened).first.city;
+    return GlassCard(
+      color: doenerOrange.withValues(alpha: 0.1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('🎉 Neu in ${city ?? 'der Gegend'}', style: const TextStyle(fontWeight: FontWeight.w600)),
+          for (final place in news.opened)
+            InkWell(
+              onTap: () => showPlaceDetail(context, place),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${place.name} hat am ${formatDay(place.openedOn!)} aufgemacht'),
+                          if (place.address != null) Text(place.address!, style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
+            ),
+          for (final place in news.upcoming)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '🗓️ Bald: ${place.name}${place.address == null ? '' : ', ${place.address}'}'
+                '${place.opensOn == null ? '' : '. Laut Google ${formatOpening(place.opensOn!)}'}',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _LiveChip extends StatelessWidget {

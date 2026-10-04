@@ -58,6 +58,10 @@ class GooglePlace {
   final String? city;
   final String? openingHours;
 
+  /// Set for announced openings (status FUTURE_OPENING): `YYYY-MM-DD`, or
+  /// `YYYY-MM` when Google only knows the month.
+  final String? openingDate;
+
   const GooglePlace({
     required this.id,
     required this.name,
@@ -69,6 +73,7 @@ class GooglePlace {
     this.postalCode,
     this.city,
     this.openingHours,
+    this.openingDate,
   });
 
   factory GooglePlace.fromJson(Map<String, dynamic> j) {
@@ -82,6 +87,8 @@ class GooglePlace {
 
     final street = [component('route'), component('street_number')].whereType<String>().join(' ');
     final hours = (j['regularOpeningHours']?['weekdayDescriptions'] as List?)?.cast<String>();
+    final opening = j['openingDate'] as Map<String, dynamic>?;
+    String two(Object? n) => '$n'.padLeft(2, '0');
     return GooglePlace(
       id: j['id'] as String,
       name: j['displayName']['text'] as String,
@@ -93,6 +100,9 @@ class GooglePlace {
       postalCode: component('postal_code'),
       city: component('locality') ?? component('postal_town'),
       openingHours: hours?.join('\n'),
+      openingDate: opening == null
+          ? null
+          : [opening['year'], two(opening['month']), if (opening['day'] != null) two(opening['day'])].join('-'),
     );
   }
 
@@ -106,7 +116,17 @@ class GooglePlace {
   bool get looksLikeDoener => _namePattern.hasMatch(name) || types.any(_types.contains);
 }
 
-const _placeFields = ['id', 'displayName', 'location', 'types', 'businessStatus', 'addressComponents', 'regularOpeningHours'];
+// openingDate is in the same price tier as businessStatus.
+const _placeFields = [
+  'id',
+  'displayName',
+  'location',
+  'types',
+  'businessStatus',
+  'openingDate',
+  'addressComponents',
+  'regularOpeningHours',
+];
 final _fieldMask = [..._placeFields.map((f) => 'places.$f'), 'nextPageToken'].join(',');
 
 /// Place Details (New). Returns null if Google no longer knows the place.
@@ -137,6 +157,8 @@ Future<List<GooglePlace>> searchTile(http.Client client, String apiKey, Tile til
       body: jsonEncode({
         'textQuery': 'Döner Kebab',
         'languageCode': 'de',
+        // Announced openings come with FUTURE_OPENING and their date.
+        'includeFutureOpeningBusinesses': true,
         'pageSize': 20,
         'locationRestriction': {
           'rectangle': {

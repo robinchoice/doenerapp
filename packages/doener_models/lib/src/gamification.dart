@@ -1,19 +1,32 @@
 import 'dtos.dart';
+import 'menu.dart';
 
+/// What someone eats at a check-in.
 class FoodItem {
   final String id;
   final String emoji;
   final String label;
-  const FoodItem(this.id, this.emoji, this.label);
+
+  /// The strictest diet the food suits.
+  final Diet diet;
+  const FoodItem(this.id, this.emoji, this.label, this.diet);
 
   static const all = [
-    FoodItem('doener', '🥙', 'Döner'),
-    FoodItem('yufka', '🌯', 'Yufka'),
-    FoodItem('lahmacun', '🫓', 'Lahmacun'),
-    FoodItem('teller', '🍽️', 'Teller'),
-    FoodItem('pommes', '🍟', 'Pommes'),
-    FoodItem('falafel', '🧆', 'Falafel'),
+    FoodItem('doener', '🥙', 'Döner', Diet.all),
+    FoodItem('yufka', '🌯', 'Yufka', Diet.all),
+    FoodItem('lahmacun', '🫓', 'Lahmacun', Diet.all),
+    FoodItem('teller', '🍽️', 'Teller', Diet.all),
+    // Without meat the wheel starts at the falafel, not the fries.
+    FoodItem('falafel', '🧆', 'Falafel', Diet.vegan),
+    FoodItem('veganDoener', '🌱', 'Veganer Döner', Diet.vegan),
+    FoodItem('halloumi', '🧀', 'Halloumi', Diet.vegetarian),
+    FoodItem('pizza', '🍕', 'Pizza', Diet.vegetarian),
+    FoodItem('pide', '🥟', 'Pide', Diet.vegetarian),
+    FoodItem('seele', '🥖', 'Seele', Diet.vegetarian),
+    FoodItem('pommes', '🍟', 'Pommes', Diet.vegan),
   ];
+
+  static List<FoodItem> forDiet(Diet diet) => [for (final f in all) if (diet.allows(f.diet)) f];
 
   static FoodItem? byId(String? id) {
     for (final item in all) {

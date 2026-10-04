@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/app_data.dart';
 import '../../core/maps.dart';
+import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
 
@@ -14,11 +15,12 @@ class MyActivityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = context.watch<AppData>();
+    final diet = context.watch<Session>().diet;
     final entries = [
       for (final v in data.visits)
-        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, rating: null as int?, food: v.dto.foodType, pending: v.pending),
+        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, score: null as double?, ratings: const <RatingItem, int>{}, food: v.dto.foodType, pending: v.pending),
       for (final r in data.reviews.values)
-        (type: FeedItemType.review, placeId: r.dto.placeId, placeName: r.dto.placeName, at: r.dto.updatedAt, text: r.dto.text, rating: r.dto.rating, food: null as String?, pending: r.pending),
+        (type: FeedItemType.review, placeId: r.dto.placeId, placeName: r.dto.placeName, at: r.dto.updatedAt, text: r.dto.text, score: r.dto.headline(diet), ratings: r.dto.ratings, food: null as String?, pending: r.pending),
     ]..sort((a, b) => b.at.compareTo(a.at));
 
     return Scaffold(
@@ -45,7 +47,9 @@ class MyActivityScreen extends StatelessWidget {
                         title: e.type == FeedItemType.visit ? 'Eingecheckt' : 'Bewertet',
                         subtitle: e.placeName,
                         timestamp: e.at,
-                        rating: e.rating,
+                        score: e.score,
+                        ratings: e.ratings,
+                        diet: diet,
                         text: e.text,
                         foodType: e.food,
                         pending: e.pending,
@@ -75,10 +79,12 @@ class _MyPlacesScreenState extends State<MyPlacesScreen> {
   @override
   Widget build(BuildContext context) {
     final data = context.watch<AppData>();
+    final diet = context.watch<Session>().diet;
     final ids = {...data.visits.map((v) => v.dto.placeId), ...data.reviews.keys};
     final places = [
       for (final id in ids)
-        if (data.places[id] case final place?) (place: place, visits: data.visitsAt(id), rating: data.reviews[id]?.dto.rating),
+        if (data.places[id] case final place?)
+          (place: place, visits: data.visitsAt(id), rating: data.reviews[id]?.dto.headline(diet)?.round()),
     ];
     switch (_sort) {
       case _Sort.rating:

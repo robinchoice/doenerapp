@@ -10,7 +10,7 @@ import 'package:http/testing.dart';
 import 'package:sembast/sembast_memory.dart';
 
 const _place = PlaceDto(placeId: 'p1', name: 'Kebap Haus', latitude: 48, longitude: 7.85);
-const _user = UserDto(id: 'u1', displayName: 'Robin');
+const _user = AccountDto(id: 'u1', displayName: 'Robin');
 
 /// Server stand-in: [mode] decides how write requests are answered.
 class FakeServer {
@@ -48,7 +48,7 @@ class FakeServer {
       userName: _user.displayName,
       placeId: _place.placeId,
       placeName: _place.name,
-      rating: body['rating'] as int,
+      ratings: UpsertReviewRequest.fromJson(body).ratings,
       createdAt: now,
       updatedAt: now,
     ).toJson());
@@ -103,11 +103,12 @@ void main() {
 
   test('only the latest review edit is queued; rejected ones are dropped', () async {
     server.mode = 'offline';
-    await data.saveReview(_place, const UpsertReviewRequest(rating: 3));
-    await data.saveReview(_place, const UpsertReviewRequest(rating: 5));
+    await data.saveReview(_place, const UpsertReviewRequest(ratings: {RatingItem.sauce: 3}));
+    await data.saveReview(_place, const UpsertReviewRequest(ratings: {RatingItem.sauce: 5, RatingItem.falafel: 4}));
     await data.sync();
     expect(data.pendingCount, 1);
-    expect(data.reviews['p1']!.dto.rating, 5);
+    expect(data.reviews['p1']!.dto.ratings, {RatingItem.sauce: 5, RatingItem.falafel: 4});
+    expect(data.reviews['p1']!.dto.rating, 5, reason: 'the Döner score is derived right away');
 
     server.mode = '400';
     await data.sync();

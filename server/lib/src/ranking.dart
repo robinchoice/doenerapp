@@ -12,12 +12,23 @@ import 'social.dart';
 const _cityRadius = 20000.0;
 const _maxEntries = 100;
 
-const _columns = {
-  RatingDimension.overall: 'rating',
-  RatingDimension.sauce: 'sauce_rating',
-  RatingDimension.fleisch: 'fleisch_rating',
-  RatingDimension.brot: 'brot_rating',
-};
+/// One row per rating of [by] (place_id, user_id, value): the main scores and
+/// the Döner items are review columns, everything else is in review_items.
+String _ratings(RankBy by) {
+  final column = switch (by) {
+    RankBy(diet: Diet.all) => 'rating',
+    RankBy(diet: Diet.vegetarian) => 'vegetarian_rating',
+    RankBy(diet: Diet.vegan) => 'vegan_rating',
+    RankBy(item: RatingItem.sauce) => 'sauce_rating',
+    RankBy(item: RatingItem.fleisch) => 'fleisch_rating',
+    RankBy(item: RatingItem.brot) => 'brot_rating',
+    _ => null,
+  };
+  return column == null
+      ? 'SELECT r.place_id, r.user_id, i.rating AS value FROM review_items i '
+          'JOIN reviews r ON r.id = i.review_id WHERE i.item = @item'
+      : 'SELECT place_id, user_id, $column AS value FROM reviews WHERE $column IS NOT NULL';
+}
 
 void mountRanking(Router router, Deps deps) {
   // GET /ranking?lat&lon&by — the rated places of the city around lat/lon
@@ -26,9 +37,10 @@ void mountRanking(Router router, Deps deps) {
     final me = await requireUser(deps, request);
     final lat = queryDouble(request, 'lat');
     final lon = queryDouble(request, 'lon');
-    final by = RatingDimension.values.asNameMap()[request.url.queryParameters['by'] ?? RatingDimension.overall.name];
+    final by = RankBy.parse(request.url.queryParameters['by'] ?? RankBy.overall.key);
     if (by == null) throw const ApiException.badRequest('Parameter "by" ist ungültig');
-    final column = _columns[by]!;
+    final ratings = _ratings(by);
+    final itemParam = {if (by.item case final item? when !item.isDoener) 'item': item.name};
 
     final nearest = await queryOne(
       deps.db,
@@ -41,20 +53,19 @@ void mountRanking(Router router, Deps deps) {
     final rows = rankByWeight(await query(
       deps.db,
       'SELECT pv.*, s.avg, s.n FROM place_view pv JOIN ('
-      '  SELECT place_id, avg($column)::float8 AS avg, count($column)::int AS n FROM reviews'
-      '  WHERE $column IS NOT NULL GROUP BY place_id'
+      '  SELECT place_id, avg(value)::float8 AS avg, count(*)::int AS n FROM ($ratings) x GROUP BY place_id'
       ') s ON s.place_id = pv.id WHERE pv.city = @city',
-      {'city': city},
+      {'city': city, ...itemParam},
     )).take(_maxEntries).toList();
 
     final friends = <String, List<FriendRatingDto>>{};
     if (rows.isNotEmpty) {
       final friendRows = await query(
         deps.db,
-        '$friendIdsCte SELECT r.place_id, u.id, u.display_name, r.$column AS value FROM reviews r '
-        'JOIN users u ON u.id = r.user_id WHERE r.user_id IN (SELECT id FROM friends) '
-        'AND r.place_id = ANY(@ids:_uuid) AND r.$column IS NOT NULL ORDER BY lower(u.display_name)',
-        {'me': me.id, 'ids': [for (final r in rows) r['id'] as String]},
+        '$friendIdsCte SELECT x.place_id, u.id, u.display_name, x.value FROM ($ratings) x '
+        'JOIN users u ON u.id = x.user_id WHERE x.user_id IN (SELECT id FROM friends) '
+        'AND x.place_id = ANY(@ids:_uuid) ORDER BY lower(u.display_name)',
+        {'me': me.id, 'ids': [for (final r in rows) r['id'] as String], ...itemParam},
       );
       for (final f in friendRows) {
         friends.putIfAbsent(f['place_id'] as String, () => []).add(FriendRatingDto(

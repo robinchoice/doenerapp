@@ -15,14 +15,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:sembast/sembast_memory.dart';
 
-const _me = UserDto(id: 'u1', displayName: 'Robin');
+const _me = AccountDto(id: 'u1', displayName: 'Robin');
 const _tom = UserDto(id: 'u2', displayName: 'Tom');
 const _ina = UserDto(id: 'u3', displayName: 'Ina');
 const _rated = PlaceDto(placeId: 'p1', name: 'Kebap Haus', latitude: 48, longitude: 7.85, avgRating: 4.5, reviewCount: 4);
 const _unrated = PlaceDto(placeId: 'p2', name: 'Neuer Laden', latitude: 48.001, longitude: 7.85);
+const _meatOnly = PlaceDto(placeId: 'p3', name: 'Fleischerei Grill', latitude: 48.002, longitude: 7.85, veganOptions: false);
 
 class FakeServer {
   final requests = <Uri>[];
@@ -48,16 +50,26 @@ class FakeServer {
     }
     return switch (path) {
       '/auth/verify' => json(const AuthResponse(token: 't', user: _me, isNewUser: false).toJson()),
+      '/users/me' => json(AccountDto(
+          id: _me.id,
+          displayName: _me.displayName,
+          diet: Diet.values.byName((jsonDecode(request.body) as Map<String, dynamic>)['diet'] as String),
+        ).toJson()),
+      '/places/new' => json(NewPlacesDto(
+          opened: [PlaceDto(placeId: 'p4', name: 'Anatolia Grill', latitude: 48, longitude: 7.86, city: 'Freiburg', openedOn: DateTime(2026, 10, 2))],
+          upcoming: const [PlaceDto(placeId: 'p5', name: 'Grillhaus Dreisam', latitude: 48, longitude: 7.87, opensOn: '2026-10-15')],
+        ).toJson()),
       '/places/top' => json([_rated.toJson(), _unrated.toJson()]),
       '/feed' => json(FeedPage(hasMore: false, items: [
           FeedItem(id: 'v1', type: FeedItemType.visit, user: _tom, place: _rated, timestamp: now, fromFriend: true, foodType: 'yufka'),
-          FeedItem(id: 'r1', type: FeedItemType.review, user: _ina, place: _rated, timestamp: now, fromFriend: false, rating: 4),
+          FeedItem(id: 'r1', type: FeedItemType.review, user: _ina, place: _rated, timestamp: now, fromFriend: false, ratings: const {RatingItem.sauce: 4}),
         ]).toJson()),
       '/ranking' => json(RankingDto(
           city: 'Freiburg im Breisgau',
-          by: RatingDimension.values.byName(request.url.queryParameters['by']!),
+          by: RankBy.parse(request.url.queryParameters['by']!)!,
           entries: [
             RankingEntryDto(place: _rated, average: 4.5, count: 4, friends: [FriendRatingDto(user: _tom, rating: 5)]),
+            const RankingEntryDto(place: _meatOnly, average: 3.5, count: 2),
           ],
         ).toJson()),
       _ => json([]),
@@ -95,6 +107,8 @@ Future<FakeServer> _pump(WidgetTester tester, Widget child, {LatLng? position}) 
 }
 
 void main() {
+  setUpAll(() => initializeDateFormatting('de'));
+
   testWidgets('start shows the best places around, marks friends and helps newcomers', (tester) async {
     final server = await _pump(tester, StartScreen(onOpenMap: () {}), position: const LatLng(48, 7.85));
 
@@ -105,6 +119,9 @@ void main() {
     expect(find.text('Eingecheckt bei Kebap Haus'), findsOneWidget);
     expect(find.text('Bewertet: Kebap Haus'), findsOneWidget);
     expect(find.byIcon(Icons.group), findsOneWidget, reason: 'only Tom is a friend');
+    expect(find.text('🎉 Neu in Freiburg'), findsOneWidget);
+    expect(find.text('Anatolia Grill hat am 2. Oktober aufgemacht'), findsOneWidget);
+    expect(find.text('🗓️ Bald: Grillhaus Dreisam. Laut Google am 15. Oktober'), findsOneWidget);
     expect(server.calls('/feed').single.queryParameters['lat'], '48.0');
 
     await tester.tap(find.text('Nur Freunde'));
@@ -123,6 +140,20 @@ void main() {
     await tester.tap(find.text('Soße'));
     await tester.pumpAndSettle();
     expect(server.calls('/ranking').last.queryParameters['by'], 'sauce');
+    expect(find.text('Fleischerei Grill'), findsOneWidget);
+  });
+
+  testWidgets('vegans rank by vegan food and miss the places without any', (tester) async {
+    final server = await _pump(tester, const RankingScreen(), position: const LatLng(48, 7.85));
+    final session = tester.element(find.byType(RankingScreen)).read<Session>();
+    await tester.runAsync(() => session.updateSettings(diet: Diet.vegan));
+    await tester.pumpAndSettle();
+
+    expect(server.calls('/ranking').last.queryParameters['by'], 'vegan');
+    expect(find.text('Vegan-Ranking Freiburg im Breisgau'), findsOneWidget);
+    expect(find.text('Fleisch'), findsNothing);
+    expect(find.text('Kebap Haus'), findsOneWidget);
+    expect(find.text('Fleischerei Grill'), findsNothing, reason: 'people found nothing vegan there');
   });
 
   testWidgets('check-in lets the user pick between shops next to each other', (tester) async {

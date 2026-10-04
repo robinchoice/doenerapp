@@ -6,6 +6,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/api.dart';
 import '../../core/app_data.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
@@ -36,25 +37,39 @@ class PlaceDetail extends StatefulWidget {
 }
 
 class _PlaceDetailState extends State<PlaceDetail> {
-  late Future<(PlaceSummaryDto, List<ReviewDto>)> _community = _loadCommunity();
+  PlaceSummaryDto? _summary;
+  List<ReviewDto> _reviews = const [];
 
-  Future<(PlaceSummaryDto, List<ReviewDto>)> _loadCommunity() async {
+  @override
+  void initState() {
+    super.initState();
+    _loadCommunity();
+  }
+
+  Future<void> _loadCommunity() async {
     final api = context.read<Session>().api;
     final id = Uri.encodeComponent(widget.placeId);
-    final results = await Future.wait([api.get('/places/$id/summary'), api.get('/places/$id/reviews')]);
-    return (
-      PlaceSummaryDto.fromJson(results[0] as Map<String, dynamic>),
-      [for (final r in results[1] as List) ReviewDto.fromJson(r as Map<String, dynamic>)],
-    );
+    try {
+      final results = await Future.wait([api.get('/places/$id/summary'), api.get('/places/$id/reviews')]);
+      if (!mounted) return;
+      setState(() {
+        _summary = PlaceSummaryDto.fromJson(results[0] as Map<String, dynamic>);
+        _reviews = [for (final r in results[1] as List) ReviewDto.fromJson(r as Map<String, dynamic>)];
+      });
+    } on OfflineException {
+      // The place itself is cached; what others say shows up next time.
+    } on ApiException {
+      // Same.
+    }
   }
 
   Future<void> _review(PlaceDto place) async {
-    final saved = await showAppSheet<bool>(context, (_) => ReviewSheet(place: place));
+    final saved = await showAppSheet<bool>(context, (_) => ReviewSheet(place: place, summary: _summary));
     if (saved == true && mounted) {
       final data = context.read<AppData>();
       await data.sync();
       if (!mounted) return;
-      setState(() => _community = _loadCommunity());
+      await _loadCommunity();
       await data.refreshPlace(place.placeId).catchError((_) {});
     }
   }
@@ -97,7 +112,11 @@ class _PlaceDetailState extends State<PlaceDetail> {
   @override
   Widget build(BuildContext context) {
     final data = context.watch<AppData>();
+    final session = context.watch<Session>();
+    final diet = session.diet;
     final place = data.places[widget.placeId] ?? widget.fallback;
+    final summary = _summary;
+    final menu = summary == null ? const <Widget>[] : _menuRows(place, summary, diet);
     final theme = Theme.of(context);
     final note = data.notes[place.placeId];
     final ownReview = data.reviews[place.placeId];
@@ -127,18 +146,20 @@ class _PlaceDetailState extends State<PlaceDetail> {
                       ]),
                     ],
                     if (addressLine.isNotEmpty) Text(addressLine, style: TextStyle(color: theme.colorScheme.outline)),
-                    if (place.specialNote != null) ...[
-                      const SizedBox(height: 6),
-                      Chip(
-                        label: Text(place.specialNote!),
-                        labelStyle: const TextStyle(color: doenerOrange, fontSize: 12),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 6, runSpacing: 6, children: [
+                      if (place.openedOn case final opened? when DateTime.now().difference(opened).inDays < 30)
+                        _Fact('🎉 Neu seit ${formatDay(opened)}', Colors.red.shade700),
+                      if (place.veganOptions == true) _Fact('🌱 Vegane Optionen', Colors.green.shade700),
+                      if (place.veganOptions == false) _Fact('Nichts Veganes', theme.colorScheme.outline),
+                      if (diet != Diet.vegan && summary?.ayranHomemade == true) const _Fact('🥛 Ayran selbstgemacht', doenerOrange),
+                      if (diet != Diet.vegan && summary?.ayranHomemade == false) _Fact('Ayran gekauft', theme.colorScheme.outline),
+                      for (final special in summary?.specials ?? const <Ingredient>[]) _Fact('✨ ${special.label}', doenerOrange),
+                    ]),
                   ],
                 ),
               ),
-              _RatingBadge(rating: place.avgRating, count: place.reviewCount),
+              _RatingBadge(score: place.score(diet), label: diet.scoreLabel),
             ],
           ),
         ),
@@ -197,30 +218,27 @@ class _PlaceDetailState extends State<PlaceDetail> {
           ),
           ReviewCard(review: ownReview.dto, onEdit: () => _review(place)),
         ],
-        FutureBuilder(
-          future: _community,
-          builder: (context, snapshot) {
-            final result = snapshot.data;
-            if (result == null) return const SizedBox.shrink();
-            final (summary, reviews) = result;
-            final others = reviews.where((r) => r.userId != context.read<Session>().user?.id).toList();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (summary.reviewCount > 0) ...[
-                  const SizedBox(height: 20),
-                  const SectionTitle(icon: Icons.groups, title: 'Community'),
-                  GlassCard(child: Text(summary.summaryText)),
-                ],
-                if (others.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  SectionTitle(icon: Icons.rate_review, title: 'Bewertungen (${others.length})'),
-                  for (final r in others) Padding(padding: const EdgeInsets.only(bottom: 8), child: ReviewCard(review: r, showAuthor: true)),
-                ],
-              ],
-            );
-          },
-        ),
+        if (menu.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const SectionTitle(icon: Icons.restaurant_menu, title: 'Was es hier gibt'),
+          GlassCard(child: Column(children: menu)),
+        ],
+        if (session.expertMode && summary != null) ...[
+          const SizedBox(height: 20),
+          SectionTitle(
+            icon: Icons.manage_search,
+            title: 'Mit allem heißt hier …',
+            trailing: summary.experts == 0
+                ? null
+                : Text('${summary.experts} ${summary.experts == 1 ? 'Angabe' : 'Angaben'}', style: TextStyle(color: theme.colorScheme.outline)),
+          ),
+          _IngredientsCard(summary: summary, diet: diet),
+        ],
+        if (_reviews.where((r) => r.userId != session.user?.id).toList() case final others when others.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          SectionTitle(icon: Icons.rate_review, title: 'Bewertungen (${others.length})'),
+          for (final r in others) Padding(padding: const EdgeInsets.only(bottom: 8), child: ReviewCard(review: r, showAuthor: true)),
+        ],
         if (visits.isNotEmpty) ...[
           const SizedBox(height: 20),
           SectionTitle(icon: Icons.check_circle, title: 'Deine Besuche (${visits.length})'),
@@ -277,6 +295,119 @@ class _PlaceDetailState extends State<PlaceDetail> {
       ],
     );
   }
+
+  /// The Döner with its sauce, meat and bread first, then everything else the
+  /// diet eats — averages of all reviews.
+  List<Widget> _menuRows(PlaceDto place, PlaceSummaryDto summary, Diet diet) {
+    final doener = place.score(Diet.all);
+    final rows = <Widget>[
+      if (diet == Diet.all && doener.average != null)
+        _MenuRow(
+          emoji: '🥙',
+          label: 'Döner',
+          detail: [
+            for (final item in RatingItem.doenerItems)
+              if (summary.items[item] case final avg?) '${item.label} ${formatRating(avg.average)}',
+          ].join(' · '),
+          average: doener.average!,
+          count: doener.count,
+        ),
+      for (final e in summary.items.entries)
+        if (diet.allows(e.key.diet) && !(diet == Diet.all && e.key.isDoener))
+          _MenuRow(emoji: e.key.emoji, label: e.key.label, detail: e.key.hint, average: e.value.average, count: e.value.count),
+    ];
+    return [
+      for (final (i, row) in rows.indexed) ...[if (i > 0) const Divider(height: 1), row],
+    ];
+  }
+}
+
+class _Fact extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _Fact(this.text, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+        child: Text(text, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500)),
+      );
+}
+
+class _MenuRow extends StatelessWidget {
+  final String emoji;
+  final String label;
+  final String? detail;
+  final double average;
+  final int count;
+  const _MenuRow({required this.emoji, required this.label, this.detail, required this.average, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(width: 30, child: Text(emoji, style: const TextStyle(fontSize: 18))),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label),
+                if (detail != null && detail!.isNotEmpty) Text(detail!, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+              ],
+            ),
+          ),
+          DoenerRating(value: average.round(), size: 13),
+          const SizedBox(width: 8),
+          Text(formatRating(average), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold)),
+          SizedBox(width: 36, child: Text('($count)', textAlign: TextAlign.right, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline))),
+        ],
+      ),
+    );
+  }
+}
+
+/// What most experts got with "mit allem", the specials marked.
+class _IngredientsCard extends StatelessWidget {
+  final PlaceSummaryDto summary;
+  final Diet diet;
+  const _IngredientsCard({required this.summary, required this.diet});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (summary.experts == 0) {
+      return GlassCard(
+        child: Text(
+          'Noch hat niemand eingetragen, was „mit allem“ hier heißt. Im Expertenmodus fragt die Bewertung danach.',
+          style: TextStyle(color: theme.colorScheme.outline),
+        ),
+      );
+    }
+    final lines = [
+      for (final group in IngredientGroup.values)
+        if (summary.ingredients.where((i) => i.group == group).toList() case final list when list.isNotEmpty)
+          (group.label, list.map((i) => i.isSpecial ? '${i.label} ✨' : i.label).join(' · ')),
+      if (diet == Diet.all && (summary.meat != null || summary.skewer != null))
+        ('Fleisch', [?summary.meat?.label, ?summary.skewer?.label].join(' · ')),
+      if (summary.bread case final bread?) ('Brot', bread.label),
+    ];
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (i, (title, text)) in lines.indexed) ...[
+            if (i > 0) const SizedBox(height: 8),
+            Text(title, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.outline)),
+            Text(text),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class ReviewCard extends StatelessWidget {
@@ -288,6 +419,7 @@ class ReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final diet = context.watch<Session>().diet;
     return GlassCard(
       onTap: onEdit,
       child: Column(
@@ -296,19 +428,12 @@ class ReviewCard extends StatelessWidget {
           Row(
             children: [
               if (showAuthor) ...[Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(width: 8)],
-              DoenerRating(value: review.rating, size: 14),
+              if (review.headline(diet) case final score?) DoenerRating(value: score.round(), size: 14),
               const Spacer(),
               if (onEdit != null) Icon(Icons.edit, size: 16, color: theme.colorScheme.outline),
             ],
           ),
-          if (review.sauceRating != null || review.fleischRating != null || review.brotRating != null) ...[
-            const SizedBox(height: 6),
-            Wrap(spacing: 12, runSpacing: 4, children: [
-              if (review.sauceRating != null) DimensionChip(label: 'Soße', value: review.sauceRating!),
-              if (review.fleischRating != null) DimensionChip(label: 'Fleisch', value: review.fleischRating!),
-              if (review.brotRating != null) DimensionChip(label: 'Brot', value: review.brotRating!),
-            ]),
-          ],
+          if (review.ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: review.ratings, diet: diet)],
           if (review.text != null) ...[const SizedBox(height: 6), Text(review.text!)],
           const SizedBox(height: 6),
           Text(formatDate(review.updatedAt), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
@@ -318,10 +443,11 @@ class ReviewCard extends StatelessWidget {
   }
 }
 
+/// The main score of the user's diet: Döner, without meat or vegan.
 class _RatingBadge extends StatelessWidget {
-  final double? rating;
-  final int count;
-  const _RatingBadge({required this.rating, required this.count});
+  final ({double? average, int count}) score;
+  final String label;
+  const _RatingBadge({required this.score, required this.label});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -333,10 +459,11 @@ class _RatingBadge extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              rating == null ? '—' : formatRating(rating!),
+              score.average == null ? '—' : formatRating(score.average!),
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: doenerOrange),
             ),
-            Text(count == 1 ? '1 Bewertung' : '$count Bewertungen', style: Theme.of(context).textTheme.labelSmall),
+            Text(label, style: Theme.of(context).textTheme.labelSmall),
+            Text(score.count == 1 ? '1 Bewertung' : '${score.count} Bewertungen', style: Theme.of(context).textTheme.labelSmall),
           ],
         ),
       );

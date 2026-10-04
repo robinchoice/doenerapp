@@ -244,6 +244,9 @@ class _PlaceDetailState extends State<PlaceDetail> {
         if (mapsAvailable)
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
+            // A rounded clip on this map makes iOS skip drawing the sheets above it wherever they
+            // cover the big map (Flutter 3.47 engine bug, undone by flutter/flutter#190003).
+            clipBehavior: !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS ? Clip.none : Clip.antiAlias,
             child: SizedBox(
               height: 160,
               child: Stack(

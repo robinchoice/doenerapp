@@ -1,13 +1,3 @@
-enum RatingDimension {
-  overall('Gesamt'),
-  sauce('Soße'),
-  fleisch('Fleisch'),
-  brot('Brot');
-
-  final String label;
-  const RatingDimension(this.label);
-}
-
 /// How many reviews of the area's average every place starts with.
 const rankingPriorWeight = 3;
 

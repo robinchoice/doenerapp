@@ -3,7 +3,6 @@ abstract final class Validation {
   static const displayNameMin = 2;
   static const displayNameMax = 30;
   static const reviewTextMax = 2000;
-  static const specialNoteMax = 80;
   static const feedbackMin = 5;
   static const feedbackMax = 5000;
   static const shopNameMin = 2;

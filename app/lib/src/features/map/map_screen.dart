@@ -11,6 +11,7 @@ import '../../core/api.dart';
 import '../../core/app_data.dart';
 import '../../core/location.dart';
 import '../../core/maps.dart';
+import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
 import 'place_search_sheet.dart';
@@ -18,6 +19,14 @@ import 'report_shop_sheet.dart';
 
 /// Above this span the viewport would be dot-soup; we don't load places.
 const _maxFetchSpanDeg = 0.5;
+
+/// Whether people found food for [diet] at [place]. Unknown places stay on
+/// the map, faded — most places aren't rated that far yet.
+bool _knownToFit(PlaceDto place, Diet diet) => switch (diet) {
+      Diet.all => true,
+      Diet.vegetarian => place.vegetarianCount > 0 || place.veganCount > 0 || place.veganOptions == true,
+      Diet.vegan => place.veganCount > 0 || place.veganOptions == true,
+    };
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -70,6 +79,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final data = context.watch<AppData>();
+    final diet = context.watch<Session>().diet;
     final userPosition = context.watch<LocationService>().position;
 
     if (userPosition != null && !_centeredOnUser && _controller != null) {
@@ -81,7 +91,10 @@ class _MapScreenState extends State<MapScreen> {
     for (final v in data.visits) {
       visitCounts[v.dto.placeId] = (visitCounts[v.dto.placeId] ?? 0) + 1;
     }
-    final places = data.places.values.where((p) => !_favoritesOnly || data.favorites.contains(p.placeId)).toList();
+    final places = data.places.values
+        .where((p) => !_favoritesOnly || data.favorites.contains(p.placeId))
+        .where((p) => diet != Diet.vegan || p.veganOptions != false)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -133,6 +146,7 @@ class _MapScreenState extends State<MapScreen> {
                                   ? BitmapDescriptor.hueGreen
                                   : BitmapDescriptor.hueOrange,
                         ),
+                        alpha: _knownToFit(place, diet) ? 1 : 0.4,
                         onTap: () => showPlaceDetail(context, place),
                       ),
                   },

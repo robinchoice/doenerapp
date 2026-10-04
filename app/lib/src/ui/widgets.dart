@@ -89,13 +89,32 @@ class DimensionChip extends StatelessWidget {
       );
 }
 
-/// A check-in or review in a feed. [highlight] marks friends.
+/// What a review rated, as small chips — only the food [diet] eats.
+class RatingChips extends StatelessWidget {
+  final Map<RatingItem, int> ratings;
+  final Diet diet;
+  const RatingChips({super.key, required this.ratings, required this.diet});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [for (final item in RatingItem.values) if (ratings[item] != null && diet.allows(item.diet)) item];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 12, runSpacing: 4, children: [
+      for (final item in items) DimensionChip(label: item.isDoener ? item.label : '${item.emoji} ${item.label}', value: ratings[item]!),
+    ]);
+  }
+}
+
+/// A check-in or review in a feed. [highlight] marks friends. Reviews show
+/// [score] and the rated items [diet] eats.
 class ActivityCard extends StatelessWidget {
   final FeedItemType type;
   final String title;
   final String subtitle;
   final DateTime timestamp;
-  final int? rating;
+  final double? score;
+  final Map<RatingItem, int> ratings;
+  final Diet diet;
   final String? text;
   final String? foodType;
   final bool pending;
@@ -108,7 +127,9 @@ class ActivityCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.timestamp,
-    this.rating,
+    this.score,
+    this.ratings = const {},
+    this.diet = Diet.all,
     this.text,
     this.foodType,
     this.pending = false,
@@ -156,7 +177,8 @@ class ActivityCard extends StatelessWidget {
               Text(relativeTime(timestamp), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
             ],
           ),
-          if (rating != null) ...[const SizedBox(height: 8), DoenerRating(value: rating!, size: 14)],
+          if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!.round(), size: 14)],
+          if (ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: ratings, diet: diet)],
           if (text != null && text!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(text!, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
@@ -257,6 +279,16 @@ String formatRating(double value) => value.toStringAsFixed(1).replaceAll('.', ',
 String formatDate(DateTime date) => DateFormat('d. MMM y', 'de').format(date.toLocal());
 
 String formatDateTime(DateTime date) => DateFormat('d. MMM y, HH:mm', 'de').format(date.toLocal());
+
+/// A calendar day like "2. Oktober" — dates without a time of day.
+String formatDay(DateTime day) => DateFormat('d. MMMM', 'de').format(day);
+
+/// An opening Google announced: "am 15. Oktober", or "im Oktober" when only the month is known.
+String formatOpening(String opensOn) {
+  final parts = opensOn.split('-').map(int.parse).toList();
+  final date = DateTime(parts[0], parts[1], parts.length > 2 ? parts[2] : 1);
+  return parts.length > 2 ? 'am ${formatDay(date)}' : 'im ${DateFormat('MMMM', 'de').format(date)}';
+}
 
 String relativeTime(DateTime date) {
   final diff = DateTime.now().difference(date);

@@ -74,12 +74,14 @@ void main() {
     final google = MockClient((request) async {
       googleCalls++;
       if (request.method == 'GET') {
-        // Place Details refresh.
+        // Place Details refresh; the announced grill has opened by now.
+        final id = request.url.pathSegments.last;
         return http.Response(
           jsonEncode({
-            'id': request.url.pathSegments.last,
-            'displayName': {'text': 'Kebap Haus'},
+            'id': id,
+            'displayName': {'text': id == 'place-announced' ? 'Neuer Grill' : 'Kebap Haus'},
             'location': {'latitude': 48.0, 'longitude': 7.85},
+            if (id == 'place-announced') 'businessStatus': 'OPERATIONAL',
           }),
           200,
           headers: {'content-type': 'application/json'},
@@ -215,6 +217,19 @@ void main() {
       expect((await call('POST', '/auth/login', body: {'email': 'spam@example.org'})).$1, 429);
     });
 
+    test('diet and expert mode follow the account', () async {
+      final (token, _) = await signUp('vera@example.org', 'Vera');
+      expect((await call('GET', '/auth/me', token: token)).$2['diet'], 'all');
+
+      final (status, updated) = await call('PATCH', '/users/me', body: {'diet': 'vegan', 'expertMode': true}, token: token);
+      expect(status, 200);
+      expect(updated['displayName'], 'Vera', reason: 'the name stays');
+      final account = AccountDto.fromJson((await call('GET', '/auth/me', token: token)).$2 as Map<String, dynamic>);
+      expect(account.diet, Diet.vegan);
+      expect(account.expertMode, isTrue);
+      expect((await call('PATCH', '/users/me', body: {'diet': 'carnivore'}, token: token)).$1, 400);
+    });
+
     test('display names are unique case-insensitively', () async {
       final (token, _) = await signUp('bert@example.org', 'Bert');
       await signUp('bert2@example.org', 'Bert2');
@@ -321,20 +336,19 @@ void main() {
     });
 
     test('reviews upsert and feed community data', () async {
-      final review = {'rating': 4, 'sauceRating': 5, 'text': 'Top Soße', 'specialNote': ' Knoblauch '};
+      final review = {'sauceRating': 5, 'fleischRating': 4, 'text': 'Top Soße'};
       expect((await call('PUT', '/places/place-kebap/review', body: review, token: anna)).$1, 200);
-      final (_, updated) = await call('PUT', '/places/place-kebap/review', body: {...review, 'rating': 5}, token: anna);
-      expect(updated['rating'], 5);
-      expect(updated['specialNote'], 'Knoblauch');
-      expect((await call('PUT', '/places/place-kebap/review', body: {'rating': 6}, token: anna)).$1, 400);
+      final (_, updated) = await call('PUT', '/places/place-kebap/review', body: {...review, 'fleischRating': 5}, token: anna);
+      expect(updated['rating'], 5, reason: 'derived from sauce, meat and bread');
+      expect(updated['text'], 'Top Soße');
+      expect((await call('PUT', '/places/place-kebap/review', body: {'sauceRating': 6}, token: anna)).$1, 400);
 
       final (_, place) = await call('GET', '/places/place-kebap');
       expect(place['reviewCount'], 1);
       expect(place['avgRating'], 5.0);
-      expect(place['specialNote'], 'Knoblauch');
 
       final (_, summary) = await call('GET', '/places/place-kebap/summary');
-      expect(summary['topDimension'], 'Soße');
+      expect(summary['items']['sauce'], {'average': 5.0, 'count': 1});
 
       final (_, top) = await call('GET', '/places/top?lat=48&lon=7.85');
       expect((top as List).single['placeId'], 'place-kebap');
@@ -371,6 +385,51 @@ void main() {
 
       final (_, annaFeed) = await call('GET', '/feed', token: anna);
       expect(annaFeed['items'], isEmpty, reason: 'own activity is not in the friends feed');
+    });
+
+    test('reviews rate more than the Döner and tell about the place', () async {
+      final (status, body) = await call('PUT', '/places/place-kebap/review', token: bob, body: {
+        'brotRating': 3,
+        'items': {'falafel': 4, 'hummus': 5, 'ayran': 3},
+        'ingredients': ['tomate', 'granatapfel'],
+        'meat': 'kalb',
+      });
+      expect(status, 200);
+      final review = ReviewDto.fromJson(body as Map<String, dynamic>);
+      expect(review.rating, isNull, reason: 'bread alone is no Döner rating');
+      expect(review.ratings, {RatingItem.brot: 3, RatingItem.falafel: 4, RatingItem.hummus: 5, RatingItem.ayran: 3});
+      expect(review.veganOptions, isTrue, reason: 'Bob rated hummus');
+      expect(review.ayranHomemade, isTrue, reason: 'only homemade ayran gets rated');
+
+      final place = PlaceDto.fromJson((await call('GET', '/places/place-kebap')).$2 as Map<String, dynamic>);
+      expect(place.score(Diet.all), (average: 5.0, count: 1), reason: "only Anna's review rates the Döner");
+      expect(place.score(Diet.vegan), (average: 4.0, count: 1));
+      expect(place.score(Diet.vegetarian), (average: 4.0, count: 1));
+      expect(place.veganOptions, isTrue);
+
+      final summary = PlaceSummaryDto.fromJson((await call('GET', '/places/place-kebap/summary')).$2 as Map<String, dynamic>);
+      expect(summary.items[RatingItem.hummus]!.average, 5);
+      expect(summary.ayranHomemade, isTrue);
+      expect(summary.ingredients, [Ingredient.tomate, Ingredient.granatapfel]);
+      expect(summary.specials, [Ingredient.granatapfel]);
+      expect(summary.meat, Meat.kalb);
+      expect(summary.experts, 1);
+
+      final (_, reviews) = await call('GET', '/places/place-kebap/reviews');
+      final bobs = (reviews as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob');
+      expect(bobs.ingredients, [Ingredient.tomate, Ingredient.granatapfel]);
+
+      final (_, feed) = await call('GET', '/feed', token: anna);
+      final item = FeedPage.fromJson(feed as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review);
+      expect(item.ratings[RatingItem.hummus], 5, reason: 'friends see what Bob rated');
+
+      Future<int> put(Map<String, dynamic> body) async => (await call('PUT', '/places/place-kebap/review', body: body, token: bob)).$1;
+      expect(await put({'items': {'ayran': 3}, 'ayranHomemade': false}), 400);
+      expect(await put({'items': {'hummus': 4}, 'veganOptions': false}), 400);
+      expect(await put({'items': {'zwiebel': 3}}), 400);
+      expect(await put({'ingredients': ['ketchup']}), 400);
+      expect(await put({}), 400, reason: 'nothing to save');
+      expect(await put({'veganOptions': false}), 200, reason: 'telling there is nothing vegan is enough');
     });
 
     test('feedback and shop reports', () async {
@@ -425,8 +484,8 @@ void main() {
           parameters: {'id': id, 'name': name, 'lat': lat, 'city': city},
         );
 
-    Future<void> review(String token, String placeId, int rating, [int? sauce]) async {
-      final (status, _) = await call('PUT', '/places/$placeId/review', body: {'rating': rating, 'sauceRating': ?sauce}, token: token);
+    Future<void> review(String token, String placeId, Map<String, dynamic> ratings) async {
+      final (status, _) = await call('PUT', '/places/$placeId/review', body: ratings, token: token);
       expect(status, 200);
     }
 
@@ -447,13 +506,14 @@ void main() {
       await place('t-new', 'Neuer Laden', 50.001, 'Testheim');
       await place('t-far', 'Fern Grill', 50.5, 'Fernstadt'); // 55 km away
 
-      await review(ute, 't-steady', 5, 3);
-      await review(vic, 't-steady', 4, 3);
-      await review(wim, 't-steady', 5);
-      await review(wim, 't-solo', 5, 5);
-      await review(ute, 't-meh', 2);
-      await review(wim, 't-meh', 2);
-      await review(wim, 't-far', 5);
+      // Döner scores 5 (4.5 rounded), 4 and 5 for Steady; sauces 4 and 3.
+      await review(ute, 't-steady', {'sauceRating': 4, 'fleischRating': 5});
+      await review(vic, 't-steady', {'sauceRating': 3, 'fleischRating': 5});
+      await review(wim, 't-steady', {'fleischRating': 5});
+      await review(wim, 't-solo', {'sauceRating': 5, 'fleischRating': 5});
+      await review(ute, 't-meh', {'fleischRating': 2});
+      await review(wim, 't-meh', {'fleischRating': 2});
+      await review(wim, 't-far', {'fleischRating': 5});
     });
 
     test('ranking is per city and weighted', () async {
@@ -465,6 +525,7 @@ void main() {
       expect(ranking.entries.map((e) => e.place.placeId), ['t-steady', 't-solo', 't-meh']);
       expect(ranking.entries.first.average, closeTo(14 / 3, 1e-9));
       expect(ranking.entries.first.count, 3);
+      expect(ranking.by, RankBy.overall);
       expect(ranking.entries.first.friends.map((f) => (f.user.displayName, f.rating)), [('Vic', 4)]);
       expect(ranking.entries[1].friends, isEmpty, reason: 'Wim is no friend');
 
@@ -514,6 +575,37 @@ void main() {
 
       final (_, friendsOnly) = await call('GET', '/feed', token: ute);
       expect((friendsOnly['items'] as List).map((i) => i['user']['displayName']).toSet(), {'Vic'});
+    });
+
+    test('rankings for vegans and single dishes', () async {
+      final (xen, _) = await signUp('xen@example.org', 'Xen');
+      await review(xen, 't-meh', {'brotRating': 4, 'items': {'falafel': 5, 'veganSauce': 5}});
+      await review(vic, 't-steady', {'sauceRating': 3, 'fleischRating': 5, 'items': {'falafel': 3}});
+
+      final (_, body) = await call('GET', '/ranking?lat=50&lon=8&by=vegan', token: ute);
+      final vegan = RankingDto.fromJson(body as Map<String, dynamic>);
+      expect(vegan.by, const RankBy.score(Diet.vegan));
+      expect(vegan.entries.map((e) => e.place.placeId), ['t-meh', 't-steady']);
+      expect(vegan.entries.first.average, closeTo(5, 1e-9), reason: 'falafel, sauce and bread: 4.67, stored as 5');
+      expect(vegan.entries[1].friends.single.rating, 3, reason: "Vic's falafel");
+
+      final (_, falafel) = await call('GET', '/ranking?lat=50&lon=8&by=falafel', token: ute);
+      expect([for (final e in falafel['entries'] as List) (e['place']['placeId'], e['average'])], [('t-meh', 5.0), ('t-steady', 3.0)]);
+
+      final (_, overall) = await call('GET', '/ranking?lat=50&lon=8', token: ute);
+      expect((overall['entries'] as List).first['count'], 3, reason: "Xen's review has no Döner score");
+
+      final (_, top) = await call('GET', '/places/top?lat=50&lon=8&limit=3&by=vegan');
+      expect(ids(top), ['t-meh', 't-steady', 't-new'], reason: 'filled up with the nearest unrated place');
+      expect((await call('GET', '/places/top?lat=50&lon=8&by=sauce')).$1, 400, reason: 'top lists go by main scores');
+
+      // Yan found nothing vegan at Steady: the falafel there wasn't vegan then.
+      final (yan, _) = await signUp('yan@example.org', 'Yan');
+      await review(yan, 't-steady', {'veganOptions': false, 'items': {'falafel': 5}});
+      final (_, after) = await call('GET', '/ranking?lat=50&lon=8&by=vegan', token: ute);
+      expect([for (final e in after['entries'] as List) (e['place']['placeId'], e['count'])], [('t-meh', 1), ('t-steady', 1)]);
+      final (_, veganTop) = await call('GET', '/places/top?lat=50&lon=8&limit=3&by=vegan');
+      expect(ids(veganTop), ['t-meh', 't-new', 't-solo'], reason: 'most say there is nothing vegan at Steady');
     });
 
     test('"eating now" lasts an hour', () async {
@@ -616,5 +708,36 @@ void main() {
     final (_, kept) = await call('GET', '/places/place-kebap');
     expect(kept['name'], 'Kebap Haus', reason: 'visited place is refreshed from Google');
     expect((await call('GET', '/places/place-unused')).$1, 404, reason: 'unused stale place is dropped');
+  });
+
+  test('announced openings become news once they open', () async {
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city, business_status, opening_date) VALUES "
+        "('place-announced', 'Neuer Grill', 48.003, 7.853, 'Freiburg', 'FUTURE_OPENING', to_char(current_date, 'YYYY-MM-DD')), "
+        "('place-later', 'Später Grill', 48.004, 7.854, 'Freiburg', 'FUTURE_OPENING', '2099-01')");
+    final before = NewPlacesDto.fromJson((await call('GET', '/places/new?lat=48&lon=7.85')).$2 as Map<String, dynamic>);
+    expect(before.opened, isEmpty);
+    expect(before.upcoming.map((p) => p.placeId), ['place-announced', 'place-later']);
+    expect(before.upcoming.last.opensOn, '2099-01');
+    expect((await call('GET', '/places/place-announced')).$1, 404, reason: 'not open yet');
+
+    await maintainPlaceCache(deps);
+
+    final after = NewPlacesDto.fromJson((await call('GET', '/places/new?lat=48&lon=7.85')).$2 as Map<String, dynamic>);
+    expect(after.opened.single.placeId, 'place-announced');
+    expect(after.opened.single.openedOn, isNotNull);
+    expect(after.upcoming.single.placeId, 'place-later', reason: 'checked only from the announced day on');
+    expect((await call('GET', '/places/place-announced')).$1, 200);
+  });
+
+  test('editing an older review keeps its overall rating', () async {
+    final (ida, idaUser) = await signUp('ida@example.org', 'Ida');
+    await db.execute(
+      Sql.named("INSERT INTO reviews (user_id, place_id, rating) SELECT @user:uuid, id, 4 FROM places WHERE google_place_id = 'place-kebap'"),
+      parameters: {'user': idaUser.id},
+    );
+    final (_, kept) = await call('PUT', '/places/place-kebap/review', body: {'text': 'Immer noch gut'}, token: ida);
+    expect(kept['rating'], 4, reason: 'no sauce, meat or bread to derive it from');
+    final (_, derived) = await call('PUT', '/places/place-kebap/review', body: {'sauceRating': 2}, token: ida);
+    expect(derived['rating'], 2, reason: 'rated Döner items take over');
   });
 }

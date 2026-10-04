@@ -20,7 +20,7 @@ class Session extends ChangeNotifier {
   }
 
   String? _token;
-  UserDto? user;
+  AccountDto? user;
   String apiBase = defaultApiBase;
 
   /// Set when the server rejected our token; the UI offers to log in again.
@@ -28,11 +28,14 @@ class Session extends ChangeNotifier {
 
   bool get isLoggedIn => _token != null && user != null;
 
+  Diet get diet => user?.diet ?? Diet.all;
+  bool get expertMode => user?.expertMode ?? false;
+
   Future<void> load() async {
     apiBase = await settingsStore.record('apiBaseOverride').get(_db) as String? ?? defaultApiBase;
     _token = await _secure.read(key: 'session_token');
     final cached = await settingsStore.record('user').get(_db) as Map<String, Object?>?;
-    if (_token != null && cached != null) user = UserDto.fromJson(cached.cast<String, dynamic>());
+    if (_token != null && cached != null) user = AccountDto.fromJson(cached.cast<String, dynamic>());
   }
 
   /// Refreshes the profile. Offline or server errors keep the cached login —
@@ -40,7 +43,7 @@ class Session extends ChangeNotifier {
   Future<void> refresh() async {
     if (_token == null) return;
     try {
-      await _setUser(UserDto.fromJson(await api.get('/auth/me') as Map<String, dynamic>));
+      await _setUser(AccountDto.fromJson(await api.get('/auth/me') as Map<String, dynamic>));
     } on OfflineException {
       // keep cached user
     } on ApiException {
@@ -61,7 +64,26 @@ class Session extends ChangeNotifier {
 
   Future<void> updateDisplayName(String name) async {
     final json = await api.patch('/users/me', UpdateMeRequest(displayName: name).toJson());
-    await _setUser(UserDto.fromJson(json as Map<String, dynamic>));
+    await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));
+  }
+
+  /// Diet and expert mode follow the account. The change shows right away and
+  /// is taken back if the server doesn't take it.
+  Future<void> updateSettings({Diet? diet, bool? expertMode}) async {
+    final previous = user!;
+    await _setUser(AccountDto(
+      id: previous.id,
+      displayName: previous.displayName,
+      diet: diet ?? previous.diet,
+      expertMode: expertMode ?? previous.expertMode,
+    ));
+    try {
+      final json = await api.patch('/users/me', UpdateMeRequest(diet: diet, expertMode: expertMode).toJson());
+      await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));
+    } catch (_) {
+      await _setUser(previous);
+      rethrow;
+    }
   }
 
   Future<void> logout() async {
@@ -90,7 +112,7 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _setUser(UserDto value) async {
+  Future<void> _setUser(AccountDto value) async {
     user = value;
     await settingsStore.record('user').put(_db, value.toJson());
     notifyListeners();

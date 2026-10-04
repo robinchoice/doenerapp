@@ -16,6 +16,9 @@ const _maxSyncSpanDeg = 0.5;
 /// "Im Umkreis": community reviews, top places and trends count within this distance.
 const communityRadius = 10000.0;
 
+/// How long a place counts as new after it opened.
+const newPlaceDays = 30;
+
 PlaceDto placeFromRow(Map<String, dynamic> row) => PlaceDto(
       placeId: row['google_place_id'] as String,
       name: row['name'] as String,
@@ -27,8 +30,26 @@ PlaceDto placeFromRow(Map<String, dynamic> row) => PlaceDto(
       openingHours: row['opening_hours'] as String?,
       avgRating: row['avg_rating'] as double?,
       reviewCount: row['review_count'] as int,
-      specialNote: row['special_note'] as String?,
+      avgVegetarian: row['avg_vegetarian'] as double?,
+      vegetarianCount: row['vegetarian_count'] as int,
+      avgVegan: row['avg_vegan'] as double?,
+      veganCount: row['vegan_count'] as int,
+      veganOptions: row['vegan_options'] as bool?,
+      openedOn: row['opened_on'] as DateTime?,
+      opensOn: row['opening_date'] as String?,
     );
+
+/// Sauce, meat and bread come from their columns, everything else from
+/// `items` (the review's review_items as JSON, see [reviewItemsJson]).
+Map<RatingItem, int> ratingsFromRow(Map<String, dynamic> row) => {
+      RatingItem.sauce: ?row['sauce_rating'] as int?,
+      RatingItem.fleisch: ?row['fleisch_rating'] as int?,
+      RatingItem.brot: ?row['brot_rating'] as int?,
+      for (final e in ((row['items'] as Map?) ?? const {}).entries) RatingItem.values.byName(e.key as String): e.value as int,
+    };
+
+/// Select expression for the items of review `r`.
+const reviewItemsJson = '(SELECT jsonb_object_agg(item, rating) FROM review_items WHERE review_id = r.id) AS items';
 
 ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       id: row['id'] as String,
@@ -36,12 +57,15 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       userName: row['display_name'] as String,
       placeId: row['google_place_id'] as String,
       placeName: row['place_name'] as String,
-      rating: row['rating'] as int,
-      sauceRating: row['sauce_rating'] as int?,
-      fleischRating: row['fleisch_rating'] as int?,
-      brotRating: row['brot_rating'] as int?,
+      rating: row['rating'] as int?,
+      ratings: ratingsFromRow(row),
+      veganOptions: row['vegan_options'] as bool?,
+      ayranHomemade: row['ayran_homemade'] as bool?,
+      ingredients: (row['ingredients'] as List?)?.map((i) => Ingredient.values.byName(i as String)).toList(),
+      meat: Meat.values.asNameMap()[row['meat']],
+      skewer: Skewer.values.asNameMap()[row['skewer']],
+      bread: Bread.values.asNameMap()[row['bread']],
       text: row['text'] as String?,
-      specialNote: row['special_note'] as String?,
       createdAt: row['created_at'] as DateTime,
       updatedAt: row['updated_at'] as DateTime,
     );
@@ -56,8 +80,8 @@ VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
       foodType: row['food_type'] as String?,
     );
 
-const _reviewSelect = 'SELECT r.*, u.display_name, p.google_place_id, p.name AS place_name FROM reviews r '
-    'JOIN users u ON u.id = r.user_id JOIN places p ON p.id = r.place_id';
+const _reviewSelect = 'SELECT r.*, $reviewItemsJson, u.display_name, p.google_place_id, p.name AS place_name '
+    'FROM reviews r JOIN users u ON u.id = r.user_id JOIN places p ON p.id = r.place_id';
 const _visitSelect = 'SELECT v.*, u.display_name, p.google_place_id, p.name AS place_name FROM visits v '
     'JOIN users u ON u.id = v.user_id JOIN places p ON p.id = v.place_id';
 
@@ -94,30 +118,56 @@ void mountPlaces(Router router, Deps deps) {
     return json(rows.map((r) => placeFromRow(r).toJson()).toList());
   });
 
-  // GET /places/top?lat&lon — best around by weighted rating. Where too few
-  // places are rated, the nearest unrated ones fill up the list.
+  // GET /places/top?lat&lon[&by] — best around by weighted rating, for the
+  // Döner (`overall`) or the main score of `vegetarian` or `vegan`. Where too
+  // few places are rated, the nearest unrated ones fill up the list.
   router.get('/places/top', (Request request) async {
     final lat = queryDouble(request, 'lat');
     final lon = queryDouble(request, 'lon');
     final radius = queryDouble(request, 'radius', fallback: communityRadius).clamp(100, 20000).toDouble();
     final limit = queryInt(request, 'limit', fallback: 10, min: 1, max: 50);
+    final diet = RankBy.parse(request.url.queryParameters['by'] ?? RankBy.overall.key)?.diet;
+    if (diet == null) throw const ApiException.badRequest('Parameter "by" ist ungültig');
+    final (avg, count) = _scoreColumns[diet]!;
     final area = radiusParams(lat, lon, radius);
+    // Vegans don't need places where most people found nothing vegan, rated or not.
+    final veganFilter = diet == Diet.vegan ? 'AND p.vegan_options IS NOT false ' : '';
 
     final rated = rankByWeight(await query(
       deps.db,
-      'SELECT p.*, p.avg_rating AS avg, p.review_count AS n FROM place_view p '
-      'WHERE review_count > 0 AND ${withinRadius('p')}',
+      'SELECT p.*, p.$avg AS avg, p.$count AS n FROM place_view p '
+      'WHERE p.$count > 0 ${veganFilter}AND ${withinRadius('p')}',
       area,
     )).take(limit).toList();
     final unrated = rated.length == limit
         ? const <Map<String, dynamic>>[]
         : await query(
             deps.db,
-            'SELECT * FROM place_view p WHERE review_count = 0 AND ${withinRadius('p')} '
-            'ORDER BY ${distanceSql('p')} LIMIT @rest:int4',
+            'SELECT * FROM place_view p WHERE p.$count = 0 $veganFilter'
+            'AND ${withinRadius('p')} ORDER BY ${distanceSql('p')} LIMIT @rest:int4',
             {...area, 'rest': limit - rated.length},
           );
     return json([...rated, ...unrated].map((r) => placeFromRow(r).toJson()).toList());
+  });
+
+  // GET /places/new?lat&lon — around: places that opened lately and the
+  // openings Google announced.
+  router.get('/places/new', (Request request) async {
+    final area = radiusParams(queryDouble(request, 'lat'), queryDouble(request, 'lon'), communityRadius);
+    final opened = await query(
+      deps.db,
+      'SELECT * FROM place_view p WHERE p.opened_on > current_date - @days:int4 AND ${withinRadius('p')} '
+      'ORDER BY p.opened_on DESC, p.name',
+      {...area, 'days': newPlaceDays},
+    );
+    final upcoming = await query(
+      deps.db,
+      'SELECT p.*, NULL::float8 AS avg_rating, 0 AS review_count, NULL::float8 AS avg_vegetarian, 0 AS vegetarian_count, '
+      'NULL::float8 AS avg_vegan, 0 AS vegan_count, NULL::boolean AS vegan_options FROM places p '
+      "WHERE p.business_status = 'FUTURE_OPENING' AND ${withinRadius('p')} ORDER BY p.opening_date NULLS LAST, p.name",
+      area,
+    );
+    return json(NewPlacesDto(opened: opened.map(placeFromRow).toList(), upcoming: upcoming.map(placeFromRow).toList()).toJson());
   });
 
   // GET /places/trending?lat&lon — most check-ins and reviews around in the
@@ -155,50 +205,94 @@ void mountPlaces(Router router, Deps deps) {
   });
 
   router.get('/places/<placeId>/summary', (Request request, String placeId) async {
-    final place = await queryOne(deps.db, 'SELECT * FROM place_view WHERE google_place_id = @id', {'id': placeId});
-    if (place == null) return json(summarize(const [], null).toJson());
     final rows = await query(
       deps.db,
-      'SELECT rating, sauce_rating, fleisch_rating, brot_rating, text FROM reviews '
-      'WHERE place_id = @id:uuid ORDER BY updated_at DESC',
-      {'id': place['id']},
+      'SELECT r.*, $reviewItemsJson FROM reviews r JOIN places p ON p.id = r.place_id WHERE p.google_place_id = @id',
+      {'id': placeId},
     );
-    return json(summarize(rows, place['special_note'] as String?).toJson());
+    return json(summarize(rows).toJson());
   });
 
   router.put('/places/<placeId>/review', (Request request, String placeId) async {
     final user = await requireUser(deps, request);
     final body = await readBody(request, UpsertReviewRequest.fromJson);
-    for (final value in [body.rating, body.sauceRating, body.fleischRating, body.brotRating]) {
-      if (!Validation.isValidRating(value)) throw const ApiException.badRequest('Bewertungen müssen 1–5 sein');
-    }
+    final ratings = body.ratings;
+    if (!ratings.values.every(Validation.isValidRating)) throw const ApiException.badRequest('Bewertungen müssen 1–5 sein');
     final text = Validation.clean(body.text);
-    final note = Validation.clean(body.specialNote);
-    if ((text?.length ?? 0) > Validation.reviewTextMax || (note?.length ?? 0) > Validation.specialNoteMax) {
-      throw const ApiException.badRequest('Text zu lang');
+    if ((text?.length ?? 0) > Validation.reviewTextMax) throw const ApiException.badRequest('Text zu lang');
+
+    // Whoever rates vegan food or ayran says the place has it.
+    final veganRated = RatingItem.veganItems.any(ratings.containsKey);
+    if (veganRated && body.veganOptions == false) {
+      throw const ApiException.badRequest('Vegane Optionen bewertet, aber keine angegeben');
+    }
+    final ayranRated = ratings.containsKey(RatingItem.ayran);
+    if (ayranRated && body.ayranHomemade == false) {
+      throw const ApiException.badRequest('Bewertet wird nur selbstgemachter Ayran');
+    }
+    final veganOptions = veganRated ? true : body.veganOptions;
+    final ayranHomemade = ayranRated ? true : body.ayranHomemade;
+    if (ratings.isEmpty &&
+        veganOptions == null &&
+        ayranHomemade == null &&
+        body.ingredients == null &&
+        body.meat == null &&
+        body.skewer == null &&
+        body.bread == null &&
+        text == null) {
+      throw const ApiException.badRequest('Die Bewertung ist leer');
     }
     final place = await _requirePlace(deps, placeId);
 
-    final saved = await queryOne(
-      deps.db,
-      'INSERT INTO reviews (user_id, place_id, rating, sauce_rating, fleisch_rating, brot_rating, text, special_note) '
-      'VALUES (@user:uuid, @place:uuid, @rating:int4, @sauce:int4, @fleisch:int4, @brot:int4, @text, @note) '
-      'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = EXCLUDED.rating, sauce_rating = EXCLUDED.sauce_rating, '
-      'fleisch_rating = EXCLUDED.fleisch_rating, brot_rating = EXCLUDED.brot_rating, text = EXCLUDED.text, '
-      'special_note = EXCLUDED.special_note, updated_at = now() RETURNING *',
-      {
-        'user': user.id,
-        'place': place['id'],
-        'rating': body.rating,
-        'sauce': body.sauceRating,
-        'fleisch': body.fleischRating,
-        'brot': body.brotRating,
-        'text': text,
-        'note': note,
-      },
-    );
+    final items = {for (final e in ratings.entries) if (!e.key.isDoener) e.key.name: e.value};
+    final saved = await deps.db.runTx((tx) async {
+      final row = await queryOne(
+        tx,
+        'INSERT INTO reviews (user_id, place_id, rating, vegetarian_rating, vegan_rating, sauce_rating, fleisch_rating, '
+        'brot_rating, vegan_options, ayran_homemade, ingredients, meat, skewer, bread, text) '
+        'VALUES (@user:uuid, @place:uuid, @rating:int4, @vegetarian:int4, @vegan:int4, @sauce:int4, @fleisch:int4, '
+        '@brot:int4, @veganOptions:boolean, @ayran:boolean, @ingredients:_text, @meat:text, @skewer:text, @bread:text, @text) '
+        // Older reviews may only have an overall rating, without sauce, meat or
+        // bread. It stays until the review rates the Döner itself.
+        'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = CASE WHEN num_nonnulls(EXCLUDED.sauce_rating, '
+        'EXCLUDED.fleisch_rating, EXCLUDED.brot_rating, reviews.sauce_rating, reviews.fleisch_rating, reviews.brot_rating) = 0 '
+        'THEN reviews.rating ELSE EXCLUDED.rating END, '
+        'vegetarian_rating = EXCLUDED.vegetarian_rating, vegan_rating = EXCLUDED.vegan_rating, '
+        'sauce_rating = EXCLUDED.sauce_rating, fleisch_rating = EXCLUDED.fleisch_rating, brot_rating = EXCLUDED.brot_rating, '
+        'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, '
+        'ingredients = EXCLUDED.ingredients, meat = EXCLUDED.meat, skewer = EXCLUDED.skewer, bread = EXCLUDED.bread, '
+        'text = EXCLUDED.text, updated_at = now() RETURNING *',
+        {
+          'user': user.id,
+          'place': place['id'],
+          'rating': Diet.all.score(ratings)?.round(),
+          'vegetarian': Diet.vegetarian.score(ratings)?.round(),
+          // Whoever found nothing vegan rated no vegan food, a falafel included.
+          'vegan': veganOptions == false ? null : Diet.vegan.score(ratings)?.round(),
+          'sauce': ratings[RatingItem.sauce],
+          'fleisch': ratings[RatingItem.fleisch],
+          'brot': ratings[RatingItem.brot],
+          'veganOptions': veganOptions,
+          'ayran': ayranHomemade,
+          'ingredients': body.ingredients?.map((i) => i.name).toList(),
+          'meat': body.meat?.name,
+          'skewer': body.skewer?.name,
+          'bread': body.bread?.name,
+          'text': text,
+        },
+      );
+      await tx.execute(Sql.named('DELETE FROM review_items WHERE review_id = @id:uuid'), parameters: {'id': row!['id']});
+      for (final e in items.entries) {
+        await tx.execute(
+          Sql.named('INSERT INTO review_items (review_id, item, rating) VALUES (@id:uuid, @item, @rating:int4)'),
+          parameters: {'id': row['id'], 'item': e.key, 'rating': e.value},
+        );
+      }
+      return row;
+    });
     return json(reviewFromRow({
-      ...saved!,
+      ...saved,
+      'items': items,
       'display_name': user.displayName,
       'google_place_id': placeId,
       'place_name': place['name'],
@@ -315,11 +409,15 @@ Future<void> _syncTile(Deps deps, String apiKey, Tile tile, String userId) async
 
 Future<void> _upsertPlace(Deps deps, GooglePlace p) => deps.db.execute(
       Sql.named(
-        'INSERT INTO places (google_place_id, name, latitude, longitude, address, postal_code, city, opening_hours) '
-        'VALUES (@id, @name, @lat, @lon, @address, @postal, @city, @hours) '
+        'INSERT INTO places (google_place_id, name, latitude, longitude, address, postal_code, city, opening_hours, '
+        'business_status, opening_date) VALUES (@id, @name, @lat, @lon, @address, @postal, @city, @hours, @status, @opening) '
         'ON CONFLICT (google_place_id) DO UPDATE SET name = EXCLUDED.name, latitude = EXCLUDED.latitude, '
         'longitude = EXCLUDED.longitude, address = EXCLUDED.address, postal_code = EXCLUDED.postal_code, '
-        'city = EXCLUDED.city, opening_hours = EXCLUDED.opening_hours, synced_at = now()',
+        'city = EXCLUDED.city, opening_hours = EXCLUDED.opening_hours, business_status = EXCLUDED.business_status, '
+        'opening_date = EXCLUDED.opening_date, synced_at = now(), '
+        // An announced shop that is open now — that's the news.
+        "opened_on = CASE WHEN places.business_status = 'FUTURE_OPENING' AND EXCLUDED.business_status = 'OPERATIONAL' "
+        'THEN current_date ELSE places.opened_on END',
       ),
       parameters: {
         'id': p.id,
@@ -330,6 +428,8 @@ Future<void> _upsertPlace(Deps deps, GooglePlace p) => deps.db.execute(
         'postal': p.postalCode,
         'city': p.city,
         'hours': p.openingHours,
+        'status': p.businessStatus,
+        'opening': p.openingDate,
       },
     );
 
@@ -340,19 +440,31 @@ Future<void> _upsertPlace(Deps deps, GooglePlace p) => deps.db.execute(
 Future<void> maintainPlaceCache(Deps deps) async {
   const activity = 'EXISTS (SELECT 1 FROM reviews r WHERE r.place_id = p.id) '
       'OR EXISTS (SELECT 1 FROM visits v WHERE v.place_id = p.id) '
-      'OR EXISTS (SELECT 1 FROM users u WHERE u.live_place_id = p.id)';
+      'OR EXISTS (SELECT 1 FROM users u WHERE u.live_place_id = p.id) '
+      // Announced openings stay until they open.
+      "OR p.business_status IS NOT DISTINCT FROM 'FUTURE_OPENING'";
 
   final apiKey = deps.config.googlePlacesApiKey;
   if (apiKey != null) {
     final stale = await query(
       deps.db,
-      "SELECT google_place_id FROM places p WHERE synced_at < now() - interval '25 days' AND ($activity)",
+      "SELECT google_place_id FROM places p WHERE (synced_at < now() - interval '25 days' AND ($activity)) "
+      // From the announced day on (daily without one): has it opened?
+      "OR (business_status = 'FUTURE_OPENING' AND (opening_date IS NULL OR opening_date <= to_char(current_date, 'YYYY-MM-DD')))",
     );
     for (final row in stale) {
       final id = row['google_place_id'] as String;
       try {
         final place = await fetchPlace(deps.httpClient, apiKey, id);
-        if (place != null) await _upsertPlace(deps, place);
+        if (place != null) {
+          await _upsertPlace(deps, place);
+        } else {
+          // An announcement Google withdrew.
+          await deps.db.execute(
+            Sql.named("DELETE FROM places WHERE google_place_id = @id AND business_status = 'FUTURE_OPENING'"),
+            parameters: {'id': id},
+          );
+        }
       } catch (e) {
         print('Refreshing place $id failed: $e');
       }
@@ -417,46 +529,47 @@ List<Map<String, dynamic>> rankByWeight(List<Map<String, dynamic>> rows) {
   return [...rows]..sort(compare);
 }
 
-/// Human-readable community summary (German), built from the place's reviews.
-PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, String? specialNote) {
-  if (reviews.isEmpty) return const PlaceSummaryDto(reviewCount: 0, summaryText: 'Noch keine Bewertungen.');
+const _scoreColumns = {
+  Diet.all: ('avg_rating', 'review_count'),
+  Diet.vegetarian: ('avg_vegetarian', 'vegetarian_count'),
+  Diet.vegan: ('avg_vegan', 'vegan_count'),
+};
 
-  double? avgOf(String column) {
-    final values = reviews.map((r) => r[column] as int?).whereType<int>().toList();
-    return values.isEmpty ? null : values.reduce((a, b) => a + b) / values.length;
+/// What the community says about a place, from its review rows.
+PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews) {
+  final values = <RatingItem, List<int>>{};
+  for (final review in reviews) {
+    for (final e in ratingsFromRow(review).entries) {
+      (values[e.key] ??= []).add(e.value);
+    }
   }
-
-  final count = reviews.length;
-  final avg = avgOf('rating')!;
-  final dims = {'Soße': avgOf('sauce_rating'), 'Fleisch': avgOf('fleisch_rating'), 'Brot': avgOf('brot_rating')};
-  final ranked = dims.entries.where((e) => e.value != null).toList()..sort((a, b) => b.value!.compareTo(a.value!));
-  final top = ranked.isEmpty ? null : ranked.first;
-
-  final word = switch (avg.round()) {
-    5 => 'ausgezeichnet',
-    4 => 'gut',
-    3 => 'okay',
-    2 => 'mäßig',
-    _ => 'schlecht',
-  };
-  final parts = ['$count ${count == 1 ? 'Bewertung' : 'Bewertungen'}, insgesamt $word (${avg.toStringAsFixed(1)}/5).'];
-  if (top != null && top.value! >= 3.5) {
-    parts.add('${top.key} wird besonders gelobt (${top.value!.toStringAsFixed(1)}/5).');
-  }
-  if (specialNote != null) parts.add('Bekannt für: $specialNote.');
-  final latestText = reviews.map((r) => r['text'] as String?).whereType<String>().firstOrNull;
-  if (latestText != null) {
-    final snippet = latestText.length > 80 ? '${latestText.substring(0, 77)}…' : latestText;
-    parts.add('„$snippet“');
-  }
-
+  final experts = [for (final r in reviews) if (r['ingredients'] case final List list) list];
   return PlaceSummaryDto(
-    reviewCount: count,
-    avgRating: avg,
-    avgSauceRating: dims['Soße'],
-    avgFleischRating: dims['Fleisch'],
-    avgBrotRating: dims['Brot'],
-    topDimension: top?.key,
-    summaryText: parts.join(' '),
+    items: {
+      for (final item in RatingItem.values)
+        if (values[item] case final v?) item: ItemAverage(v.reduce((a, b) => a + b) / v.length, v.length),
+    },
+    ayranHomemade: plurality([for (final r in reviews) r['ayran_homemade'] as bool?]),
+    // What at least half of the experts got.
+    ingredients: [
+      for (final i in Ingredient.values)
+        if (experts.isNotEmpty && experts.where((list) => list.contains(i.name)).length * 2 >= experts.length) i,
+    ],
+    meat: Meat.values.asNameMap()[plurality([for (final r in reviews) r['meat'] as String?])],
+    skewer: Skewer.values.asNameMap()[plurality([for (final r in reviews) r['skewer'] as String?])],
+    bread: Bread.values.asNameMap()[plurality([for (final r in reviews) r['bread'] as String?])],
+    experts: experts.length,
   );
+}
+
+/// The most common answer — null if nobody answered or it's a tie.
+T? plurality<T extends Object>(Iterable<T?> answers) {
+  final counts = <T, int>{};
+  for (final answer in answers.nonNulls) {
+    counts[answer] = (counts[answer] ?? 0) + 1;
+  }
+  if (counts.isEmpty) return null;
+  final most = counts.values.reduce(math.max);
+  final top = [for (final e in counts.entries) if (e.value == most) e.key];
+  return top.length == 1 ? top.single : null;
 }

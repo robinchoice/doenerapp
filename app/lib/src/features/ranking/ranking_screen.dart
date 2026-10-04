@@ -7,13 +7,15 @@ import 'package:provider/provider.dart';
 import '../../core/app_data.dart';
 import '../../core/location.dart';
 import '../../core/maps.dart';
+import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
 
 /// Moving further than this can mean another city.
 const _reloadDistance = 1000.0;
 
-/// The best places of the user's city, overall or by sauce, meat and bread.
+/// The best places of the user's city: by the main score of the user's diet
+/// or by a single dish.
 class RankingScreen extends StatefulWidget {
   const RankingScreen({super.key});
 
@@ -22,19 +24,36 @@ class RankingScreen extends StatefulWidget {
 }
 
 class _RankingScreenState extends State<RankingScreen> {
-  RatingDimension _by = RatingDimension.overall;
+  RankBy? _by;
+  Diet? _diet;
   Future<RankingDto>? _ranking;
   LatLng? _center;
 
   void _load() {
     final center = _center = context.read<LocationService>().position ?? fallbackLocation;
-    _ranking = context.read<AppData>().ranking(center.latitude, center.longitude, _by);
+    _ranking = context.read<AppData>().ranking(center.latitude, center.longitude, _by!);
   }
+
+  static String _hint(RankBy by) => switch (by) {
+        RankBy(diet: Diet.all) => 'Durchschnitt aus Soße, Fleisch und Brot',
+        RankBy(diet: Diet.vegetarian) => 'Falafel, Halloumi und veganer Döner mit Soße und Brot',
+        RankBy(diet: Diet.vegan) => 'Falafel, veganer Döner, vegane Soße und Hummus mit Brot',
+        RankBy(item: RatingItem.ayran) => 'Nur selbstgemachter Ayran',
+        _ => '',
+      };
 
   @override
   Widget build(BuildContext context) {
     final position = context.watch<LocationService>().position;
+    final diet = context.watch<Session>().diet;
     final center = _center;
+    // A new diet starts at its own main score.
+    if (diet != _diet) {
+      _diet = diet;
+      _by = RankBy.forDiet(diet).first;
+      _ranking = null;
+    }
+    final by = _by!;
     if (_ranking == null ||
         (position != null &&
             center != null &&
@@ -48,26 +67,48 @@ class _RankingScreenState extends State<RankingScreen> {
       builder: (context, snapshot) {
         final ranking = snapshot.connectionState == ConnectionState.done ? snapshot.data : null;
         final city = ranking?.city;
+        final title = switch (diet) { Diet.all => 'Ranking', Diet.vegetarian => 'Veggie-Ranking', Diet.vegan => 'Vegan-Ranking' };
+        // Vegans don't need the places where people found nothing vegan.
+        final entries = [
+          for (final e in ranking?.entries ?? const <RankingEntryDto>[])
+            if (diet != Diet.vegan || e.place.veganOptions != false) e,
+        ];
         return Scaffold(
-          appBar: AppBar(title: Text(city == null ? 'Ranking' : 'Ranking $city')),
+          appBar: AppBar(title: Text(city == null ? title : '$title $city')),
           body: RefreshIndicator(
             onRefresh: () async {
               setState(_load);
-              await _ranking!.catchError((_) => RankingDto(by: _by, entries: const []));
+              await _ranking!.catchError((_) => RankingDto(by: by, entries: const []));
             },
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                SegmentedButton<RatingDimension>(
-                  segments: [for (final d in RatingDimension.values) ButtonSegment(value: d, label: Text(d.label))],
-                  selected: {_by},
-                  // Four segments on a phone: without the check mark "Gesamt" stays on one line.
-                  showSelectedIcon: false,
-                  onSelectionChanged: (s) => setState(() {
-                    _by = s.first;
-                    _load();
-                  }),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final option in RankBy.forDiet(diet))
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(option.diet == Diet.vegan || option.diet == Diet.vegetarian
+                                ? '${option.diet!.emoji} ${option.label}'
+                                : option.label),
+                            selected: option == by,
+                            onSelected: (_) => setState(() {
+                              _by = option;
+                              _load();
+                            }),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
+                if (_hint(by).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_hint(by), style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12)),
+                  ),
                 const SizedBox(height: 16),
                 if (snapshot.connectionState != ConnectionState.done)
                   const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
@@ -84,16 +125,16 @@ class _RankingScreenState extends State<RankingScreen> {
                     title: 'Hier gibt es noch kein Ranking',
                     message: 'Die App kennt in deiner Gegend noch keine Döner-Läden. Schau auf der Karte, was es gibt.',
                   )
-                else if (ranking!.entries.isEmpty)
+                else if (entries.isEmpty)
                   EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'Noch keine Bewertungen in $city',
-                    message: _by == RatingDimension.overall
+                    message: by == RankBy.overall
                         ? 'Bewerte deinen Stammladen – dann steht er hier ganz oben.'
-                        : 'Für ${_by.label} hat hier noch niemand eine Note vergeben.',
+                        : 'Für ${by.label} hat hier noch niemand eine Note vergeben.',
                   )
                 else
-                  for (final (i, entry) in ranking.entries.indexed)
+                  for (final (i, entry) in entries.indexed)
                     Padding(padding: const EdgeInsets.only(bottom: 10), child: _RankingRow(rank: i + 1, entry: entry)),
                 const GoogleAttribution(),
               ],

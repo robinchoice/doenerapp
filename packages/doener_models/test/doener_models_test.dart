@@ -91,17 +91,18 @@ void main() {
       place: const PlaceDto(placeId: 'p', name: 'Laden', latitude: 48, longitude: 7.8, avgRating: 4),
       timestamp: DateTime.utc(2026, 9, 1, 12, 0, 0, 123, 456),
       fromFriend: true,
-      rating: 5,
+      ratings: const {RatingItem.sauce: 5, RatingItem.falafel: 4},
     );
     final page = FeedPage.fromJson(FeedPage(items: [item], cursor: 'c', hasMore: true).toJson());
     expect(page.items.single.timestamp, item.timestamp);
     expect(page.items.single.place.avgRating, 4.0);
     expect(page.items.single.type, FeedItemType.review);
     expect(page.items.single.fromFriend, isTrue);
+    expect(page.items.single.ratings, item.ratings);
 
     final ranking = RankingDto.fromJson(RankingDto(
       city: 'Freiburg im Breisgau',
-      by: RatingDimension.sauce,
+      by: const RankBy.item(RatingItem.sauce),
       entries: [
         RankingEntryDto(
           place: item.place,
@@ -111,7 +112,7 @@ void main() {
         ),
       ],
     ).toJson());
-    expect(ranking.by, RatingDimension.sauce);
+    expect(ranking.by, const RankBy.item(RatingItem.sauce));
     expect(ranking.entries.single.average, 4.0);
     expect(ranking.entries.single.friends.single.user.displayName, 'Robin');
   });
@@ -123,5 +124,111 @@ void main() {
     expect(single, closeTo((5 + 3 * mean) / 4, 1e-9));
     expect(many, greaterThan(single), reason: 'ten 4.5s beat a single 5');
     expect(weightedRating(mean, 7, mean), closeTo(mean, 1e-9));
+  });
+
+  group('menu', () {
+    test('diets eat what suits them', () {
+      expect(Diet.all.allows(Diet.all), isTrue);
+      expect(Diet.vegetarian.allows(RatingItem.halloumi.diet), isTrue);
+      expect(Diet.vegetarian.allows(RatingItem.fleisch.diet), isFalse);
+      expect(Diet.vegan.allows(RatingItem.ayran.diet), isFalse);
+      expect(Diet.vegan.allows(RatingItem.hummus.diet), isTrue);
+      expect(FoodItem.forDiet(Diet.vegan).map((f) => f.id), ['falafel', 'veganDoener', 'pommes']);
+    });
+
+    test('main scores need the dish they are about', () {
+      const ratings = {RatingItem.sauce: 5, RatingItem.fleisch: 4, RatingItem.brot: 3, RatingItem.ayran: 1};
+      expect(Diet.all.score(ratings), 4, reason: 'ayran is no part of the Döner');
+      expect(Diet.vegan.score(ratings), isNull);
+      expect(Diet.all.score(const {RatingItem.brot: 5}), isNull, reason: 'bread alone is no Döner rating');
+      expect(Diet.vegan.score(const {RatingItem.falafel: 4, RatingItem.hummus: 5, RatingItem.brot: 3}), 4);
+      expect(Diet.vegetarian.score(const {RatingItem.halloumi: 5, RatingItem.sauce: 3}), 4);
+    });
+
+    test('headline falls back to what the review is about', () {
+      const vegan = {RatingItem.veganDoener: 5, RatingItem.brot: 3};
+      expect(Diet.all.headline(vegan), 4, reason: 'no Döner score, so the vegan one');
+      expect(Diet.all.headline(const {RatingItem.pizza: 2, RatingItem.ayran: 5}), 2, reason: 'drinks only count alone');
+      expect(Diet.all.headline(const {RatingItem.ayran: 5}), 5);
+      expect(Diet.vegan.headline(const {}), isNull);
+      expect(Diet.vegan.headline(const {RatingItem.sauce: 5, RatingItem.fleisch: 4}), isNull, reason: 'nothing vegan in it');
+      expect(Diet.vegetarian.headline(const {RatingItem.fleisch: 2, RatingItem.sauce: 4}), 4, reason: 'only the sauce fits');
+    });
+
+    test('reviews from before the single items keep their overall score', () {
+      final legacy = ReviewDto(
+        id: 'r',
+        userId: 'u',
+        userName: 'Robin',
+        placeId: 'p',
+        placeName: 'Laden',
+        rating: 4,
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      );
+      expect(legacy.headline(Diet.all), 4);
+      expect(legacy.headline(Diet.vegan), isNull, reason: 'an overall score was about the Döner');
+
+      final setByHand = ReviewDto(
+        id: 'r',
+        userId: 'u',
+        userName: 'Robin',
+        placeId: 'p',
+        placeName: 'Laden',
+        rating: 5,
+        ratings: const {RatingItem.sauce: 3, RatingItem.fleisch: 3},
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      );
+      expect(setByHand.headline(Diet.all), 5, reason: 'the score that counts for the place and the ranking');
+    });
+
+    test('rankings per diet', () {
+      expect(RankBy.forDiet(Diet.vegan).first, const RankBy.score(Diet.vegan));
+      expect(RankBy.forDiet(Diet.vegetarian).map((r) => r.key), isNot(contains('fleisch')));
+      expect(RankBy.forDiet(Diet.all).first.key, 'overall', reason: 'the key older apps send');
+      for (final diet in Diet.values) {
+        for (final by in RankBy.forDiet(diet)) {
+          expect(RankBy.parse(by.key), by);
+        }
+      }
+      expect(RankBy.parse('zwiebel'), isNull);
+      expect(RankBy.parse('all'), isNull);
+    });
+  });
+
+  test('review JSON keeps sauce, meat and bread where older apps read them', () {
+    final review = ReviewDto(
+      id: 'r',
+      userId: 'u',
+      userName: 'Robin',
+      placeId: 'p',
+      placeName: 'Laden',
+      rating: 4,
+      ratings: const {RatingItem.sauce: 5, RatingItem.brot: 3, RatingItem.ayran: 5},
+      ayranHomemade: true,
+      ingredients: const [Ingredient.granatapfel, Ingredient.mais],
+      meat: Meat.kalb,
+      createdAt: DateTime.utc(2026, 10, 4),
+      updatedAt: DateTime.utc(2026, 10, 4),
+    );
+    final json = review.toJson();
+    expect(json['sauceRating'], 5);
+    expect(json['items'], {'ayran': 5});
+    final back = ReviewDto.fromJson(json);
+    expect(back.ratings, review.ratings);
+    expect(back.ingredients, review.ingredients);
+    expect(back.meat, Meat.kalb);
+
+    final legacy = ReviewDto.fromJson({...json}..remove('items')..remove('ingredients')..remove('meat'));
+    expect(legacy.ratings, {RatingItem.sauce: 5, RatingItem.brot: 3}, reason: 'reviews stored by older builds');
+    expect(() => UpsertReviewRequest.fromJson({'items': {'zwiebel': 3}}), throwsArgumentError);
+  });
+
+  test('account settings default for profiles cached by older builds', () {
+    final account = AccountDto.fromJson(const {'id': 'u', 'displayName': 'Robin'});
+    expect(account.diet, Diet.all);
+    expect(account.expertMode, isFalse);
+    expect(const UpdateMeRequest(diet: Diet.vegan).toJson(), {'diet': 'vegan'});
   });
 }

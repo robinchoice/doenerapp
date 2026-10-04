@@ -215,7 +215,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class FeedbackSheet extends StatefulWidget {
-  const FeedbackSheet({super.key});
+  /// The screen the tester came from; attached unless removed.
+  final Uint8List? screenshot;
+
+  const FeedbackSheet({super.key, this.screenshot});
 
   @override
   State<FeedbackSheet> createState() => _FeedbackSheetState();
@@ -223,7 +226,7 @@ class FeedbackSheet extends StatefulWidget {
 
 class _FeedbackSheetState extends State<FeedbackSheet> {
   final _message = TextEditingController();
-  Uint8List? _screenshot;
+  late Uint8List? _screenshot = widget.screenshot;
   bool _sending = false;
   String? _error;
 

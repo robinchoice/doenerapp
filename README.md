@@ -110,6 +110,10 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 - Ist die iOS-App installiert, öffnet der Link sie direkt (Universal Links, Domains in `app/ios/Runner/Runner.entitlements`). Ohne App führt er auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau, von dort in die Web-App. Neue Accounts merken sich, über wessen Link sie kamen.
 - Freunde per Namenssuche finden (ab 2 Zeichen); wer eine offene Anfrage zurückschickt, nimmt sie damit an
 
+### Fehler melden
+
+Für die Testphase liegt ein Käfer-Knopf über allen Screens, auch über Sheets. Er lässt sich verschieben. Ein Tipp fotografiert den Screen darunter (ohne die Google-Karte, native Ansichten erfasst Flutter nicht) und öffnet das Feedback-Formular mit diesem Screenshot. Das Formular gibt es auch unter Einstellungen → Feedback geben. Der Server speichert jede Meldung und mailt sie an `FEEDBACK_EMAIL`, mit dem Screenshot im Anhang. Eine Antwort auf die Mail geht direkt an den Tester.
+
 ---
 
 ## Architektur
@@ -234,6 +238,7 @@ cd app && flutter test
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
 | `APP_DOWNLOAD_URL` | – | Ziel von „App holen“ auf der Einladungsseite (z. B. öffentlicher TestFlight-Link); ohne nur Web-App |
+| `FEEDBACK_EMAIL` | – | Empfänger der Tester-Meldungen; ohne werden sie nur gespeichert |
 
 **App (`--dart-define`):**
 

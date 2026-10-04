@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:provider/provider.dart';
 import 'package:sembast/sembast.dart';
 
@@ -20,10 +24,13 @@ import 'features/onboarding/welcome_screen.dart';
 import 'features/place/check_in_sheet.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/ranking/ranking_screen.dart';
+import 'features/settings/settings_screen.dart';
 import 'features/social/friends.dart';
 import 'features/social/invite.dart';
 import 'features/start/start_screen.dart';
 import 'ui/widgets.dart';
+
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 class DoenerApp extends StatelessWidget {
   final bool onboardingDone;
@@ -43,6 +50,7 @@ class DoenerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
+        navigatorKey: _navigatorKey,
         title: 'Döner App',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
@@ -50,6 +58,7 @@ class DoenerApp extends StatelessWidget {
         locale: const Locale('de'),
         supportedLocales: const [Locale('de')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        builder: (context, child) => _FeedbackButton(child: child!),
         home: _Root(
           onboardingDone: onboardingDone,
           invitePromptDone: invitePromptDone,
@@ -58,6 +67,83 @@ class DoenerApp extends StatelessWidget {
           links: links,
         ),
       );
+}
+
+/// Test phase: a bug button over every screen, sheets included. It takes a
+/// screenshot of what is below it and opens the feedback form with it.
+/// Drag it aside when it covers something.
+class _FeedbackButton extends StatefulWidget {
+  final Widget child;
+  const _FeedbackButton({required this.child});
+
+  @override
+  State<_FeedbackButton> createState() => _FeedbackButtonState();
+}
+
+class _FeedbackButtonState extends State<_FeedbackButton> {
+  static const _size = 40.0;
+  final _screen = GlobalKey();
+  Offset? _position;
+  bool _open = false;
+
+  /// Without the Google map: Flutter can't capture native views.
+  Future<Uint8List?> _screenshot() async {
+    try {
+      final boundary = _screen.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: min(MediaQuery.devicePixelRatioOf(context), 2));
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return png?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Screenshot failed: $e'); // the report still goes out, just without it
+      return null;
+    }
+  }
+
+  Future<void> _report() async {
+    if (_open) return;
+    setState(() => _open = true);
+    final screenshot = await _screenshot();
+    if (!mounted) return;
+    await showAppSheet(_navigatorKey.currentContext!, (_) => FeedbackSheet(screenshot: screenshot));
+    if (mounted) setState(() => _open = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loggedIn = context.select<Session, bool>((s) => s.isLoggedIn);
+    return LayoutBuilder(builder: (context, constraints) {
+      final padding = MediaQuery.paddingOf(context);
+      final position = _position ?? Offset(constraints.maxWidth - _size - 8, constraints.maxHeight * 0.6);
+      final left = clampDouble(position.dx, 0, max(0.0, constraints.maxWidth - _size));
+      final top = clampDouble(position.dy, padding.top, max(padding.top, constraints.maxHeight - _size - padding.bottom));
+      return Stack(
+        children: [
+          RepaintBoundary(key: _screen, child: widget.child),
+          if (loggedIn && !_open)
+            Positioned(
+              left: left,
+              top: top,
+              // On the web the map is a DOM element and would take the taps.
+              child: PointerInterceptor(
+                intercepting: kIsWeb,
+                child: GestureDetector(
+                  onPanUpdate: (details) => setState(() => _position = Offset(left, top) + details.delta),
+                  child: Opacity(
+                    opacity: 0.85,
+                    child: FloatingActionButton.small(
+                      heroTag: null,
+                      onPressed: _report,
+                      child: const Icon(Icons.bug_report_outlined, semanticLabel: 'Fehler melden'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    });
+  }
 }
 
 class _Root extends StatefulWidget {

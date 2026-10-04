@@ -12,6 +12,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:sembast/sembast_memory.dart';
 
@@ -20,6 +21,7 @@ const _ina = UserDto(id: 'u2', displayName: 'Ina');
 class FakeServer {
   String name;
   String? verifiedWithInvite;
+  Map<String, dynamic>? feedback;
   final requests = <String>[];
   FakeServer(this.name);
 
@@ -36,6 +38,9 @@ class FakeServer {
         return json(UserDto(id: 'u1', displayName: name).toJson());
       case '/me/invite':
         return json(const InviteDto(code: 'mine', url: 'https://doener.test/i/mine').toJson());
+      case '/feedback':
+        feedback = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response('', 204);
       case '/invites/abc':
         return json(_ina.toJson());
       case '/invites/abc/accept':
@@ -94,6 +99,33 @@ void main() {
     await _pumpApp(tester);
     expect(find.text('Code schicken'), findsOneWidget);
     expect(find.text('Später'), findsNothing);
+    expect(find.byIcon(Icons.bug_report_outlined), findsNothing, reason: 'feedback needs an account');
+  });
+
+  testWidgets('the bug button sends feedback with a screenshot of the screen', (tester) async {
+    PackageInfo.setMockInitialValues(appName: 'Döner App', packageName: 'doener', version: '1.0.0', buildNumber: '42', buildSignature: '');
+    final (server, _) = await _pumpApp(tester, loggedIn: true, name: 'Robin');
+
+    // The screenshot is rendered for real, outside the test's fake clock.
+    await tester.runAsync(() async {
+      await tester.tap(find.byIcon(Icons.bug_report_outlined));
+      await Future<void>.delayed(const Duration(seconds: 1));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Screenshot entfernen'), findsOneWidget);
+    expect(find.byIcon(Icons.bug_report_outlined), findsNothing, reason: 'hidden while the form is open');
+
+    await tester.enterText(find.byType(TextField).last, 'Karte ruckelt');
+    await tester.pump();
+    await tester.tap(find.text('Senden'));
+    await tester.pumpAndSettle();
+    expect(server.feedback?['message'], 'Karte ruckelt');
+    expect(base64.decode(server.feedback!['screenshotBase64'] as String).take(4), [0x89, 0x50, 0x4e, 0x47], reason: 'PNG');
+    expect(find.text('Danke für dein Feedback!'), findsOneWidget);
+    // The tap's handler runs outside the fake clock and continues there.
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(find.byIcon(Icons.bug_report_outlined), findsOneWidget);
   });
 
   testWidgets('the placeholder name has to go before the app opens', (tester) async {

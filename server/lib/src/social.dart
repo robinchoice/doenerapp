@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
 import 'package:doener_models/doener_models.dart';
+import 'package:mime/mime.dart';
 import 'package:postgres/postgres.dart';
+import 'package:sentry/sentry.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
@@ -265,6 +268,8 @@ void mountSocial(Router router, Deps deps) {
         'platform': body.platform,
       },
     );
+    final to = deps.config.feedbackEmail;
+    if (to != null) await _mailFeedback(deps, to, me, message, body, screenshot);
     return noContent();
   });
 
@@ -287,6 +292,33 @@ void mountSocial(Router router, Deps deps) {
     );
     return noContent();
   });
+}
+
+/// Replying to the mail reaches the tester. A failed mail doesn't fail the
+/// request: the feedback is stored already.
+Future<void> _mailFeedback(Deps deps, String to, AuthUser me, String message, FeedbackRequest body, List<int>? screenshot) async {
+  try {
+    final user = await queryOne(deps.db, 'SELECT email FROM users WHERE id = @id:uuid', {'id': me.id});
+    final email = user!['email'] as String;
+    final firstLine = message.split('\n').first;
+    final type = screenshot == null ? null : lookupMimeType('', headerBytes: screenshot);
+    await deps.mailer.send(
+      to: to,
+      subject: 'Feedback von ${me.displayName}: ${firstLine.length > 60 ? '${firstLine.substring(0, 60)}…' : firstLine}',
+      text: '$message\n\n--\n${me.displayName} <$email>\nApp ${body.appVersion} (${body.buildNumber}), ${body.platform}',
+      replyTo: email,
+      attachment: screenshot == null
+          ? null
+          : (
+              fileName: type == null ? 'screenshot' : 'screenshot.${extensionFromMime(type)}',
+              contentType: type ?? 'application/octet-stream',
+              bytes: screenshot,
+            ),
+    );
+  } catch (e, st) {
+    print('Feedback mail failed: $e');
+    unawaited(Sentry.captureException(e, stackTrace: st));
+  }
 }
 
 const _friendshipSelect = 'SELECT f.id, f.status, f.created_at, f.requester_id, f.addressee_id, '

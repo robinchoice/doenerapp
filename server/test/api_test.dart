@@ -17,10 +17,16 @@ import 'package:test/test.dart';
 /// TEST_DB_HOST / TEST_DB_USER / TEST_DB_PASSWORD); the database
 /// `doener_test` is recreated on every run.
 class CapturingMailer implements Mailer {
-  final sent = <({String to, String text})>[];
+  final sent = <({String to, String subject, String text, String? replyTo, MailAttachment? attachment})>[];
   @override
-  Future<void> send({required String to, required String subject, required String text}) async =>
-      sent.add((to: to, text: text));
+  Future<void> send({
+    required String to,
+    required String subject,
+    required String text,
+    String? replyTo,
+    MailAttachment? attachment,
+  }) async =>
+      sent.add((to: to, subject: subject, text: text, replyTo: replyTo, attachment: attachment));
 }
 
 void main() {
@@ -55,6 +61,7 @@ void main() {
       publicUrl: 'https://doener.test',
       googlePlacesApiKey: 'fake-key',
       webDir: '/nonexistent',
+      feedbackEmail: 'robin@doener.test',
     );
     db = openPool(config);
     // Leftovers of the Vapor backend, as in production — same names as the new tables.
@@ -367,9 +374,29 @@ void main() {
     });
 
     test('feedback and shop reports', () async {
-      final shot = base64.encode([1, 2, 3]);
-      expect((await call('POST', '/feedback', body: {'message': 'Karte ruckelt', 'screenshotBase64': shot}, token: bob)).$1, 204);
+      final png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3];
+      final feedback = {
+        'message': 'Karte ruckelt\nbeim Zoomen',
+        'screenshotBase64': base64.encode(png),
+        'appVersion': '1.0.0',
+        'buildNumber': '42',
+        'platform': 'iOS',
+      };
+      expect((await call('POST', '/feedback', body: feedback, token: bob)).$1, 204);
+      final mail = mailer.sent.last;
+      expect(mail.to, 'robin@doener.test');
+      expect(mail.subject, 'Feedback von Bob: Karte ruckelt');
+      expect(mail.replyTo, 'bob@example.org');
+      expect(mail.text, allOf(contains('Karte ruckelt\nbeim Zoomen'), contains('Bob <bob@example.org>'), contains('1.0.0 (42), iOS')));
+      expect(mail.attachment?.fileName, 'screenshot.png');
+      expect(mail.attachment?.contentType, 'image/png');
+      expect(mail.attachment?.bytes, png);
+
+      expect((await call('POST', '/feedback', body: {'message': 'Ohne Bild'}, token: bob)).$1, 204);
+      expect(mailer.sent.last.attachment, isNull);
       expect((await call('POST', '/feedback', body: {'message': 'x'}, token: bob)).$1, 400);
+      final stored = await db.execute('SELECT count(*)::int, count(screenshot)::int FROM feedback');
+      expect(stored.first, [2, 1]);
       expect((await call('POST', '/shop-reports', body: {'name': 'Erbil', 'latitude': 48.0}, token: bob)).$1, 204);
       final rows = await db.execute('SELECT count(*)::int FROM shop_reports');
       expect(rows.first.first, 1);

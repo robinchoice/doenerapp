@@ -31,6 +31,9 @@ class Config {
   /// Without it, the page only offers the web app.
   final String? appDownloadUrl;
 
+  /// Where tester feedback is mailed. Without it, feedback is only stored.
+  final String? feedbackEmail;
+
   const Config({
     required this.database,
     this.databaseTls = false,
@@ -42,6 +45,7 @@ class Config {
     this.webDir = 'web',
     this.corsOrigin,
     this.appDownloadUrl,
+    this.feedbackEmail,
   });
 
   factory Config.fromEnvironment(Map<String, String> env) {
@@ -76,6 +80,7 @@ class Config {
       webDir: get('WEB_DIR') ?? 'web',
       corsOrigin: get('CORS_ORIGIN'),
       appDownloadUrl: get('APP_DOWNLOAD_URL'),
+      feedbackEmail: get('FEEDBACK_EMAIL'),
     );
   }
 }

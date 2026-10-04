@@ -107,7 +107,7 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 ### Freunde
 
 - Persönlicher Einladungslink samt QR-Code (Profil, Freunde-Liste, letzter Onboarding-Schritt): Wer ihn öffnet und sich anmeldet, ist sofort befreundet, eine offene Anfrage gilt damit als angenommen. Der Link lässt sich zurücksetzen.
-- Ohne App führt der Link auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau, von dort in die Web-App. Neue Accounts merken sich, über wessen Link sie kamen.
+- Ist die iOS-App installiert, öffnet der Link sie direkt (Universal Links, Domains in `app/ios/Runner/Runner.entitlements`). Ohne App führt er auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau, von dort in die Web-App. Neue Accounts merken sich, über wessen Link sie kamen.
 - Freunde per Namenssuche finden (ab 2 Zeichen); wer eine offene Anfrage zurückschickt, nimmt sie damit an
 
 ---
@@ -171,7 +171,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Ranking-Regel, Stempel
 | POST | `/feedback` | Feedback mit optionalem Screenshot |
 | POST | `/shop-reports` | Fehlenden Laden melden |
 
-Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus.
+Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS diese Links in der App öffnet.
 
 ---
 
@@ -297,7 +297,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 - Erinnerung nach dem Check-in („Wie war's bei X?“)
 - Push für Check-ins von Freunden: iOS über APNs, dazu Web Push
 - Öffentliches Profil mit Stufe, Wegfallendes entfernen
-- Universal Links, damit QR-Code, Einladungs- und Magic-Link die App öffnen (bis dahin: Code eintippen)
+- Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
 - Melden und Blockieren (Pflicht für die Stores, spätestens mit den Fotos)
 
 ### Phase 2 – Community
@@ -317,6 +317,7 @@ Skript über die Datenbank, Ziele nach 4 Wochen:
 
 ### Voraussetzungen und Offenes
 
-- APNs-Schlüssel im Apple-Developer-Konto (für Push) und eine Subdomain ohne „api“ für die Links (für Universal Links)
+- APNs-Schlüssel im Apple-Developer-Konto (für Push) und eine Subdomain ohne „api“ für die Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
 - Upload ins Play Store (bisher nur das App Bundle als Artefakt)
+- Android-App-Links: Der Intent-Filter steht, es fehlt `/.well-known/assetlinks.json` mit dem SHA-256 des Release-Schlüssels. Bis dahin öffnen Einladungslinks auf Android den Browser, weil die CI ohne Keystore-Secrets mit wechselnden Debug-Keys signiert.
 - Später: Bezirke für Großstädte. Falls Fakes auftauchen, zählen nur noch Bewertungen mit Häkchen voll.

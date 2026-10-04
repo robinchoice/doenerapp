@@ -159,7 +159,14 @@ class InviterBanner extends StatefulWidget {
 }
 
 class _InviterBannerState extends State<InviterBanner> {
-  late final Future<UserDto> _inviter = context.read<Friends>().inviter(widget.code);
+  late Future<UserDto> _inviter = context.read<Friends>().inviter(widget.code);
+
+  @override
+  void didUpdateWidget(InviterBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Another invite link was opened in the meantime.
+    if (widget.code != oldWidget.code) _inviter = context.read<Friends>().inviter(widget.code);
+  }
 
   @override
   Widget build(BuildContext context) => FutureBuilder<UserDto>(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +35,11 @@ class DoenerApp extends StatelessWidget {
   /// Invite link that brought the user here and is not accepted yet.
   final String? inviteCode;
 
-  const DoenerApp({super.key, required this.onboardingDone, required this.invitePromptDone, this.linkToken, this.inviteCode});
+  /// Links that open the installed app (`https://…/i/<code>`), the one it
+  /// was started with included.
+  final Stream<Uri>? links;
+
+  const DoenerApp({super.key, required this.onboardingDone, required this.invitePromptDone, this.linkToken, this.inviteCode, this.links});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -49,6 +55,7 @@ class DoenerApp extends StatelessWidget {
           invitePromptDone: invitePromptDone,
           linkToken: linkToken,
           inviteCode: inviteCode,
+          links: links,
         ),
       );
 }
@@ -58,7 +65,8 @@ class _Root extends StatefulWidget {
   final bool invitePromptDone;
   final String? linkToken;
   final String? inviteCode;
-  const _Root({required this.onboardingDone, required this.invitePromptDone, this.linkToken, this.inviteCode});
+  final Stream<Uri>? links;
+  const _Root({required this.onboardingDone, required this.invitePromptDone, this.linkToken, this.inviteCode, this.links});
 
   @override
   State<_Root> createState() => _RootState();
@@ -73,10 +81,12 @@ class _RootState extends State<_Root> {
   late String? _inviteCode = widget.inviteCode;
   bool _acceptingInvite = false;
   late final AppLifecycleListener _lifecycle;
+  StreamSubscription<Uri>? _links;
 
   @override
   void initState() {
     super.initState();
+    _links = widget.links?.listen(_openLink);
     final data = context.read<AppData>();
     final location = context.read<LocationService>();
     _lifecycle = AppLifecycleListener(onResume: () {
@@ -96,8 +106,18 @@ class _RootState extends State<_Root> {
 
   @override
   void dispose() {
+    _links?.cancel();
     _lifecycle.dispose();
     super.dispose();
+  }
+
+  /// An invite link opened in the app counts like one opened in the browser:
+  /// kept until the login, accepted once the account has a name.
+  Future<void> _openLink(Uri link) async {
+    final segments = link.pathSegments;
+    if (segments.length != 2 || segments.first != 'i') return;
+    await pendingInviteRecord.put(context.read<Database>(), segments.last);
+    if (mounted) setState(() => _inviteCode = segments.last);
   }
 
   Future<void> _finishOnboarding() async {

@@ -11,6 +11,20 @@ import 'places.dart';
 import 'ranking.dart';
 import 'social.dart';
 
+/// Lets iOS open invite links in the installed app instead of the browser (Universal Links).
+const _appSiteAssociation = {
+  'applinks': {
+    'details': [
+      {
+        'appIDs': ['T2F442364K.com.robinchoice.doener'],
+        'components': [
+          {'/': '/i/*'},
+        ],
+      },
+    ],
+  },
+};
+
 /// API under `/api/v1`, the Flutter web build (if present) everywhere else.
 Handler buildHandler(Deps deps) {
   final api = Router(notFoundHandler: (_) => json({'error': 'Nicht gefunden'}, status: 404))
@@ -30,7 +44,8 @@ Handler buildHandler(Deps deps) {
 
   final root = Router()
     ..mount('/api/v1/', api.call)
-    ..get('/i/<code>', (Request request, String code) => invitePage(deps, request, code));
+    ..get('/i/<code>', (Request request, String code) => invitePage(deps, request, code))
+    ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation));
 
   final webDir = Directory(deps.config.webDir);
   if (webDir.existsSync()) {

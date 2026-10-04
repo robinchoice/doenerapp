@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:doener_app/src/app.dart';
@@ -56,6 +57,7 @@ Future<(FakeServer, Database)> _pumpApp(
   bool loggedIn = false,
   String name = 'Döner-Fan-1234',
   String? inviteCode,
+  Stream<Uri>? links,
 }) async {
   // Phone-sized screen; the default 800×600 cuts off the login form.
   tester.view.physicalSize = const Size(1170, 2532);
@@ -81,7 +83,7 @@ Future<(FakeServer, Database)> _pumpApp(
       ChangeNotifierProvider(create: (_) => LocationService()),
       ChangeNotifierProvider(create: (_) => Friends(session)),
     ],
-    child: DoenerApp(onboardingDone: true, invitePromptDone: false, inviteCode: inviteCode),
+    child: DoenerApp(onboardingDone: true, invitePromptDone: false, inviteCode: inviteCode, links: links),
   ));
   await tester.pumpAndSettle();
   return (server, db);
@@ -134,5 +136,25 @@ void main() {
     expect(server.requests, contains('POST /invites/abc/accept'));
     expect(find.text('Du bist jetzt mit Ina befreundet.'), findsOneWidget);
     expect(await tester.runAsync(() => pendingInviteRecord.get(db)), isNull);
+  });
+
+  testWidgets('an invite link opened in the app makes friends right away', (tester) async {
+    final links = StreamController<Uri>();
+    final (server, _) = await _pumpApp(tester, loggedIn: true, name: 'Robin', links: links.stream);
+
+    links.add(Uri.parse('https://doener-api.pleasance.org/i/abc'));
+    await tester.pumpAndSettle();
+    expect(server.requests, contains('POST /invites/abc/accept'));
+    expect(find.text('Du bist jetzt mit Ina befreundet.'), findsOneWidget);
+  });
+
+  testWidgets('an invite link opened before the login names the inviter', (tester) async {
+    final links = StreamController<Uri>();
+    final (server, _) = await _pumpApp(tester, links: links.stream);
+
+    links.add(Uri.parse('https://doener-api.pleasance.org/i/abc'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Ina hat dich eingeladen'), findsOneWidget);
+    expect(server.requests, isNot(contains('POST /invites/abc/accept')));
   });
 }

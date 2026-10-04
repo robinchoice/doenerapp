@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/google_places.dart';
 import 'package:doener_server/src/http.dart';
@@ -16,6 +18,21 @@ void main() {
     final handler = buildHandler(Deps(db: db, config: config, mailer: LogMailer(), httpClient: http.Client()));
     final response = await handler(Request('GET', Uri.parse('http://localhost/api/v1/health')));
     expect(response.statusCode, 503);
+  });
+
+  test('iOS finds the app for invite links', () async {
+    final config = Config(database: Endpoint(host: 'localhost', port: 1, database: 'doener'), webDir: '/nonexistent');
+    final db = openPool(config);
+    addTearDown(db.close);
+    final handler = buildHandler(Deps(db: db, config: config, mailer: LogMailer(), httpClient: http.Client()));
+    final response = await handler(Request('GET', Uri.parse('http://localhost/.well-known/apple-app-site-association')));
+    expect(response.statusCode, 200);
+    expect(response.mimeType, 'application/json', reason: 'Apple ignores the file with any other type');
+    final details = (jsonDecode(await response.readAsString())['applinks']['details'] as List).single;
+    expect(details['appIDs'], ['T2F442364K.com.robinchoice.doener']);
+    expect(details['components'], [
+      {'/': '/i/*'},
+    ]);
   });
 
   test('tiles cover the requested box', () {

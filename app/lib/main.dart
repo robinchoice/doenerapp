@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -69,6 +70,7 @@ Future<void> startApp() async {
         invitePromptDone: invitePromptDone,
         linkToken: linkToken,
         inviteCode: inviteCode,
+        links: kIsWeb ? null : AppLinks().uriLinkStream,
       ),
     ),
   );

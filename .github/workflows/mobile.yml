@@ -49,6 +49,26 @@ jobs:
           [ -n "$KEY" ] || { echo "Secret GOOGLE_MAPS_IOS_KEY fehlt"; exit 1; }
           echo "GOOGLE_MAPS_IOS_KEY=$KEY" > ios/Flutter/Secrets.xcconfig
 
+      # Festes Development-Zertifikat fürs Archiv. Ohne legt Xcode pro Lauf ein neues an,
+      # bis die Zertifikatsgrenze des Teams erreicht ist. Profile und Export bleiben automatisch.
+      - name: Signing-Zertifikat installieren
+        env:
+          IOS_DEV_CERTIFICATE: ${{ secrets.IOS_DEV_CERTIFICATE }}
+          IOS_DEV_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DEV_CERTIFICATE_PASSWORD }}
+        run: |
+          [ -n "$IOS_DEV_CERTIFICATE" ] || { echo "Secret IOS_DEV_CERTIFICATE fehlt"; exit 1; }
+          umask 077
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          printf '%s' "$IOS_DEV_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/signing.p12" -P "$IOS_DEV_CERTIFICATE_PASSWORD" -k "$KEYCHAIN_PATH" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
       - name: Flutter-Build vorbereiten
         working-directory: app
         run: flutter build ios --release --no-codesign --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --build-number=$((GITHUB_RUN_NUMBER + 10))

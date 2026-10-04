@@ -2,6 +2,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -245,20 +246,26 @@ class _PlaceDetailState extends State<PlaceDetail> {
             borderRadius: BorderRadius.circular(16),
             child: SizedBox(
               height: 160,
-              child: IgnorePointer(
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(target: LatLng(place.latitude, place.longitude), zoom: 16),
-                  liteModeEnabled: true,
-                  zoomControlsEnabled: false,
-                  mapToolbarEnabled: false,
-                  markers: {
-                    Marker(
-                      markerId: MarkerId(place.placeId),
-                      position: LatLng(place.latitude, place.longitude),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+              child: Stack(
+                children: [
+                  IgnorePointer(
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(target: LatLng(place.latitude, place.longitude), zoom: 16),
+                      liteModeEnabled: true,
+                      zoomControlsEnabled: false,
+                      mapToolbarEnabled: false,
+                      markers: {
+                        Marker(
+                          markerId: MarkerId(place.placeId),
+                          position: LatLng(place.latitude, place.longitude),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                        ),
+                      },
                     ),
-                  },
-                ),
+                  ),
+                  // IgnorePointer doesn't reach the map's DOM element on the web.
+                  if (kIsWeb) Positioned.fill(child: PointerInterceptor(child: const SizedBox.expand())),
+                ],
               ),
             ),
           )

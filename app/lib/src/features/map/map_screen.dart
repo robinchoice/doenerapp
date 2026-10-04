@@ -4,6 +4,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
@@ -136,6 +137,10 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                   },
                 ),
+                // On the web the map is a DOM element that still takes the touches under an
+                // open sheet. The browser then cancels the sheet's scrolling.
+                if (kIsWeb && ModalRoute.isCurrentOf(context) == false)
+                  Positioned.fill(child: PointerInterceptor(child: const SizedBox.expand())),
                 Positioned(
                   top: 8,
                   left: 0,

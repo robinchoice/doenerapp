@@ -44,6 +44,7 @@ Danach kommt ein Drehrad mit den Essenstypen, die zur Ernährung passen (Döner,
 - Check-ins werden sofort lokal gespeichert und über eine Sync-Queue an den Server geschickt
 - Die ID erzeugt der Client, deshalb entstehen bei Wiederholungen keine doppelten Besuche
 - Ein Check-in setzt für eine Stunde den Live-Status („isst gerade bei …“), aber nur wenn er wirklich gerade passiert
+- Eine halbe Stunde danach fragt eine lokale Benachrichtigung „Wie war's bei X?“, wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“. Ein Tipp öffnet den Bewertungsbogen. Wer vorher bewertet, wird nicht gefragt, ein späterer Check-in ersetzt die Erinnerung, und in den Einstellungen lässt sie sich abschalten. Dafür braucht es weder Server noch APNs. Browser können keine Benachrichtigungen planen, deshalb zeigt die Web-App die Frage bis 12 Stunden nach dem Check-in als Karte auf Start
 
 ### Bewertungen
 
@@ -308,7 +309,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 - **Kern:** Bewertungen und das Ranking der Stadt, nicht Menge oder Spiel.
 - **Zwei Ebenen:** Bewertungen (ab Phase 2 auch Fragen) sieht jeder im Umkreis von 10 km, mit Namen. Check-ins sehen nur Freunde. Freunde verbinden sich per QR-Code oder Einladungslink.
-- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren mit 🤤, 🥙 oder 🙋. Nach etwa 30 Minuten fragt ein Push „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
+- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren mit 🤤, 🥙 oder 🙋. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
 - **Bewertung:** optional mit Foto. Bewerten darf jeder, wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
 - **Push nur für Freunde und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar.
 - **Belohnung:** eine Stufe nach bewerteten Läden (bisherige Stufen-Namen) neben dem Namen, ab Phase 2 mit den Upvotes. Wrapped gibt es nur im Dezember.
@@ -318,8 +319,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 ### Phase 1 – Bester Döner der Stadt
 
-- Erinnerung nach dem Check-in („Wie war's bei X?“)
-- Push für Check-ins von Freunden, neue Läden und die Erinnerung, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
+- Push für Check-ins von Freunden und neue Läden, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
 - Öffentliches Profil mit Stufe, Wegfallendes entfernen
 - Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
 - Melden und Blockieren (Pflicht für die Stores, spätestens mit den Fotos)

@@ -1,4 +1,5 @@
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -8,9 +9,11 @@ import '../../core/api.dart';
 import '../../core/app_data.dart';
 import '../../core/location.dart';
 import '../../core/maps.dart';
+import '../../core/reminders.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
+import '../place/review_sheet.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
 
@@ -138,7 +141,19 @@ class _StartScreenState extends State<StartScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
     }
 
+    // The apps remind with a notification, the browser can't.
+    final due = kIsWeb ? data.reviewDue(DateTime.now()) : null;
+    final duePlace = due == null ? null : data.places[due.dto.placeId];
+    final dueText = duePlace == null ? null : reminderText(duePlace.name, data.reviews[duePlace.placeId]?.dto.headline(diet));
     final tasks = [
+      if (duePlace != null)
+        _Task(
+          icon: Icons.rate_review_outlined,
+          title: dueText!.$1,
+          message: dueText.$2,
+          onTap: () => showAppSheet(context, (_) => ReviewSheet(place: duePlace)),
+          onClose: () => data.dismissReviewDue(due!),
+        ),
       if (data.reviews.isEmpty)
         _Task(
           icon: Icons.restaurant,
@@ -286,7 +301,8 @@ class _Task extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback onTap;
-  const _Task({required this.icon, required this.title, required this.message, required this.onTap});
+  final VoidCallback? onClose;
+  const _Task({required this.icon, required this.title, required this.message, required this.onTap, this.onClose});
 
   @override
   Widget build(BuildContext context) => GlassCard(
@@ -305,7 +321,10 @@ class _Task extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right),
+            if (onClose != null)
+              IconButton(icon: const Icon(Icons.close), tooltip: 'Ausblenden', onPressed: onClose)
+            else
+              const Icon(Icons.chevron_right),
           ],
         ),
       );

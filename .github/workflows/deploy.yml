@@ -48,7 +48,7 @@ jobs:
       - name: Deploy to Coolify
         env:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-          APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+          APP_UUID: ${{ secrets.COOLIFY_UUID }}
         run: |
           # Zeigt Status + Antwort, statt Fehler wie `curl -f` zu verschlucken.
           coolify() {

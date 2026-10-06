@@ -279,7 +279,7 @@ cd app && flutter test
 Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, alles andere ist die Web-App.
 
 **Secrets:**
-- Coolify: `COOLIFY_APP_UUID`, `COOLIFY_TOKEN`
+- Coolify: `COOLIFY_UUID`, `COOLIFY_TOKEN`
 - Google Maps: `GOOGLE_MAPS_IOS_KEY`, `GOOGLE_MAPS_ANDROID_KEY`, `GOOGLE_MAPS_WEB_KEY`
 - iOS: `ASC_KEY_P8` (Base64), `ASC_KEY_ID`, `ASC_ISSUER_ID`, dazu `IOS_DEV_CERTIFICATE` (Base64-PKCS12 eines festen „Apple Development“-Zertifikats, läuft am 04.10.2027 ab) und `IOS_DEV_CERTIFICATE_PASSWORD`. Ohne festes Zertifikat legt Xcode pro Lauf ein neues an, bis die Zertifikatsgrenze des Teams erreicht ist.
 - Android: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` – ohne sie wird mit Debug-Keys signiert

@@ -17,11 +17,13 @@ import 'package:sembast/sembast.dart';
 import 'core/api.dart';
 import 'core/app_data.dart';
 import 'core/location.dart';
+import 'core/reminders.dart';
 import 'core/session.dart';
 import 'features/auth/login_screen.dart';
 import 'features/map/map_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/place/check_in_sheet.dart';
+import 'features/place/review_sheet.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/ranking/ranking_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -272,6 +274,7 @@ class _HomeShellState extends State<HomeShell> {
   static const _mapTab = 3;
   int _tab = 0;
   late final LocationService _location = context.read<LocationService>();
+  late final Reminders? _reminders = context.read<Reminders?>();
   LatLng? _loadedAround;
 
   @override
@@ -279,12 +282,25 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _location.addListener(_loadAround);
     _loadAround();
+    // A reminder may have started the app.
+    _reminders?.opened.addListener(_openReminder);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
   }
 
   @override
   void dispose() {
     _location.removeListener(_loadAround);
+    _reminders?.opened.removeListener(_openReminder);
     super.dispose();
+  }
+
+  /// A tapped reminder opens the review of its place.
+  void _openReminder() {
+    final placeId = _reminders?.opened.value;
+    if (placeId == null || !mounted) return;
+    _reminders!.opened.value = null;
+    final place = context.read<AppData>().places[placeId];
+    if (place != null) showAppSheet(context, (_) => ReviewSheet(place: place));
   }
 
   List<PlaceDto> _nearby(AppData data) {

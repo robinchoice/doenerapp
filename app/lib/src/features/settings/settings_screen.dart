@@ -10,6 +10,7 @@ import 'package:sembast/sembast.dart';
 
 import '../../core/api.dart';
 import '../../core/app_data.dart';
+import '../../core/reminders.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../social/friends.dart';
@@ -175,6 +176,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: session.expertMode,
               onChanged: (value) => _updateSettings(expertMode: value),
             ),
+            if (context.read<Reminders?>() case final reminders?)
+              SwitchListTile(
+                title: const Text('Erinnerung nach dem Check-in'),
+                subtitle: const Text('Eine halbe Stunde später fragt die App, wie es war.'),
+                value: reminders.enabled,
+                onChanged: (value) async {
+                  await reminders.setEnabled(value);
+                  setState(() {});
+                },
+              ),
           ],
           header('Synchronisation'),
           ListTile(

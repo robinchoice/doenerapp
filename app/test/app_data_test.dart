@@ -139,6 +139,24 @@ void main() {
     expect(restarted.reviews['p1']!.dto.photoId, 'ph1');
   });
 
+  test('half an hour after a check-in, the place is due for a review until it gets one', () async {
+    await data.checkIn(_place);
+    final later = DateTime.now().add(const Duration(minutes: 31));
+    expect(data.reviewDue(DateTime.now()), isNull, reason: 'still eating');
+    expect(data.reviewDue(later)?.dto.placeId, 'p1');
+    expect(data.reviewDue(DateTime.now().add(const Duration(hours: 13))), isNull, reason: 'too long ago');
+
+    await data.dismissReviewDue(data.reviewDue(later)!);
+    final restarted = AppData(db, session);
+    await restarted.load();
+    expect(restarted.reviewDue(later), isNull, reason: 'closed stays closed');
+
+    await data.checkIn(_place);
+    expect(data.reviewDue(later), isNotNull, reason: 'a new check-in asks again');
+    await data.saveReview(_place, const UpsertReviewRequest(ratings: {RatingItem.sauce: 4}));
+    expect(data.reviewDue(later), isNull);
+  });
+
   test('places within the check-in radius, nearest first', () async {
     data.places['p1'] = _place;
     data.places['near'] = const PlaceDto(placeId: 'near', name: 'Nebenan', latitude: 48.0005, longitude: 7.85);

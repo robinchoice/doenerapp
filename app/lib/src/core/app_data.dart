@@ -8,6 +8,7 @@ import 'package:sembast/sembast.dart';
 import 'package:uuid/uuid.dart';
 
 import 'api.dart';
+import 'reminders.dart';
 import 'session.dart';
 
 final _places = stringMapStoreFactory.store('places');
@@ -40,8 +41,9 @@ class LocalReview {
 class AppData extends ChangeNotifier {
   final Database _db;
   final Session session;
+  final Reminders? reminders;
 
-  AppData(this._db, this.session);
+  AppData(this._db, this.session, {this.reminders});
 
   ApiClient get _api => session.api;
 
@@ -52,6 +54,9 @@ class AppData extends ChangeNotifier {
   List<LocalVisit> visits = [];
   int pendingCount = 0;
   String? lastSyncError;
+
+  /// The check-in whose "Wie war's?" card was closed.
+  String? _dismissedReviewDue;
 
   Future<void> load() async {
     // Google allows caching place details for at most 30 days; older entries
@@ -79,6 +84,7 @@ class AppData extends ChangeNotifier {
     visits = [for (final r in await _visits.find(_db)) _visitFromRecord(r.value)];
     _sortVisits();
     pendingCount = await _queue.count(_db);
+    _dismissedReviewDue = await settingsStore.record('reviewDueDismissed').get(_db) as String?;
     notifyListeners();
   }
 
@@ -194,6 +200,24 @@ class AppData extends ChangeNotifier {
     await _putVisit(LocalVisit(visit, pending: true));
     await _enqueue('visit', place.placeId, request.toJson());
     sync();
+    if (reminders case final r?) unawaited(r.schedule(place, request.visitedAt, rating: reviews[place.placeId]?.dto.headline(session.diet)));
+  }
+
+  /// The latest check-in, if it was half an hour to half a day ago and the
+  /// place wasn't reviewed since. The web app asks "Wie war's?" on Start.
+  LocalVisit? reviewDue(DateTime now) {
+    final last = visits.firstOrNull;
+    if (last == null || last.dto.id == _dismissedReviewDue) return null;
+    final since = now.difference(last.dto.visitedAt);
+    if (since < reminderDelay || since > const Duration(hours: 12)) return null;
+    final review = reviews[last.dto.placeId]?.dto;
+    return review != null && !review.updatedAt.isBefore(last.dto.visitedAt) ? null : last;
+  }
+
+  Future<void> dismissReviewDue(LocalVisit visit) async {
+    _dismissedReviewDue = visit.dto.id;
+    notifyListeners();
+    await settingsStore.record('reviewDueDismissed').put(_db, visit.dto.id);
   }
 
   Future<void> saveReview(PlaceDto place, UpsertReviewRequest request) async {
@@ -229,6 +253,7 @@ class AppData extends ChangeNotifier {
     await _queue.delete(_db, finder: Finder(filter: Filter.and([Filter.equals('kind', 'review'), Filter.equals('placeId', place.placeId)])));
     await _enqueue('review', place.placeId, request.toJson());
     sync();
+    if (reminders case final r?) unawaited(r.cancelFor(place.placeId));
   }
 
   /// Replaces synced visits/reviews with the server's copy; pending ones stay.

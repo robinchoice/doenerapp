@@ -15,9 +15,9 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Döner App braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Für Feedback kannst du einen Screenshot anhängen.</string>
+	<string>An Bewertungen und Feedback kannst du Fotos anhängen.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Für Feedback kannst du ein Foto anhängen.</string>
+	<string>Für Bewertungen und Feedback kannst du ein Foto aufnehmen.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Die Döner App nimmt keinen Ton auf.</string>
 	<key>GMSApiKey</key>

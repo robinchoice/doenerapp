@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/foundation.dart';
@@ -27,7 +28,10 @@ class LocalVisit {
 class LocalReview {
   final ReviewDto dto;
   final bool pending;
-  const LocalReview(this.dto, {this.pending = false});
+
+  /// A new photo waiting for upload; once on the server, [ReviewDto.photoId] points to it.
+  final Uint8List? photo;
+  const LocalReview(this.dto, {this.pending = false, this.photo});
 }
 
 /// Local-first data: everything the UI shows comes from here. The server is
@@ -214,10 +218,13 @@ class AppData extends ChangeNotifier {
       skewer: request.skewer,
       bread: request.bread,
       text: Validation.clean(request.text),
+      photoId: request.photoBase64 != null || request.removePhoto ? null : previous?.photoId,
+      onSite: (previous?.onSite ?? false) || visitsAt(place.placeId).isNotEmpty,
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
     );
-    await _putReview(LocalReview(review, pending: true));
+    final photo = request.photoBase64 == null ? null : base64.decode(request.photoBase64!);
+    await _putReview(LocalReview(review, pending: true, photo: photo));
     // Only the latest edit per place needs to reach the server.
     await _queue.delete(_db, finder: Finder(filter: Filter.and([Filter.equals('kind', 'review'), Filter.equals('placeId', place.placeId)])));
     await _enqueue('review', place.placeId, request.toJson());
@@ -391,10 +398,14 @@ class AppData extends ChangeNotifier {
   void _sortVisits() => visits.sort((a, b) => b.dto.visitedAt.compareTo(a.dto.visitedAt));
 
   static Map<String, Object?> _visitRecord(LocalVisit v) => {'dto': v.dto.toJson(), 'pending': v.pending};
-  static Map<String, Object?> _reviewRecord(LocalReview r) => {'dto': r.dto.toJson(), 'pending': r.pending};
+  static Map<String, Object?> _reviewRecord(LocalReview r) =>
+      {'dto': r.dto.toJson(), 'pending': r.pending, if (r.photo != null) 'photo': base64.encode(r.photo!)};
 
   static LocalVisit _visitFromRecord(Map<String, Object?> r) =>
       LocalVisit(VisitDto.fromJson((r['dto'] as Map).cast<String, dynamic>()), pending: r['pending'] as bool);
-  static LocalReview _reviewFromRecord(Map<String, Object?> r) =>
-      LocalReview(ReviewDto.fromJson((r['dto'] as Map).cast<String, dynamic>()), pending: r['pending'] as bool);
+  static LocalReview _reviewFromRecord(Map<String, Object?> r) => LocalReview(
+        ReviewDto.fromJson((r['dto'] as Map).cast<String, dynamic>()),
+        pending: r['pending'] as bool,
+        photo: r['photo'] == null ? null : base64.decode(r['photo'] as String),
+      );
 }

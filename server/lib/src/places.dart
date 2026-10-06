@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:doener_models/doener_models.dart';
@@ -51,6 +52,10 @@ Map<RatingItem, int> ratingsFromRow(Map<String, dynamic> row) => {
 /// Select expression for the items of review `r`.
 const reviewItemsJson = '(SELECT jsonb_object_agg(item, rating) FROM review_items WHERE review_id = r.id) AS items';
 
+/// Select expressions for the photo of review `r` and whether its author checked in at the place.
+const reviewPhotoId = '(SELECT id FROM review_photos WHERE review_id = r.id) AS photo_id';
+const reviewOnSite = 'EXISTS (SELECT 1 FROM visits v WHERE v.user_id = r.user_id AND v.place_id = r.place_id) AS on_site';
+
 ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       id: row['id'] as String,
       userId: row['user_id'] as String,
@@ -66,6 +71,8 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       skewer: Skewer.values.asNameMap()[row['skewer']],
       bread: Bread.values.asNameMap()[row['bread']],
       text: row['text'] as String?,
+      photoId: row['photo_id'] as String?,
+      onSite: row['on_site'] as bool,
       createdAt: row['created_at'] as DateTime,
       updatedAt: row['updated_at'] as DateTime,
     );
@@ -80,7 +87,7 @@ VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
       foodType: row['food_type'] as String?,
     );
 
-const _reviewSelect = 'SELECT r.*, $reviewItemsJson, u.display_name, p.google_place_id, p.name AS place_name '
+const _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewOnSite, u.display_name, p.google_place_id, p.name AS place_name '
     'FROM reviews r JOIN users u ON u.id = r.user_id JOIN places p ON p.id = r.place_id';
 const _visitSelect = 'SELECT v.*, u.display_name, p.google_place_id, p.name AS place_name FROM visits v '
     'JOIN users u ON u.id = v.user_id JOIN places p ON p.id = v.place_id';
@@ -232,6 +239,7 @@ void mountPlaces(Router router, Deps deps) {
     }
     final veganOptions = veganRated ? true : body.veganOptions;
     final ayranHomemade = ayranRated ? true : body.ayranHomemade;
+    final photo = body.photoBase64 == null ? null : _decodePhoto(body.photoBase64!);
     if (ratings.isEmpty &&
         veganOptions == null &&
         ayranHomemade == null &&
@@ -239,7 +247,8 @@ void mountPlaces(Router router, Deps deps) {
         body.meat == null &&
         body.skewer == null &&
         body.bread == null &&
-        text == null) {
+        text == null &&
+        photo == null) {
       throw const ApiException.badRequest('Die Bewertung ist leer');
     }
     final place = await _requirePlace(deps, placeId);
@@ -288,15 +297,29 @@ void mountPlaces(Router router, Deps deps) {
           parameters: {'id': row['id'], 'item': e.key, 'rating': e.value},
         );
       }
+      if (photo != null || body.removePhoto) {
+        await tx.execute(Sql.named('DELETE FROM review_photos WHERE review_id = @id:uuid'), parameters: {'id': row['id']});
+      }
+      if (photo != null) {
+        await tx.execute(
+          Sql.named('INSERT INTO review_photos (review_id, content_type, data) VALUES (@id:uuid, @type, @data:bytea)'),
+          parameters: {'id': row['id'], 'type': photo.type, 'data': photo.bytes},
+        );
+      }
       return row;
     });
-    return json(reviewFromRow({
-      ...saved,
-      'items': items,
-      'display_name': user.displayName,
-      'google_place_id': placeId,
-      'place_name': place['name'],
-    }).toJson());
+    final row = await queryOne(deps.db, '$_reviewSelect WHERE r.id = @id:uuid', {'id': saved['id']});
+    return json(reviewFromRow(row!).toJson());
+  });
+
+  // GET /photos/<id> — a review photo. A new photo gets a new id, so this never changes.
+  router.get('/photos/<id>', (Request request, String id) async {
+    final row = await queryOne(deps.db, 'SELECT content_type, data FROM review_photos WHERE id = @id:uuid', {'id': requireUuid(id)});
+    if (row == null) throw const ApiException.notFound('Foto nicht gefunden');
+    return Response.ok(row['data'] as List<int>, headers: {
+      'content-type': row['content_type'] as String,
+      'cache-control': 'public, max-age=31536000, immutable',
+    });
   });
 
   router.post('/places/<placeId>/visits', (Request request, String placeId) async {
@@ -572,4 +595,17 @@ T? plurality<T extends Object>(Iterable<T?> answers) {
   final most = counts.values.reduce(math.max);
   final top = [for (final e in counts.entries) if (e.value == most) e.key];
   return top.length == 1 ? top.single : null;
+}
+
+({List<int> bytes, String type}) _decodePhoto(String base64Photo) {
+  final List<int> bytes;
+  try {
+    bytes = base64.decode(base64Photo);
+  } on FormatException {
+    throw const ApiException.badRequest('Foto ist kein gültiges Base64');
+  }
+  if (bytes.length > Validation.reviewPhotoMaxBytes) throw const ApiException(413, 'Foto zu groß');
+  final type = Validation.photoType(bytes);
+  if (type == null) throw const ApiException.badRequest('Foto muss JPEG, PNG oder WebP sein');
+  return (bytes: bytes, type: type);
 }

@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_data.dart';
@@ -29,7 +33,9 @@ class ReviewSheet extends StatefulWidget {
 }
 
 class _ReviewSheetState extends State<ReviewSheet> {
-  late final ReviewDto? _existing = context.read<AppData>().reviews[widget.place.placeId]?.dto;
+  late final LocalReview? _local = context.read<AppData>().reviews[widget.place.placeId];
+  late final ReviewDto? _existing = _local?.dto;
+  late final bool _checkedIn = (_existing?.onSite ?? false) || context.read<AppData>().visitsAt(widget.place.placeId).isNotEmpty;
   late final Diet _diet = context.read<Session>().diet;
   late final bool _expert = context.read<Session>().expertMode;
   late final _text = TextEditingController(text: _existing?.text);
@@ -45,6 +51,13 @@ class _ReviewSheetState extends State<ReviewSheet> {
   /// Prefilled from the others, the expert part only counts once it's touched.
   late bool _expertTouched = _existing?.ingredients != null;
 
+  /// Picked now or still waiting for upload; replaces the photo on the server.
+  late Uint8List? _photo = _local?.photo;
+  bool _removePhoto = false;
+  String? _photoError;
+
+  bool get _hasPhoto => _photo != null || (_existing?.photoId != null && !_removePhoto);
+
   static _Answer? _answer(bool? value) => value == null ? null : (value ? _Answer.yes : _Answer.no);
   static bool? _bool(_Answer? answer) => switch (answer) { _Answer.yes => true, _Answer.no => false, _ => null };
 
@@ -53,6 +66,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
       _bool(_vegan) != null ||
       _bool(_ayran) != null ||
       _expertTouched ||
+      _hasPhoto ||
       Validation.clean(_text.text) != null;
 
   @override
@@ -95,6 +109,27 @@ class _ReviewSheetState extends State<ReviewSheet> {
         _expertTouched = true;
       });
 
+  Future<void> _pickPhoto(ImageSource source) async {
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, maxHeight: 1600, imageQuality: 75);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() {
+      if (Validation.photoType(bytes) == null) {
+        _photoError = 'Das Foto muss ein JPEG, PNG oder WebP sein.';
+      } else if (bytes.length > Validation.reviewPhotoMaxBytes) {
+        _photoError = 'Das Foto ist zu groß.';
+      } else {
+        _photo = bytes;
+        _photoError = null;
+      }
+    });
+  }
+
+  void _dropPhoto() => setState(() {
+        _photo = null;
+        _removePhoto = true;
+      });
+
   Future<void> _save() async {
     await context.read<AppData>().saveReview(
           widget.place,
@@ -108,6 +143,8 @@ class _ReviewSheetState extends State<ReviewSheet> {
             skewer: _expertTouched ? _skewer : _existing?.skewer,
             bread: _expertTouched ? _bread : _existing?.bread,
             text: Validation.clean(_text.text),
+            photoBase64: _photo == null ? null : base64.encode(_photo!),
+            removePhoto: _removePhoto && _photo == null,
           ),
         );
     if (mounted) Navigator.of(context).pop(true);
@@ -306,6 +343,36 @@ class _ReviewSheetState extends State<ReviewSheet> {
         ],
         if (_expert) ...[const SizedBox(height: 12), _expertCard()],
         const SizedBox(height: 16),
+        if (_hasPhoto) ...[
+          ReviewPhoto(photoId: _existing?.photoId, bytes: _photo),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(onPressed: _dropPhoto, icon: const Icon(Icons.delete_outline), label: const Text('Foto entfernen')),
+          ),
+        ] else
+          Row(
+            children: [
+              if (!kIsWeb) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickPhoto(ImageSource.camera),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Foto machen'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickPhoto(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text(kIsWeb ? 'Foto hinzufügen' : 'Aus Galerie'),
+                ),
+              ),
+            ],
+          ),
+        if (_photoError != null) Text(_photoError!, style: TextStyle(color: theme.colorScheme.error)),
+        const SizedBox(height: 12),
         TextField(
           controller: _text,
           minLines: 3,
@@ -314,7 +381,14 @@ class _ReviewSheetState extends State<ReviewSheet> {
           onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(hintText: 'Was war gut, was nicht? (optional)'),
         ),
-        const SizedBox(height: 8),
+        if (!_checkedIn)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Checke vor Ort ein, dann trägt deine Bewertung das Häkchen „vor Ort“.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+            ),
+          ),
         FilledButton(onPressed: _canSave ? _save : null, child: const Text('Speichern')),
       ],
     );

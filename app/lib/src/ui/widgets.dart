@@ -1,6 +1,10 @@
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../core/session.dart';
 
 const doenerOrange = Color(0xFFFF8C00);
 
@@ -117,6 +121,9 @@ class ActivityCard extends StatelessWidget {
   final Diet diet;
   final String? text;
   final String? foodType;
+  final String? photoId;
+  final Uint8List? photo;
+  final bool onSite;
   final bool pending;
   final bool highlight;
   final VoidCallback? onTap;
@@ -132,6 +139,9 @@ class ActivityCard extends StatelessWidget {
     this.diet = Diet.all,
     this.text,
     this.foodType,
+    this.photoId,
+    this.photo,
+    this.onSite = false,
     this.pending = false,
     this.highlight = false,
     this.onTap,
@@ -168,6 +178,7 @@ class ActivityCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         const Icon(Icons.group, size: 14, color: doenerOrange, semanticLabel: 'Freund'),
                       ],
+                      if (onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
                     ]),
                     Text(subtitle, style: const TextStyle(color: doenerOrange)),
                   ],
@@ -183,7 +194,60 @@ class ActivityCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(text!, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           ],
+          if (photo != null || photoId != null) ...[const SizedBox(height: 10), ReviewPhoto(photoId: photoId, bytes: photo)],
         ],
+      ),
+    );
+  }
+}
+
+/// The reviewer checked in at the place.
+class OnSiteBadge extends StatelessWidget {
+  const OnSiteBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: 'Hat hier eingecheckt',
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.verified, size: 14, color: Colors.green.shade600),
+          const SizedBox(width: 3),
+          Text('vor Ort', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.green.shade600, fontWeight: FontWeight.w600)),
+        ]),
+      );
+}
+
+/// A review photo: [bytes] while it waits for upload, otherwise loaded by
+/// [photoId]. A tap shows it whole.
+class ReviewPhoto extends StatelessWidget {
+  final String? photoId;
+  final Uint8List? bytes;
+  final double height;
+  const ReviewPhoto({super.key, this.photoId, this.bytes, this.height = 180});
+
+  @override
+  Widget build(BuildContext context) {
+    final image = bytes != null ? MemoryImage(bytes!) : NetworkImage('${context.read<Session>().apiBase}/photos/$photoId') as ImageProvider;
+    return GestureDetector(
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (context) => GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: InteractiveViewer(child: Image(image: image, fit: BoxFit.contain)),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image(
+          image: image,
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, _, _) => Container(
+            height: height,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Icon(Icons.broken_image_outlined, color: Theme.of(context).colorScheme.outline),
+          ),
+        ),
       ),
     );
   }

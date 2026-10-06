@@ -297,6 +297,12 @@ class ReviewDto {
   final Skewer? skewer;
   final Bread? bread;
   final String? text;
+
+  /// Served at `/photos/<photoId>`; a new photo gets a new id.
+  final String? photoId;
+
+  /// The reviewer has checked in at the place.
+  final bool onSite;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -315,6 +321,8 @@ class ReviewDto {
     this.skewer,
     this.bread,
     this.text,
+    this.photoId,
+    this.onSite = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -338,6 +346,8 @@ class ReviewDto {
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
         text: j['text'] as String?,
+        photoId: j['photoId'] as String?,
+        onSite: j['onSite'] as bool? ?? false,
         createdAt: _date(j['createdAt']),
         updatedAt: _date(j['updatedAt']),
       );
@@ -357,6 +367,8 @@ class ReviewDto {
         'skewer': skewer?.name,
         'bread': bread?.name,
         'text': text,
+        'photoId': photoId,
+        'onSite': onSite,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
@@ -376,6 +388,11 @@ class UpsertReviewRequest {
   final Bread? bread;
   final String? text;
 
+  /// A new photo (JPEG, PNG or WebP). Without it, the previous photo stays
+  /// unless [removePhoto] is set.
+  final String? photoBase64;
+  final bool removePhoto;
+
   const UpsertReviewRequest({
     this.ratings = const {},
     this.veganOptions,
@@ -385,6 +402,8 @@ class UpsertReviewRequest {
     this.skewer,
     this.bread,
     this.text,
+    this.photoBase64,
+    this.removePhoto = false,
   });
 
   factory UpsertReviewRequest.fromJson(Json j) => UpsertReviewRequest(
@@ -396,6 +415,8 @@ class UpsertReviewRequest {
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
         text: j['text'] as String?,
+        photoBase64: j['photoBase64'] as String?,
+        removePhoto: j['removePhoto'] as bool? ?? false,
       );
 
   Json toJson() => {
@@ -407,6 +428,8 @@ class UpsertReviewRequest {
         'skewer': skewer?.name,
         'bread': bread?.name,
         'text': text,
+        'photoBase64': photoBase64,
+        'removePhoto': removePhoto,
       };
 }
 
@@ -493,6 +516,10 @@ class FeedItem {
   final String? text;
   final String? foodType;
 
+  /// See [ReviewDto.photoId] and [ReviewDto.onSite].
+  final String? photoId;
+  final bool onSite;
+
   const FeedItem({
     required this.id,
     required this.type,
@@ -504,6 +531,8 @@ class FeedItem {
     this.ratings = const {},
     this.text,
     this.foodType,
+    this.photoId,
+    this.onSite = false,
   });
 
   /// See [ReviewDto.headline].
@@ -520,6 +549,8 @@ class FeedItem {
         ratings: _ratingsFromJson(j),
         text: j['text'] as String?,
         foodType: j['foodType'] as String?,
+        photoId: j['photoId'] as String?,
+        onSite: j['onSite'] as bool? ?? false,
       );
 
   Json toJson() => {
@@ -533,6 +564,8 @@ class FeedItem {
         ..._ratingsToJson(ratings),
         'text': text,
         'foodType': foodType,
+        'photoId': photoId,
+        'onSite': onSite,
       };
 }
 

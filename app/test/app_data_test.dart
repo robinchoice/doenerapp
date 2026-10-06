@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:doener_app/src/core/app_data.dart';
 import 'package:doener_app/src/core/session.dart';
@@ -16,6 +17,7 @@ const _user = AccountDto(id: 'u1', displayName: 'Robin');
 class FakeServer {
   String mode = 'ok';
   final requests = <String>[];
+  Map<String, dynamic>? lastBody;
 
   http.Response _json(Object body, [int status = 200]) =>
       http.Response(jsonEncode(body), status, headers: {'content-type': 'application/json'});
@@ -29,7 +31,7 @@ class FakeServer {
     if (mode == '401') return _json({'error': 'Sitzung abgelaufen'}, 401);
     if (mode == '400') return _json({'error': 'Ungültig'}, 400);
 
-    final body = jsonDecode(request.body) as Map<String, dynamic>;
+    final body = lastBody = jsonDecode(request.body) as Map<String, dynamic>;
     final now = DateTime.now().toUtc();
     if (path.endsWith('/visits')) {
       return _json(VisitDto(
@@ -49,6 +51,7 @@ class FakeServer {
       placeId: _place.placeId,
       placeName: _place.name,
       ratings: UpsertReviewRequest.fromJson(body).ratings,
+      photoId: body['photoBase64'] == null ? null : 'ph1',
       createdAt: now,
       updatedAt: now,
     ).toJson());
@@ -57,13 +60,14 @@ class FakeServer {
 
 void main() {
   late FakeServer server;
+  late Database db;
   late Session session;
   late AppData data;
 
   setUp(() async {
     FlutterSecureStorage.setMockInitialValues({});
     server = FakeServer();
-    final db = await newDatabaseFactoryMemory().openDatabase('test.db');
+    db = await newDatabaseFactoryMemory().openDatabase('test.db');
     session = Session(db, httpClient: MockClient(server.handle));
     await session.load();
     data = AppData(db, session);
@@ -115,6 +119,24 @@ void main() {
     expect(data.pendingCount, 0);
     expect(data.reviews, isEmpty);
     expect(data.lastSyncError, contains('verworfen'));
+  });
+
+  test('a review photo waits with the review, also across a restart', () async {
+    server.mode = 'offline';
+    final photo = Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0, 1]);
+    await data.checkIn(_place);
+    await data.saveReview(_place, UpsertReviewRequest(ratings: const {RatingItem.sauce: 4}, photoBase64: base64.encode(photo)));
+    expect(data.reviews['p1']!.dto.onSite, isTrue, reason: 'checked in here');
+
+    final restarted = AppData(db, session);
+    await restarted.load();
+    expect(restarted.reviews['p1']!.photo, photo);
+
+    server.mode = 'ok';
+    await restarted.sync();
+    expect(server.lastBody?['photoBase64'], base64.encode(photo));
+    expect(restarted.reviews['p1']!.photo, isNull, reason: 'uploaded');
+    expect(restarted.reviews['p1']!.dto.photoId, 'ph1');
   });
 
   test('places within the check-in radius, nearest first', () async {

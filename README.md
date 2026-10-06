@@ -29,7 +29,7 @@ Die Karte lädt Dönerläden für den sichtbaren Ausschnitt (nur bis 0,5° Span)
 
 Google erlaubt, Laden-Details höchstens 30 Tage zu speichern (nur die Place ID unbegrenzt) und Places-Daten nur auf Google-Karten zu zeigen. Deshalb: Karte von Google Maps, ein täglicher Job auf dem Server frischt Läden mit Besuchen oder Bewertungen auf und löscht ungenutzte nach 30 Tagen, die App verwirft ihren lokalen Cache ebenso. Listen ohne Karte tragen den Hinweis „Ortsdaten: Google Maps“.
 
-- Pins: orange, besuchte Läden grün, Favoriten pink; fremde Geschäfts-POIs sind ausgeblendet
+- Pins im Produktton, besuchte Läden grün, Favoriten pink; im Dunkelmodus ist die Karte dunkel; fremde Geschäfts-POIs sind ausgeblendet
 - Lupe oben rechts: Suche in allen Läden, die die App schon kennt; daneben der Favoriten-Filter per Herz
 - „Laden fehlt?“ oben links schickt eine Meldung samt Kartenposition an den Server
 - Mit Ernährung „Vegan“ verschwinden Läden, in denen die Mehrheit nichts Veganes gefunden hat. Bei Vegetarisch und Vegan sind Läden blass, von denen noch niemand Passendes bewertet hat
@@ -37,7 +37,7 @@ Google erlaubt, Laden-Details höchstens 30 Tage zu speichern (nur die Place ID 
 
 ### Check-In
 
-Eingecheckt wird nur vor Ort, über den 🥙-Knopf in der Mitte der Tab-Leiste. Er ist orange, sobald ein Laden höchstens 150 m entfernt ist, sonst grau. Dafür lädt die App die Läden rund um den Standort und verfolgt ihn, solange sie offen ist. Ein Tipp auf den grauen Knopf fragt nach dem Standort, falls er noch nicht freigegeben ist, und lädt die Läden in der Nähe neu. Den Abstand prüft nur die App: Koordinaten ließen sich ohnehin fälschen, deshalb verzichtet der Server darauf, solange keine Fakes auftauchen.
+Eingecheckt wird nur vor Ort, über den 🥙-Knopf in der Mitte der Tab-Leiste. Er trägt den Verlauf, sobald ein Laden höchstens 150 m entfernt ist, sonst ist er grau. Dafür lädt die App die Läden rund um den Standort und verfolgt ihn, solange sie offen ist. Ein Tipp auf den grauen Knopf fragt nach dem Standort, falls er noch nicht freigegeben ist, und lädt die Läden in der Nähe neu. Den Abstand prüft nur die App: Koordinaten ließen sich ohnehin fälschen, deshalb verzichtet der Server darauf, solange keine Fakes auftauchen.
 
 Danach kommt ein Drehrad mit den Essenstypen, die zur Ernährung passen (Döner, Yufka, Lahmacun, Teller, Pommes, Falafel, veganer Döner, Halloumi, Pizza, Pide, Seele), das oberste Symbol ist ausgewählt. Stehen mehrere Läden nebeneinander, wählt man vorher den richtigen aus. Nach dem Check-in regnet es Emojis des gewählten Essens. Einen Kommentar gibt es nicht.
 
@@ -103,7 +103,7 @@ Die Regeln liegen in `packages/doener_models` und sind dort getestet.
 
 ### Döner Wrapped
 
-Jahresrückblick auf 5 Seiten mit wechselnden Farbverläufen: Besuche im Jahr, Lieblingsessen, Stammladen, entdeckte Läden, Zusammenfassung mit aktivstem Monat.
+Jahresrückblick auf 5 Seiten auf dunklem Grund: Besuche im Jahr, Lieblingsessen, Stammladen, entdeckte Läden, Zusammenfassung mit aktivstem Monat.
 
 ### Start
 
@@ -114,7 +114,7 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 - „Neu in [Stadt]“: Läden, die in den letzten 30 Tagen aufgemacht haben, und Eröffnungen, die Google angekündigt hat („Bald: … Laut Google am 15. Oktober“)
 - „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
 - „Gerade im Trend“: meiste Check-ins und Bewertungen der letzten 7 Tage, Check-ins zählen anonym
-- Feed: Check-ins und Bewertungen der Freunde (orange hinterlegt) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Freunde. Der Filter „Nur Freunde“ blendet die anderen aus, die eigene Aktivität steht im Profil
+- Feed: Check-ins und Bewertungen der Freunde (mit Linie in der Akzentfarbe) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Freunde. Der Filter „Nur Freunde“ blendet die anderen aus, die eigene Aktivität steht im Profil
 
 ### Ranking
 
@@ -294,7 +294,7 @@ Die Build-Nummer steigt pro Lauf automatisch (TestFlight lehnt doppelte ab).
 
 ## Design-Prinzipien
 
-- **Orange als Akzentfarbe:** konsistent für alle interaktiven Elemente, Material 3, Hell- und Dunkelmodus
+- **Pleasance-Familie:** Gestaltung nach `DESIGN.md` im Starter (`~/dev/starter`). Stufe 3, Ausschnitt 2,55–3,20 (`appBand` in `app/lib/src/ui/brand.dart`). Der Verlauf sitzt nur auf Handlungsflächen (Hauptbuttons, Einchecken, aktiver Tab, Fortschritt), Bricolage Grotesque (selbst gehostet) für Titel, Plätze und Noten, Listen mit Haarlinien. Hell- und Dunkelmodus folgen dem System, ab 900 px Breite gibt es eine Navigationsleiste links
 - **Offline-First:** Jede Aktion wird lokal gespeichert, bevor sie das Netzwerk berührt
 - **Emoji als UI:** Essenstypen, Konfetti und Wrapped nutzen Emojis statt eigener Grafiken
 - **FOSS, wo es geht:** Flutter, Dart, Postgres, Web-Ressourcen selbst gehostet statt vom CDN. Karte und Laden-Daten kommen von Google, weil OpenStreetMap deutlich weniger Döner-Läden und Öffnungszeiten kennt.

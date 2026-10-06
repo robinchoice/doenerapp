@@ -65,10 +65,7 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
                     ),
                   ),
                   if (p.avgRating != null)
-                    Column(children: [
-                      Text(formatRating(p.avgRating!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 20)),
-                      Text('${p.reviewCount} Bew.', style: Theme.of(context).textTheme.labelSmall),
-                    ]),
+                    ScoreBlock(average: p.avgRating!, count: p.reviewCount, size: 26),
                 ],
               ),
             ),

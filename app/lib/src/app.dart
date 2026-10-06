@@ -355,37 +355,76 @@ class _HomeShellState extends State<HomeShell> {
     final pending = context.select<AppData, int>((d) => d.pendingCount);
     context.watch<LocationService>();
     final onSite = context.select<AppData, bool>((d) => _nearby(d).isNotEmpty);
-    return Scaffold(
-      body: IndexedStack(
-        index: _tab < _checkInTab ? _tab : _tab - 1,
-        children: [
-          StartScreen(onOpenMap: () => setState(() => _tab = _mapTab)),
-          const RankingScreen(),
-          const MapScreen(),
-          const ProfileScreen(),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => i == _checkInTab ? _checkIn() : setState(() => _tab = i),
-        destinations: [
-          const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Start'),
-          const NavigationDestination(icon: Icon(Icons.emoji_events_outlined), selectedIcon: Icon(Icons.emoji_events), label: 'Ranking'),
-          NavigationDestination(
-            icon: CircleAvatar(
-              radius: 22,
-              backgroundColor: onSite ? doenerOrange : Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Opacity(opacity: onSite ? 1 : 0.4, child: const Text('🥙', style: TextStyle(fontSize: 22))),
+    // Browsers on a desktop get a rail on the left and a column of readable width.
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    Widget column(Widget child) => wide ? Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 720), child: child)) : child;
+    final checkIn = GradientCircle(
+      size: 44,
+      active: onSite,
+      child: Opacity(opacity: onSite ? 1 : 0.4, child: const Text('🥙', style: TextStyle(fontSize: 22))),
+    );
+    final profileIcon = Badge(isLabelVisible: pending > 0, label: Text('$pending'), child: const Icon(Icons.account_circle_outlined));
+    final destinations = [
+      (icon: const Icon(Icons.home_outlined), selected: const Icon(Icons.home), label: 'Start'),
+      (icon: const Icon(Icons.emoji_events_outlined), selected: const Icon(Icons.emoji_events), label: 'Ranking'),
+      (icon: checkIn, selected: checkIn, label: 'Einchecken'),
+      (icon: const Icon(Icons.map_outlined), selected: const Icon(Icons.map), label: 'Karte'),
+      (icon: profileIcon, selected: const Icon(Icons.account_circle), label: 'Profil'),
+    ];
+    void select(int i) => i == _checkInTab ? _checkIn() : setState(() => _tab = i);
+    final body = IndexedStack(
+      index: _tab < _checkInTab ? _tab : _tab - 1,
+      children: [
+        column(StartScreen(onOpenMap: () => setState(() => _tab = _mapTab))),
+        column(const RankingScreen()),
+        const MapScreen(),
+        column(const ProfileScreen()),
+      ],
+    );
+    if (wide) {
+      return Scaffold(
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _tab,
+              onDestinationSelected: select,
+              labelType: NavigationRailLabelType.all,
+              minWidth: 96,
+              leading: const Padding(
+                padding: EdgeInsets.only(top: 8, bottom: 20),
+                child: Column(children: [BrandTile(), SizedBox(height: 6), Text('Döner', style: displayStyle)]),
+              ),
+              destinations: [
+                for (final (i, d) in destinations.indexed)
+                  NavigationRailDestination(
+                    icon: d.icon,
+                    selectedIcon: i == _checkInTab ? d.selected : ActiveTabMark(icon: d.selected),
+                    label: Text(d.label),
+                  ),
+              ],
             ),
-            label: 'Einchecken',
-          ),
-          const NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Karte'),
-          NavigationDestination(
-            icon: Badge(isLabelVisible: pending > 0, label: Text('$pending'), child: const Icon(Icons.account_circle_outlined)),
-            selectedIcon: const Icon(Icons.account_circle),
-            label: 'Profil',
-          ),
-        ],
+            const VerticalDivider(width: 1),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+    return Scaffold(
+      body: body,
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
+        child: NavigationBar(
+          selectedIndex: _tab,
+          onDestinationSelected: select,
+          destinations: [
+            for (final (i, d) in destinations.indexed)
+              NavigationDestination(
+                icon: d.icon,
+                selectedIcon: i == _checkInTab ? d.selected : ActiveTabMark(icon: d.selected),
+                label: d.label,
+              ),
+          ],
+        ),
       ),
     );
   }

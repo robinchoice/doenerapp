@@ -128,7 +128,8 @@ class _PlaceDetailState extends State<PlaceDetail> {
       controller: widget.controller,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       children: [
-        GlassCard(
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -136,7 +137,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(place.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(place.name, style: displayStyle.copyWith(fontSize: 30, color: theme.colorScheme.onSurface)),
                     if (place.address != null) ...[
                       const SizedBox(height: 4),
                       Row(children: [
@@ -152,9 +153,9 @@ class _PlaceDetailState extends State<PlaceDetail> {
                         _Fact('🎉 Neu seit ${formatDay(opened)}', Colors.red.shade700),
                       if (place.veganOptions == true) _Fact('🌱 Vegane Optionen', Colors.green.shade700),
                       if (place.veganOptions == false) _Fact('Nichts Veganes', theme.colorScheme.outline),
-                      if (diet != Diet.vegan && summary?.ayranHomemade == true) const _Fact('🥛 Ayran selbstgemacht', doenerOrange),
+                      if (diet != Diet.vegan && summary?.ayranHomemade == true) _Fact('🥛 Ayran selbstgemacht', context.accent),
                       if (diet != Diet.vegan && summary?.ayranHomemade == false) _Fact('Ayran gekauft', theme.colorScheme.outline),
-                      for (final special in summary?.specials ?? const <Ingredient>[]) _Fact('✨ ${special.label}', doenerOrange),
+                      for (final special in summary?.specials ?? const <Ingredient>[]) _Fact('✨ ${special.label}', context.accent),
                     ]),
                   ],
                 ),
@@ -165,34 +166,37 @@ class _PlaceDetailState extends State<PlaceDetail> {
         ),
         if (place.openingHours != null) ...[
           const SizedBox(height: 12),
-          GlassCard(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.schedule, color: doenerOrange),
-                const SizedBox(width: 10),
-                Expanded(child: Text(place.openingHours!)),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.schedule, size: 18, color: theme.colorScheme.outline),
+              const SizedBox(width: 8),
+              Expanded(child: Text(place.openingHours!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline))),
+            ],
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        // Rating is the main action; the others stay neutral.
         Row(
           children: [
-            _ActionTile(
+            Expanded(
+              child: FilledButton.icon(onPressed: () => _review(place), icon: const Icon(Icons.restaurant, size: 18), label: const Text('Bewerten')),
+            ),
+            const SizedBox(width: 8),
+            _ActionButton(
               icon: isFavorite ? Icons.favorite : Icons.favorite_border,
               label: isFavorite ? 'Favorit' : 'Merken',
-              color: Colors.pink,
+              color: isFavorite ? Colors.pink : null,
               onTap: () => data.toggleFavorite(place.placeId),
             ),
-            _ActionTile(icon: Icons.restaurant, label: 'Bewerten', color: doenerOrange, onTap: () => _review(place)),
-            _ActionTile(
+            const SizedBox(width: 8),
+            _ActionButton(
               icon: note != null ? Icons.sticky_note_2 : Icons.sticky_note_2_outlined,
               label: 'Notiz',
-              color: Colors.blue,
               onTap: () => _editNote(place, note),
             ),
-            _ActionTile(icon: Icons.directions, label: 'Route', color: Colors.purple, onTap: () => _openRoute(place)),
+            const SizedBox(width: 8),
+            _ActionButton(icon: Icons.directions, label: 'Route', onTap: () => _openRoute(place)),
           ],
         ),
         if (note != null) ...[
@@ -202,7 +206,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Notiz', style: theme.textTheme.labelMedium?.copyWith(color: Colors.blue)),
+                Text('Notiz', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.outline)),
                 const SizedBox(height: 4),
                 Text(note),
               ],
@@ -212,7 +216,6 @@ class _PlaceDetailState extends State<PlaceDetail> {
         if (ownReview != null) ...[
           const SizedBox(height: 20),
           SectionTitle(
-            icon: Icons.person,
             title: 'Deine Bewertung',
             trailing: ownReview.pending ? const Tooltip(message: 'Wird synchronisiert', child: Icon(Icons.cloud_upload_outlined, size: 18)) : null,
           ),
@@ -220,13 +223,14 @@ class _PlaceDetailState extends State<PlaceDetail> {
         ],
         if (menu.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const SectionTitle(icon: Icons.restaurant_menu, title: 'Was es hier gibt'),
-          GlassCard(child: Column(children: menu)),
+          const SectionTitle(title: 'Was es hier gibt'),
+          const Divider(),
+          ...menu,
+          const Divider(),
         ],
         if (session.expertMode && summary != null) ...[
           const SizedBox(height: 20),
           SectionTitle(
-            icon: Icons.manage_search,
             title: 'Mit allem heißt hier …',
             trailing: summary.experts == 0
                 ? null
@@ -236,12 +240,12 @@ class _PlaceDetailState extends State<PlaceDetail> {
         ],
         if (_reviews.where((r) => r.userId != session.user?.id).toList() case final others when others.isNotEmpty) ...[
           const SizedBox(height: 20),
-          SectionTitle(icon: Icons.rate_review, title: 'Bewertungen (${others.length})'),
+          SectionTitle(title: 'Bewertungen (${others.length})'),
           for (final r in others) Padding(padding: const EdgeInsets.only(bottom: 8), child: ReviewCard(review: r, showAuthor: true)),
         ],
         if (visits.isNotEmpty) ...[
           const SizedBox(height: 20),
-          SectionTitle(icon: Icons.check_circle, title: 'Deine Besuche (${visits.length})'),
+          SectionTitle(title: 'Deine Besuche (${visits.length})'),
           for (final v in visits)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -272,6 +276,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                   IgnorePointer(
                     child: GoogleMap(
                       initialCameraPosition: CameraPosition(target: LatLng(place.latitude, place.longitude), zoom: 16),
+                      style: mapStyle(theme.brightness),
                       liteModeEnabled: true,
                       zoomControlsEnabled: false,
                       mapToolbarEnabled: false,
@@ -279,7 +284,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                         Marker(
                           markerId: MarkerId(place.placeId),
                           position: LatLng(place.latitude, place.longitude),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(pinHue),
                         ),
                       },
                     ),
@@ -347,7 +352,7 @@ class _MenuRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           SizedBox(width: 30, child: Text(emoji, style: const TextStyle(fontSize: 18))),
@@ -361,9 +366,11 @@ class _MenuRow extends StatelessWidget {
             ),
           ),
           DoenerRating(value: average.round(), size: 13),
-          const SizedBox(width: 8),
-          Text(formatRating(average), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold)),
-          SizedBox(width: 36, child: Text('($count)', textAlign: TextAlign.right, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline))),
+          SizedBox(width: 36, child: Text('$count', textAlign: TextAlign.right, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline))),
+          SizedBox(
+            width: 44,
+            child: Text(formatRating(average), textAlign: TextAlign.right, style: numberStyle.copyWith(fontSize: 22, color: theme.colorScheme.onSurface)),
+          ),
         ],
       ),
     );
@@ -455,47 +462,41 @@ class _RatingBadge extends StatelessWidget {
   const _RatingBadge({required this.score, required this.label});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: doenerOrange.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              score.average == null ? '—' : formatRating(score.average!),
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: doenerOrange),
-            ),
-            Text(label, style: Theme.of(context).textTheme.labelSmall),
-            Text(score.count == 1 ? '1 Bewertung' : '${score.count} Bewertungen', style: Theme.of(context).textTheme.labelSmall),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      constraints: const BoxConstraints(minWidth: 88),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          Text(score.average == null ? '—' : formatRating(score.average!), style: numberStyle.copyWith(fontSize: 40, color: theme.colorScheme.onSurface)),
+          const SizedBox(height: 4),
+          Text(label, style: theme.textTheme.labelSmall),
+          Text(score.count == 1 ? '1 Bewertung' : '${score.count} Bewertungen', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+        ],
+      ),
+    );
+  }
 }
 
-class _ActionTile extends StatelessWidget {
+class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
+  final Color? color;
   final VoidCallback onTap;
-  const _ActionTile({required this.icon, required this.label, required this.color, required this.onTap});
+  const _ActionButton({required this.icon, required this.label, this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: GlassCard(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            onTap: onTap,
-            child: Column(
-              children: [
-                CircleAvatar(radius: 20, backgroundColor: color.withValues(alpha: 0.12), child: Icon(icon, color: color, size: 20)),
-                const SizedBox(height: 6),
-                Text(label, style: Theme.of(context).textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
+  Widget build(BuildContext context) => IconButton.filledTonal(
+        tooltip: label,
+        onPressed: onTap,
+        icon: Icon(icon, color: color),
+        style: IconButton.styleFrom(
+          fixedSize: const Size(46, 46),
+          backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
         ),
       );
 }

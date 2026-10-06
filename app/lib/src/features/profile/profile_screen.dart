@@ -44,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final visits = data.visits.map((v) => v.dto).toList();
     final stats = ProfileStats.compute(visits: visits, reviewCount: data.reviews.length, cityOf: (id) => data.places[id]?.city);
     final foods = foodCounts(visits);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -57,121 +58,128 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
         children: [
-          GlassCard(
-            child: Row(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ClipOval(child: Image.asset('assets/logo.jpg', width: 64, height: 64, fit: BoxFit.cover)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(user?.displayName ?? 'Döner-Fan', style: Theme.of(context).textTheme.titleLarge),
-                      if (stats.firstVisit != null)
-                        Text('Seit ${DateFormat('MMMM y', 'de').format(stats.firstVisit!.toLocal())}',
-                            style: TextStyle(color: Theme.of(context).colorScheme.outline)),
-                    ],
-                  ),
+                Row(
+                  children: [
+                    const BrandTile(size: 64),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(user?.displayName ?? 'Döner-Fan', style: displayStyle.copyWith(fontSize: 28, color: theme.colorScheme.onSurface)),
+                          Text.rich(
+                            TextSpan(children: [
+                              if (stats.firstVisit != null) TextSpan(text: 'Seit ${DateFormat('MMMM y', 'de').format(stats.firstVisit!.toLocal())} · '),
+                              TextSpan(text: stats.stampTier.displayName, style: TextStyle(color: context.accent, fontWeight: FontWeight.w600)),
+                            ]),
+                            style: TextStyle(color: theme.colorScheme.outline),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 16),
+                const Divider(),
+                _MenuRow(
+                  icon: Icons.group,
+                  label: 'Freunde',
+                  trailing: [
+                    if (friends.incoming.isNotEmpty) Badge(label: Text('${friends.incoming.length}')),
+                    const SizedBox(width: 8),
+                    Text('${friends.accepted.length}', style: TextStyle(color: theme.colorScheme.outline)),
+                  ],
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
+                ),
+                _MenuRow(icon: Icons.qr_code_2, label: 'Freunde einladen', onTap: () => showAppSheet(context, (_) => const InviteSheet())),
+                _MenuRow(
+                  icon: Icons.history,
+                  label: 'Meine Aktivität',
+                  trailing: [if (data.pendingCount > 0) Badge(label: Text('${data.pendingCount}'))],
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyActivityScreen())),
+                ),
+                _MenuRow(
+                  icon: Icons.storefront,
+                  label: 'Meine Läden',
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPlacesScreen())),
+                ),
+                _MenuRow(
+                  icon: Icons.auto_awesome,
+                  label: 'Döner Wrapped ${DateTime.now().year}',
+                  trailing: [Text('Dein Jahresrückblick', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline))],
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WrappedScreen())),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                IntrinsicHeight(
+                  child: Row(children: [
+                    _StatCard(value: stats.totalVisits, label: 'Besuche'),
+                    const VerticalDivider(width: 1),
+                    _StatCard(value: stats.totalReviews, label: 'Bewertungen'),
+                    const VerticalDivider(width: 1),
+                    _StatCard(value: stats.uniquePlaces, label: 'Läden'),
+                  ]),
+                ),
+                const Divider(),
+                const SizedBox(height: 20),
+                _StampCard(stats: stats),
+                const SizedBox(height: 24),
+                FoodStatsCard(foods: foods),
+                const SizedBox(height: 24),
+                _Achievements(unlocked: stats.unlockedAchievements(friendsCount: friends.accepted.length)),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          GlassCard(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
-            child: Row(children: [
-              const Icon(Icons.group, color: doenerOrange),
-              const SizedBox(width: 12),
-              const Expanded(child: Text('Freunde')),
-              if (friends.incoming.isNotEmpty) Badge(label: Text('${friends.incoming.length}')),
-              const SizedBox(width: 8),
-              Text('${friends.accepted.length}'),
-              const Icon(Icons.chevron_right),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          GlassCard(
-            onTap: () => showAppSheet(context, (_) => const InviteSheet()),
-            child: const Row(children: [
-              Icon(Icons.qr_code_2, color: doenerOrange),
-              SizedBox(width: 12),
-              Expanded(child: Text('Freunde einladen')),
-              Icon(Icons.chevron_right),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          GlassCard(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyActivityScreen())),
-            child: Row(children: [
-              const Icon(Icons.history, color: doenerOrange),
-              const SizedBox(width: 12),
-              const Expanded(child: Text('Meine Aktivität')),
-              if (data.pendingCount > 0) Badge(label: Text('${data.pendingCount}')),
-              const Icon(Icons.chevron_right),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          GlassCard(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPlacesScreen())),
-            child: const Row(children: [
-              Icon(Icons.storefront, color: doenerOrange),
-              SizedBox(width: 12),
-              Expanded(child: Text('Meine Läden')),
-              Icon(Icons.chevron_right),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          Row(children: [
-            _StatCard(value: stats.totalVisits, label: 'Besuche', icon: Icons.check_circle, color: Colors.green),
-            const SizedBox(width: 12),
-            _StatCard(value: stats.totalReviews, label: 'Bewertungen', icon: Icons.star, color: doenerOrange),
-            const SizedBox(width: 12),
-            _StatCard(value: stats.uniquePlaces, label: 'Läden', icon: Icons.place, color: Colors.purple),
-          ]),
-          const SizedBox(height: 12),
-          FoodStatsCard(foods: foods),
-          const SizedBox(height: 12),
-          GlassCard(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WrappedScreen())),
-            child: Row(children: [
-              const Icon(Icons.auto_awesome, color: doenerOrange, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Döner Wrapped ${DateTime.now().year}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text('Dein persönlicher Jahresrückblick', style: Theme.of(context).textTheme.bodySmall),
-                ]),
-              ),
-              const Icon(Icons.chevron_right),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          _StampCard(stats: stats),
-          const SizedBox(height: 20),
-          _Achievements(unlocked: stats.unlockedAchievements(friendsCount: friends.accepted.length)),
+          const PleasanceFooter(),
         ],
       ),
     );
   }
 }
 
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final List<Widget> trailing;
+  final VoidCallback onTap;
+  const _MenuRow({required this.icon, required this.label, this.trailing = const [], required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
+          child: Row(children: [
+            Icon(icon, color: context.accent, size: 22),
+            const SizedBox(width: 14),
+            Expanded(child: Text(label)),
+            ...trailing,
+            Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
+          ]),
+        ),
+      );
+}
+
 class _StatCard extends StatelessWidget {
   final int value;
   final String label;
-  final IconData icon;
-  final Color color;
-  const _StatCard({required this.value, required this.label, required this.icon, required this.color});
+  const _StatCard({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: GlassCard(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 6),
-            Text('$value', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            Text(label, style: Theme.of(context).textTheme.labelSmall),
+            Text('$value', style: numberStyle.copyWith(fontSize: 44, color: Theme.of(context).colorScheme.onSurface)),
+            const SizedBox(height: 4),
+            Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.outline)),
           ]),
         ),
       );
@@ -182,37 +190,35 @@ class FoodStatsCard extends StatelessWidget {
   const FoodStatsCard({super.key, required this.foods});
 
   @override
-  Widget build(BuildContext context) => GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SectionTitle(icon: Icons.bar_chart, title: 'Dein Döner-Konsum'),
-            if (foods.isEmpty) Text('Noch keine Check-ins mit Essenstyp', style: Theme.of(context).textTheme.bodySmall),
-            for (final (food, count) in foods)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(children: [
-                  SizedBox(width: 32, child: Text(food.emoji, style: const TextStyle(fontSize: 20))),
-                  SizedBox(width: 80, child: Text(food.label)),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, c) => Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          width: c.maxWidth * count / foods.first.$2,
-                          height: 20,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(color: doenerOrange, borderRadius: BorderRadius.circular(10)),
-                          child: Text('$count', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionTitle(title: 'Dein Döner-Konsum'),
+          if (foods.isEmpty) Text('Noch keine Check-ins mit Essenstyp', style: Theme.of(context).textTheme.bodySmall),
+          for (final (food, count) in foods)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                SizedBox(width: 32, child: Text(food.emoji, style: const TextStyle(fontSize: 20))),
+                SizedBox(width: 80, child: Text(food.label)),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, c) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        width: c.maxWidth * count / foods.first.$2,
+                        height: 20,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface, borderRadius: BorderRadius.circular(6)),
+                        child: Text('$count', style: TextStyle(color: Theme.of(context).colorScheme.surface, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                     ),
                   ),
-                ]),
-              ),
-          ],
-        ),
+                ),
+              ]),
+            ),
+        ],
       );
 }
 
@@ -223,48 +229,43 @@ class _StampCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tier = stats.stampTier;
-    final color = tierColor(tier);
+    final color = tierColor(context, tier);
+    final scheme = Theme.of(context).colorScheme;
     final next = tier.nextTier;
     final inTier = stats.totalVisits - tier.stampsRequired;
     final dots = next == null ? 10 : next.stampsRequired - tier.stampsRequired;
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionTitle(
-            icon: Icons.verified,
-            title: 'Stempelkarte',
-            trailing: Chip(
-              label: Text(tier.displayName, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-              backgroundColor: color.withValues(alpha: 0.15),
-              side: BorderSide.none,
-              visualDensity: VisualDensity.compact,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionTitle(
+          title: 'Stempelkarte',
+          trailing: Chip(
+            label: Text(tier.displayName, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            backgroundColor: color.withValues(alpha: 0.15),
+            side: BorderSide.none,
+            visualDensity: VisualDensity.compact,
           ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: stats.stampProgress, minHeight: 8, color: color, backgroundColor: color.withValues(alpha: 0.15)),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            next == null ? 'Höchste Stufe erreicht!' : 'Noch ${stats.stampsToNextTier} Besuche bis ${next.displayName}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (var i = 0; i < dots; i++)
-                CircleAvatar(
-                  radius: 8,
-                  backgroundColor: i < inTier || next == null ? color : Colors.grey.withValues(alpha: 0.2),
-                  child: i < inTier || next == null ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
-                ),
-            ],
-          ),
-        ],
-      ),
+        ),
+        GradientProgress(value: stats.stampProgress),
+        const SizedBox(height: 6),
+        Text(
+          next == null ? 'Höchste Stufe erreicht!' : 'Noch ${stats.stampsToNextTier} Besuche bis ${next.displayName}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (var i = 0; i < dots; i++)
+              CircleAvatar(
+                radius: 8,
+                backgroundColor: i < inTier || next == null ? scheme.onSurface : scheme.onSurface.withValues(alpha: 0.08),
+                child: i < inTier || next == null ? Icon(Icons.check, size: 10, color: scheme.surface) : null,
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -278,7 +279,6 @@ class _Achievements extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionTitle(
-            icon: Icons.emoji_events,
             title: 'Erfolge',
             trailing: Text('${unlocked.length}/${AchievementType.values.length}'),
           ),
@@ -295,8 +295,8 @@ class _Achievements extends StatelessWidget {
                   child: Column(children: [
                     CircleAvatar(
                       radius: 26,
-                      backgroundColor: unlocked.contains(type) ? doenerOrange.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.08),
-                      child: Icon(achievementIcon(type), color: unlocked.contains(type) ? doenerOrange : Colors.grey.withValues(alpha: 0.4)),
+                      backgroundColor: unlocked.contains(type) ? Theme.of(context).colorScheme.secondaryContainer : Colors.grey.withValues(alpha: 0.08),
+                      child: Icon(achievementIcon(type), color: unlocked.contains(type) ? context.accent : Colors.grey.withValues(alpha: 0.4)),
                     ),
                     const SizedBox(height: 4),
                     Text(type.title, textAlign: TextAlign.center, maxLines: 2, style: const TextStyle(fontSize: 10)),
@@ -319,14 +319,6 @@ class WrappedScreen extends StatefulWidget {
 class _WrappedScreenState extends State<WrappedScreen> {
   int _page = 0;
 
-  static const _gradients = [
-    [Colors.orange, Colors.red],
-    [Colors.pink, Colors.purple],
-    [Colors.blue, Colors.cyan],
-    [Colors.green, Colors.teal],
-    [Colors.orange, Colors.amber],
-  ];
-
   @override
   Widget build(BuildContext context) {
     final data = context.watch<AppData>();
@@ -345,9 +337,10 @@ class _WrappedScreenState extends State<WrappedScreen> {
     final busiestMonth = byMonth.entries.fold<MapEntry<int, int>?>(null, (best, e) => best == null || e.value > best.value ? e : best);
     final monthName = busiestMonth == null ? null : DateFormat('MMMM', 'de').format(DateTime(year, busiestMonth.key));
 
-    const white = TextStyle(color: Colors.white);
-    Widget big(String text) => Text(text, style: white.copyWith(fontSize: 64, fontWeight: FontWeight.bold), textAlign: TextAlign.center);
-    Widget label(String text) => Text(text, style: white.copyWith(fontSize: 20), textAlign: TextAlign.center);
+    // Always dark, like the tile: big numbers glow, the text stays light.
+    final highlight = accentFor(Brightness.dark);
+    Widget big(String text) => Text(text, style: numberStyle.copyWith(fontSize: 96, color: highlight), textAlign: TextAlign.center);
+    Widget label(String text) => Text(text, style: const TextStyle(color: nightText, fontSize: 20), textAlign: TextAlign.center);
     Widget emoji(String e) => Text(e, style: const TextStyle(fontSize: 80));
 
     final pages = [
@@ -372,10 +365,9 @@ class _WrappedScreenState extends State<WrappedScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: Colors.white),
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 500),
-        decoration: BoxDecoration(gradient: LinearGradient(colors: _gradients[_page], begin: Alignment.topLeft, end: Alignment.bottomRight)),
+      backgroundColor: night,
+      appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: nightText),
+      body: SizedBox.expand(
         child: Stack(
           children: [
             PageView(
@@ -398,11 +390,16 @@ class _WrappedScreenState extends State<WrappedScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   for (var i = 0; i < pages.length; i++)
-                    Container(
-                      margin: const EdgeInsets.all(4),
-                      width: 8,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.all(3),
+                      width: i == _page ? 22 : 8,
                       height: 8,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: i == _page ? 1 : 0.4)),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        gradient: i == _page ? actionGradient : null,
+                        color: i == _page ? null : Colors.white.withValues(alpha: 0.18),
+                      ),
                     ),
                 ],
               ),

@@ -292,7 +292,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
                       child: Text(
                         _labels[score],
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: context.accent, fontWeight: FontWeight.w600),
                       ),
                     ),
                 ],

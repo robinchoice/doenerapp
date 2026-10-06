@@ -17,6 +17,7 @@ dependencies:
   doener_models:
     path: ../packages/doener_models
   flutter_secure_storage: ^11.2.0
+  flutter_svg: ^2.3.0
   geolocator: ^14.1.1
   google_maps_flutter: ^2.18.2
   http: ^1.6.0
@@ -48,14 +49,18 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/logo.jpg
+    - assets/pleasance-wordmark.svg
+  fonts:
+    - family: Bricolage Grotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque.ttf
 
 flutter_launcher_icons:
-  image_path: assets/logo.jpg
+  image_path: assets/icon.png
   android: true
   ios: true
   remove_alpha_ios: true
   web:
     generate: true
-    background_color: "#FF8C00"
-    theme_color: "#FF8C00"
+    background_color: "#F4F4F1"
+    theme_color: "#121117"

@@ -175,7 +175,9 @@ class _StartScreenState extends State<StartScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Start')),
+      appBar: AppBar(
+        title: const Row(children: [BrandTile(size: 30), SizedBox(width: 10), Text('Döner App')]),
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: NotificationListener<ScrollNotification>(
@@ -205,7 +207,6 @@ class _StartScreenState extends State<StartScreen> {
               ],
               if (tasks.isNotEmpty) const SizedBox(height: 10),
               SectionTitle(
-                icon: Icons.emoji_events,
                 title: switch (diet) { Diet.all => 'Top 3 hier', Diet.vegetarian => 'Top 3 ohne Fleisch', Diet.vegan => 'Top 3 vegan' },
                 trailing: position == null
                     ? Text('Freiburg', style: TextStyle(color: Theme.of(context).colorScheme.outline))
@@ -218,13 +219,14 @@ class _StartScreenState extends State<StartScreen> {
                   onTap: widget.onOpenMap,
                   child: const Text('Hier kennt die App noch keine Döner-Läden. Schau auf der Karte, was es in der Nähe gibt.'),
                 )
-              else
-                for (final (i, place) in _top.indexed)
-                  Padding(padding: const EdgeInsets.only(bottom: 10), child: _TopTile(rank: i + 1, place: place, diet: diet)),
+              else ...[
+                const Divider(),
+                for (final (i, place) in _top.indexed) _TopTile(rank: i + 1, place: place, diet: diet),
+              ],
               if (_trending.where((p) => diet != Diet.vegan || p.veganOptions != false).toList() case final trending
                   when trending.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                const SectionTitle(icon: Icons.local_fire_department, title: 'Gerade im Trend'),
+                const SizedBox(height: 24),
+                const SectionTitle(title: 'Gerade im Trend'),
                 SizedBox(
                   height: 118,
                   child: ListView.separated(
@@ -237,7 +239,6 @@ class _StartScreenState extends State<StartScreen> {
               ],
               const SizedBox(height: 24),
               SectionTitle(
-                icon: Icons.forum_outlined,
                 title: _friendsOnly ? 'Deine Freunde' : 'In deiner Gegend',
                 trailing: FilterChip(
                   label: const Text('Nur Freunde'),
@@ -248,10 +249,9 @@ class _StartScreenState extends State<StartScreen> {
                   },
                 ),
               ),
+              if (_items.isNotEmpty) const Divider(),
               for (final item in _items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: ActivityCard(
+                ActivityCard(
                     type: item.type,
                     title: item.user.displayName,
                     subtitle: '${item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet:'} ${item.place.name}',
@@ -264,8 +264,7 @@ class _StartScreenState extends State<StartScreen> {
                     photoId: item.photoId,
                     onSite: item.onSite,
                     highlight: item.fromFriend,
-                    onTap: () => showPlaceDetail(context, item.place),
-                  ),
+                  onTap: () => showPlaceDetail(context, item.place),
                 ),
               if (_loading)
                 const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
@@ -307,10 +306,10 @@ class _Task extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GlassCard(
         onTap: onTap,
-        color: doenerOrange.withValues(alpha: 0.1),
+        color: Theme.of(context).colorScheme.secondaryContainer,
         child: Row(
           children: [
-            Icon(icon, color: doenerOrange, size: 28),
+            Icon(icon, color: context.accent, size: 28),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -340,7 +339,7 @@ class _TopTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final score = place.score(diet);
-    return GlassCard(
+    return HairlineRow(
       onTap: () => showPlaceDetail(context, place),
       child: Row(
         children: [
@@ -350,18 +349,15 @@ class _TopTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(place.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (place.address != null) Text(place.address!, style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(place.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (place.address != null) Text(place.address!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
           if (score.average == null)
             Text('noch unbewertet', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline))
           else
-            Column(children: [
-              Text(formatRating(score.average!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 20)),
-              Text('${score.count} Bew.', style: theme.textTheme.labelSmall),
-            ]),
+            ScoreBlock(average: score.average!, count: score.count),
         ],
       ),
     );
@@ -389,7 +385,7 @@ class _PlaceCard extends StatelessWidget {
               Row(children: [
                 DoenerRating(value: score.average!.round(), size: 12),
                 const SizedBox(width: 4),
-                Text(formatRating(score.average!), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(formatRating(score.average!), style: numberStyle.copyWith(color: context.accent, fontSize: 15)),
                 Text(' (${score.count})', style: Theme.of(context).textTheme.labelSmall),
               ]),
           ],
@@ -408,7 +404,6 @@ class _NewPlacesCard extends StatelessWidget {
     final theme = Theme.of(context);
     final city = (news.opened.isEmpty ? news.upcoming : news.opened).first.city;
     return GlassCard(
-      color: doenerOrange.withValues(alpha: 0.1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -456,11 +451,10 @@ class _LiveChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GlassCard(
         padding: const EdgeInsets.all(12),
-        color: doenerOrange.withValues(alpha: 0.1),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(status.user.displayName, style: const TextStyle(fontWeight: FontWeight.w600, color: doenerOrange)),
+            Text(status.user.displayName, style: TextStyle(fontWeight: FontWeight.w600, color: context.accent)),
             Text('isst gerade bei ${status.placeName}', maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
             if (FoodItem.byId(status.foodType) case final food?) Text('${food.emoji} ${food.label}', style: Theme.of(context).textTheme.bodySmall),
           ],

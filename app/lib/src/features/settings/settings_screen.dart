@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     Widget header(String text) => Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-          child: Text(text, style: theme.textTheme.titleSmall?.copyWith(color: doenerOrange)),
+          child: Text(text, style: theme.textTheme.titleSmall?.copyWith(color: context.accent)),
         );
 
     return Scaffold(

@@ -81,6 +81,14 @@ void main() {
       expect(Validation.isValidRating(5), isTrue);
       expect(Validation.clean('  '), isNull);
     });
+
+    test('photo types', () {
+      expect(Validation.photoType([0xff, 0xd8, 0xff, 0xe0]), 'image/jpeg');
+      expect(Validation.photoType([0x89, 0x50, 0x4e, 0x47, 0x0d]), 'image/png');
+      expect(Validation.photoType([...'RIFF'.codeUnits, 0, 0, 0, 0, ...'WEBP'.codeUnits]), 'image/webp');
+      expect(Validation.photoType('GIF89a'.codeUnits), isNull);
+      expect(Validation.photoType([0xff]), isNull);
+    });
   });
 
   test('DTO JSON roundtrip', () {
@@ -92,6 +100,8 @@ void main() {
       timestamp: DateTime.utc(2026, 9, 1, 12, 0, 0, 123, 456),
       fromFriend: true,
       ratings: const {RatingItem.sauce: 5, RatingItem.falafel: 4},
+      photoId: 'photo',
+      onSite: true,
     );
     final page = FeedPage.fromJson(FeedPage(items: [item], cursor: 'c', hasMore: true).toJson());
     expect(page.items.single.timestamp, item.timestamp);
@@ -99,6 +109,7 @@ void main() {
     expect(page.items.single.type, FeedItemType.review);
     expect(page.items.single.fromFriend, isTrue);
     expect(page.items.single.ratings, item.ratings);
+    expect((page.items.single.photoId, page.items.single.onSite), ('photo', true));
 
     final ranking = RankingDto.fromJson(RankingDto(
       city: 'Freiburg im Breisgau',

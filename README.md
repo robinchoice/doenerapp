@@ -54,6 +54,8 @@ Ein Bogen, alle Punkte 1–5 und optional. Oben der Döner mit Soße, Fleisch un
 - „Selbstgemachter Ayran?“: Bewertet wird nur selbstgemachter, „gekauft“ steht trotzdem am Laden
 - Expertenmodus (Einstellungen): fragt ab, was in „mit allem“ steckt (Salat, Besonderheiten wie Granatapfelkerne oder Mais, Soßen), dazu Fleisch, Spieß (selbst gesteckt oder Fertigspieß) und Brot. Vorausgefüllt mit dem, was andere angegeben haben
 - Eine Bewertung pro Nutzer und Laden, eine neue ersetzt die alte. Die Angaben (vegan, Ayran, Zutaten) hängen an der Bewertung, pro Laden zählt die Mehrheit
+- Optional ein Foto (Kamera oder Galerie, JPEG, PNG oder WebP bis 3 MB). Es bleibt beim Bearbeiten, bis es ersetzt oder entfernt wird, und wartet wie die Bewertung offline in der Queue. Der Server speichert es in Postgres, jedes neue Foto bekommt eine neue ID und ist darüber dauerhaft cachebar
+- Wer im Laden schon einmal eingecheckt hat, bekommt das Häkchen „vor Ort“. Der Server leitet es beim Lesen aus den Check-ins ab
 - Durchschnitt und Anzahl berechnet der Server beim Lesen. Die Noten einer Bewertung (Döner, ohne Fleisch, vegan) leitet er beim Speichern aus den Punkten ab (`Diet.score` in `packages/doener_models`)
 - In der Laden-Ansicht: Chips für vegane Optionen, Ayran und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Expertenmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen
 
@@ -174,7 +176,8 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/places/:placeId` | Laden (Google Place ID) |
 | GET | `/places/:placeId/reviews` | Bewertungen des Ladens |
 | GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran und was „mit allem“ heißt |
-| PUT | `/places/:placeId/review` | Eigene Bewertung speichern |
+| PUT | `/places/:placeId/review` | Eigene Bewertung speichern, optional mit Foto (`photoBase64`) oder ohne das bisherige (`removePhoto`) |
+| GET | `/photos/:id` | Foto einer Bewertung (ohne Login) |
 | POST | `/places/:placeId/visits` | Check-in (idempotent über Client-ID) |
 | GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten |
 | DELETE | `/me/live-status` | Live-Status beenden |
@@ -315,7 +318,6 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 ### Phase 1 – Bester Döner der Stadt
 
-- Neue Bewertung mit Foto und Häkchen „vor Ort“
 - Erinnerung nach dem Check-in („Wie war's bei X?“)
 - Push für Check-ins von Freunden, neue Läden und die Erinnerung, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
 - Öffentliches Profil mit Stufe, Wegfallendes entfernen

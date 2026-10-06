@@ -216,7 +216,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
             title: 'Deine Bewertung',
             trailing: ownReview.pending ? const Tooltip(message: 'Wird synchronisiert', child: Icon(Icons.cloud_upload_outlined, size: 18)) : null,
           ),
-          ReviewCard(review: ownReview.dto, onEdit: () => _review(place)),
+          ReviewCard(review: ownReview.dto, photo: ownReview.photo, onEdit: () => _review(place)),
         ],
         if (menu.isNotEmpty) ...[
           const SizedBox(height: 20),
@@ -412,9 +412,12 @@ class _IngredientsCard extends StatelessWidget {
 
 class ReviewCard extends StatelessWidget {
   final ReviewDto review;
+
+  /// The own photo while it waits for upload.
+  final Uint8List? photo;
   final bool showAuthor;
   final VoidCallback? onEdit;
-  const ReviewCard({super.key, required this.review, this.showAuthor = false, this.onEdit});
+  const ReviewCard({super.key, required this.review, this.photo, this.showAuthor = false, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -429,12 +432,14 @@ class ReviewCard extends StatelessWidget {
             children: [
               if (showAuthor) ...[Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(width: 8)],
               if (review.headline(diet) case final score?) DoenerRating(value: score.round(), size: 14),
+              if (review.onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
               const Spacer(),
               if (onEdit != null) Icon(Icons.edit, size: 16, color: theme.colorScheme.outline),
             ],
           ),
           if (review.ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: review.ratings, diet: diet)],
           if (review.text != null) ...[const SizedBox(height: 6), Text(review.text!)],
+          if (photo != null || review.photoId != null) ...[const SizedBox(height: 10), ReviewPhoto(photoId: review.photoId, bytes: photo)],
           const SizedBox(height: 6),
           Text(formatDate(review.updatedAt), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
         ],

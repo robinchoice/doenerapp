@@ -199,6 +199,17 @@ final migrations = <List<String>>[
       WHERE p.business_status IS DISTINCT FROM 'FUTURE_OPENING'
     ''',
   ],
+  [
+    // One photo per review, kept out of `reviews` so `r.*` stays small. A new
+    // photo gets a new id, which makes its URL cacheable for good.
+    '''CREATE TABLE review_photos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      review_id uuid NOT NULL UNIQUE REFERENCES reviews (id) ON DELETE CASCADE,
+      content_type text NOT NULL,
+      data bytea NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

@@ -246,6 +246,8 @@ class _StartScreenState extends State<StartScreen> {
                     diet: diet,
                     text: item.text,
                     foodType: item.foodType,
+                    photoId: item.photoId,
+                    onSite: item.onSite,
                     highlight: item.fromFriend,
                     onTap: () => showPlaceDetail(context, item.place),
                   ),

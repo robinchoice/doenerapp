@@ -1,4 +1,5 @@
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,9 +19,9 @@ class MyActivityScreen extends StatelessWidget {
     final diet = context.watch<Session>().diet;
     final entries = [
       for (final v in data.visits)
-        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, score: null as double?, ratings: const <RatingItem, int>{}, food: v.dto.foodType, pending: v.pending),
+        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, score: null as double?, ratings: const <RatingItem, int>{}, food: v.dto.foodType, photoId: null as String?, photo: null as Uint8List?, onSite: false, pending: v.pending),
       for (final r in data.reviews.values)
-        (type: FeedItemType.review, placeId: r.dto.placeId, placeName: r.dto.placeName, at: r.dto.updatedAt, text: r.dto.text, score: r.dto.headline(diet), ratings: r.dto.ratings, food: null as String?, pending: r.pending),
+        (type: FeedItemType.review, placeId: r.dto.placeId, placeName: r.dto.placeName, at: r.dto.updatedAt, text: r.dto.text, score: r.dto.headline(diet), ratings: r.dto.ratings, food: null as String?, photoId: r.dto.photoId, photo: r.photo, onSite: r.dto.onSite, pending: r.pending),
     ]..sort((a, b) => b.at.compareTo(a.at));
 
     return Scaffold(
@@ -52,6 +53,9 @@ class MyActivityScreen extends StatelessWidget {
                         diet: diet,
                         text: e.text,
                         foodType: e.food,
+                        photoId: e.photoId,
+                        photo: e.photo,
+                        onSite: e.onSite,
                         pending: e.pending,
                         onTap: data.places[e.placeId] == null ? null : () => showPlaceDetail(context, data.places[e.placeId]!),
                       ),

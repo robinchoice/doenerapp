@@ -432,6 +432,50 @@ void main() {
       expect(await put({'veganOptions': false}), 200, reason: 'telling there is nothing vegan is enough');
     });
 
+    test('reviews carry a photo and tell who was there', () async {
+      final jpeg = [0xff, 0xd8, 0xff, 0xe0, 1, 2, 3];
+      final photo = base64.encode(jpeg);
+      Future<(int, dynamic)> put(Map<String, dynamic> body) => call('PUT', '/places/place-kebap/review', body: body, token: bob);
+      Future<ReviewDto> saved(Map<String, dynamic> body) async {
+        final (status, json) = await put(body);
+        expect(status, 200, reason: '$json');
+        return ReviewDto.fromJson(json as Map<String, dynamic>);
+      }
+
+      final first = await saved({'sauceRating': 4, 'photoBase64': photo});
+      expect(first.photoId, isNotNull);
+      expect(first.onSite, isFalse, reason: 'Bob never checked in here');
+      final response = await handler(Request('GET', Uri.parse('http://localhost/api/v1/photos/${first.photoId}')));
+      expect(response.statusCode, 200);
+      expect(response.headers['content-type'], 'image/jpeg');
+      expect(response.headers['cache-control'], contains('immutable'));
+      expect(await response.read().expand((chunk) => chunk).toList(), jpeg);
+
+      expect((await saved({'sauceRating': 5})).photoId, first.photoId, reason: 'an edit without a photo keeps it');
+      final replaced = await saved({'sauceRating': 5, 'photoBase64': photo});
+      expect(replaced.photoId, allOf(isNotNull, isNot(first.photoId)), reason: 'a new photo gets a new URL');
+      expect((await call('GET', '/photos/${first.photoId}')).$1, 404);
+      expect((await saved({'sauceRating': 5, 'removePhoto': true})).photoId, isNull);
+      expect((await call('GET', '/photos/${replaced.photoId}')).$1, 404);
+
+      expect((await put({'photoBase64': base64.encode([1, 2, 3])})).$1, 400, reason: 'not an image');
+      expect((await put({'photoBase64': 'kein Base64!'})).$1, 400);
+      expect((await put({'photoBase64': base64.encode([...jpeg, ...List.filled(Validation.reviewPhotoMaxBytes, 0)])})).$1, 413);
+
+      await call('POST', '/places/place-kebap/visits',
+          body: {'id': '33333333-2222-4333-8444-555555555555', 'visitedAt': DateTime.now().toUtc().toIso8601String()}, token: bob);
+      final withCheckIn = await saved({'photoBase64': photo});
+      expect(withCheckIn.photoId, isNotNull, reason: 'a photo alone is a review');
+      expect(withCheckIn.onSite, isTrue);
+
+      final (_, reviews) = await call('GET', '/places/place-kebap/reviews');
+      final bobs = (reviews as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob');
+      expect((bobs.photoId, bobs.onSite), (withCheckIn.photoId, true));
+      final (_, feed) = await call('GET', '/feed', token: anna);
+      final item = FeedPage.fromJson(feed as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review);
+      expect((item.photoId, item.onSite), (withCheckIn.photoId, true));
+    });
+
     test('feedback and shop reports', () async {
       final png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3];
       final feedback = {

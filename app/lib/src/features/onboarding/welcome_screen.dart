@@ -51,12 +51,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         );
 
     Widget step(IconData icon, String title, String text) => ListTile(
-          leading: CircleAvatar(backgroundColor: doenerOrange.withValues(alpha: 0.15), child: Icon(icon, color: doenerOrange)),
+          leading: CircleAvatar(backgroundColor: theme.colorScheme.secondaryContainer, child: Icon(icon, color: context.accent)),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(text),
         );
 
     return Scaffold(
+      bottomNavigationBar: const SafeArea(top: false, child: PleasanceFooter()),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -69,7 +70,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     onPageChanged: (p) => setState(() => _page = p),
                     children: [
                       page(
-                        top: ClipOval(child: Image.asset('assets/logo.jpg', width: 140, height: 140, fit: BoxFit.cover)),
+                        top: const BrandTile(size: 132),
                         title: 'Döner App',
                         text: 'Finde, bewerte und sammle deine liebsten Döner-Läden.',
                         extra: widget.inviteCode == null ? null : InviterBanner(code: widget.inviteCode!),
@@ -78,7 +79,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         top: Icon(
                           location.position != null ? Icons.location_on : Icons.location_searching,
                           size: 96,
-                          color: location.denied ? Colors.grey : doenerOrange,
+                          color: location.denied ? Colors.grey : context.accent,
                         ),
                         title: 'Dein Standort',
                         text: location.position != null
@@ -120,7 +121,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           height: 8,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            color: i == _page ? doenerOrange : theme.colorScheme.outlineVariant,
+                            gradient: i == _page ? actionGradient : null,
+                            color: i == _page ? null : theme.colorScheme.outlineVariant,
                           ),
                         ),
                       const Spacer(),

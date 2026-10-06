@@ -104,7 +104,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final friends = context.watch<Friends>();
     Widget header(String text) => Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: doenerOrange)),
+          child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: context.accent)),
         );
 
     return Scaffold(

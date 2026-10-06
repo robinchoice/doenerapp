@@ -62,14 +62,7 @@ class _CheckInSheetState extends State<CheckInSheet> {
             const SizedBox(height: 8),
             RotaryPicker(items: _foods, selected: _selected, onChanged: (i) => setState(() => _selected = i)),
             Center(
-              child: SizedBox.square(
-                dimension: 72,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(shape: const CircleBorder(), backgroundColor: doenerOrange, padding: EdgeInsets.zero),
-                  onPressed: _done ? null : _checkIn,
-                  child: const Icon(Icons.check, size: 34, color: Colors.white),
-                ),
-              ),
+              child: GradientCircle(size: 72, active: !_done, onPressed: _done ? null : _checkIn, child: const Icon(Icons.check)),
             ),
           ],
         ),

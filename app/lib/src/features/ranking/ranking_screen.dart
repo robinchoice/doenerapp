@@ -133,9 +133,10 @@ class _RankingScreenState extends State<RankingScreen> {
                         ? 'Bewerte deinen Stammladen – dann steht er hier ganz oben.'
                         : 'Für ${by.label} hat hier noch niemand eine Note vergeben.',
                   )
-                else
-                  for (final (i, entry) in entries.indexed)
-                    Padding(padding: const EdgeInsets.only(bottom: 10), child: _RankingRow(rank: i + 1, entry: entry)),
+                else ...[
+                  const Divider(),
+                  for (final (i, entry) in entries.indexed) _RankingRow(rank: i + 1, entry: entry),
+                ],
                 const GoogleAttribution(),
               ],
             ),
@@ -154,7 +155,7 @@ class _RankingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GlassCard(
+    return HairlineRow(
       onTap: () => showPlaceDetail(context, entry.place),
       child: Row(
         children: [
@@ -164,11 +165,11 @@ class _RankingRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.place.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(entry.place.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5), maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (entry.friends.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Row(children: [
-                    const Icon(Icons.group, size: 14, color: doenerOrange),
+                    Icon(Icons.group, size: 14, color: context.accent),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -183,10 +184,7 @@ class _RankingRow extends StatelessWidget {
               ],
             ),
           ),
-          Column(children: [
-            Text(formatRating(entry.average), style: const TextStyle(color: doenerOrange, fontWeight: FontWeight.bold, fontSize: 20)),
-            Text('${entry.count} Bew.', style: theme.textTheme.labelSmall),
-          ]),
+          ScoreBlock(average: entry.average, count: entry.count),
         ],
       ),
     );

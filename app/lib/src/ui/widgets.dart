@@ -5,27 +5,136 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/session.dart';
+import 'brand.dart';
 
-const doenerOrange = Color(0xFFFF8C00);
+export 'brand.dart';
 
 ThemeData buildTheme(Brightness brightness) {
-  // Buttons in the brand orange (as in the iOS app) instead of the muted seed tone.
-  final scheme = ColorScheme.fromSeed(seedColor: doenerOrange, brightness: brightness)
-      .copyWith(primary: doenerOrange, onPrimary: Colors.white);
-  return ThemeData(
-    colorScheme: scheme,
-    useMaterial3: true,
+  final isDark = brightness == Brightness.dark;
+  final accent = accentFor(brightness);
+  final ground = isDark ? night : paper;
+  final card = isDark ? nightRaised : Colors.white;
+  final text = isDark ? nightText : ink;
+  final quiet = isDark ? nightMuted : muted;
+  final line = isDark ? nightLine : hairline;
+  final scheme = ColorScheme.fromSeed(seedColor: accent, brightness: brightness).copyWith(
+    primary: accent,
+    onPrimary: isDark ? ink : Colors.white,
+    surface: ground,
+    onSurface: text,
+    onSurfaceVariant: quiet,
+    surfaceContainerLowest: card,
+    surfaceContainerLow: card,
+    surfaceContainer: card,
+    surfaceContainerHigh: isDark ? const Color(0xFF1F1E25) : const Color(0xFFECEBE6),
+    surfaceContainerHighest: isDark ? const Color(0xFF26252D) : const Color(0xFFE6E5E0),
+    outline: quiet,
+    outlineVariant: line,
+    inverseSurface: text,
+    onInverseSurface: ground,
+    secondaryContainer: accent.withValues(alpha: 0.14),
+    // Label of a selected chip, which is filled with the text colour.
+    onSecondaryContainer: ground,
+  );
+  final base = ThemeData(colorScheme: scheme, useMaterial3: true, scaffoldBackgroundColor: ground, dividerColor: line);
+  TextStyle? display(TextStyle? style) => style?.merge(displayStyle);
+  final textTheme = base.textTheme;
+  const radius = BorderRadius.all(Radius.circular(8));
+  final selectedChip = WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? text : null);
+  return base.copyWith(
+    textTheme: textTheme.copyWith(
+      displayLarge: display(textTheme.displayLarge),
+      displayMedium: display(textTheme.displayMedium),
+      displaySmall: display(textTheme.displaySmall),
+      headlineLarge: display(textTheme.headlineLarge),
+      headlineMedium: display(textTheme.headlineMedium),
+      headlineSmall: display(textTheme.headlineSmall),
+      titleLarge: display(textTheme.titleLarge),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: ground,
+      foregroundColor: text,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+      titleTextStyle: displayStyle.copyWith(fontSize: 28, color: text),
+    ),
     cardTheme: CardThemeData(
       elevation: 0,
       margin: EdgeInsets.zero,
-      color: scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: line)),
     ),
+    dividerTheme: DividerThemeData(color: line, space: 1, thickness: 1),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: isDark ? nightRaised : ground,
+      surfaceTintColor: Colors.transparent,
+      dragHandleColor: line,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: ground,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: Colors.transparent,
+      height: 76,
+      iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(color: states.contains(WidgetState.selected) ? text : quiet)),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+            fontSize: 12,
+            color: states.contains(WidgetState.selected) ? text : quiet,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400,
+          )),
+    ),
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: ground,
+      indicatorColor: Colors.transparent,
+      selectedIconTheme: IconThemeData(color: text),
+      unselectedIconTheme: IconThemeData(color: quiet),
+      selectedLabelTextStyle: TextStyle(fontSize: 12, color: text, fontWeight: FontWeight.w600),
+      unselectedLabelTextStyle: TextStyle(fontSize: 12, color: quiet),
+    ),
+    chipTheme: ChipThemeData(
+      color: selectedChip,
+      checkmarkColor: ground,
+      side: BorderSide(color: line),
+      shape: const RoundedRectangleBorder(borderRadius: radius),
+    ),
+    // Main actions carry the gradient, with dark text on it.
+    filledButtonTheme: FilledButtonThemeData(
+      style: ButtonStyle(
+        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: const WidgetStatePropertyAll(ink),
+        shape: const WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: radius)),
+        minimumSize: const WidgetStatePropertyAll(Size(64, 46)),
+        textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        backgroundBuilder: (context, states, child) => Opacity(
+          opacity: states.contains(WidgetState.disabled) ? 0.5 : 1,
+          child: DecoratedBox(decoration: BoxDecoration(gradient: actionGradient, borderRadius: radius), child: child),
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: text, side: BorderSide(color: line), shape: const RoundedRectangleBorder(borderRadius: radius)),
+    ),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: accent)),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: card,
+      foregroundColor: text,
+      elevation: 2,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+    ),
+    badgeTheme: BadgeThemeData(backgroundColor: text, textColor: ground),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: accent),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      fillColor: card,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: line)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: line)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: accent, width: 1.5)),
     ),
   );
+}
+
+extension Accent on BuildContext {
+  /// Links, rating marks and small hints: deep on light, glow on dark.
+  Color get accent => Theme.of(this).colorScheme.primary;
 }
 
 class GlassCard extends StatelessWidget {
@@ -67,7 +176,7 @@ class DoenerRating extends StatelessWidget {
                 child: Icon(
                   i <= value ? Icons.restaurant : Icons.restaurant_outlined,
                   size: size,
-                  color: i <= value ? doenerOrange : inactive,
+                  color: i <= value ? context.accent : inactive,
                 ),
               ),
             ),
@@ -109,7 +218,7 @@ class RatingChips extends StatelessWidget {
   }
 }
 
-/// A check-in or review in a feed. [highlight] marks friends. Reviews show
+/// A check-in or review in a feed, as a row with a hairline below. [highlight] marks friends. Reviews show
 /// [score] and the rated items [diet] eats.
 class ActivityCard extends StatelessWidget {
   final FeedItemType type;
@@ -151,51 +260,58 @@ class ActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isVisit = type == FeedItemType.visit;
-    final color = isVisit ? Colors.green : doenerOrange;
-    return GlassCard(
+    return InkWell(
       onTap: onTap,
-      color: highlight ? doenerOrange.withValues(alpha: 0.1) : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: color.withValues(alpha: 0.12),
-                child: isVisit && foodType != null
-                    ? Text(foodEmoji(foodType), style: const TextStyle(fontSize: 18))
-                    : Icon(isVisit ? Icons.check_circle : Icons.restaurant, size: 18, color: color),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Flexible(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-                      if (highlight) ...[
-                        const SizedBox(width: 6),
-                        const Icon(Icons.group, size: 14, color: doenerOrange, semanticLabel: 'Freund'),
-                      ],
-                      if (onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
-                    ]),
-                    Text(subtitle, style: const TextStyle(color: doenerOrange)),
-                  ],
-                ),
-              ),
-              if (pending) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.cloud_upload_outlined, size: 16)),
-              Text(relativeTime(timestamp), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
-            ],
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: theme.dividerColor),
+            left: BorderSide(color: highlight ? context.accent : Colors.transparent, width: 3),
           ),
-          if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!.round(), size: 14)],
-          if (ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: ratings, diet: diet)],
-          if (text != null && text!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(text!, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 14, 0, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+                  child: isVisit && foodType != null
+                      ? Text(foodEmoji(foodType), style: const TextStyle(fontSize: 18))
+                      : Icon(isVisit ? Icons.check_circle : Icons.restaurant, size: 18, color: context.accent),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Flexible(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                        if (highlight) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund'),
+                        ],
+                        if (onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
+                      ]),
+                      Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                    ],
+                  ),
+                ),
+                if (pending) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.cloud_upload_outlined, size: 16)),
+                Text(relativeTime(timestamp), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+              ],
+            ),
+            if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!.round(), size: 14)],
+            if (ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: ratings, diet: diet)],
+            if (text != null && text!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(text!, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+            ],
+            if (photo != null || photoId != null) ...[const SizedBox(height: 10), ReviewPhoto(photoId: photoId, bytes: photo)],
           ],
-          if (photo != null || photoId != null) ...[const SizedBox(height: 10), ReviewPhoto(photoId: photoId, bytes: photo)],
-        ],
+        ),
       ),
     );
   }
@@ -253,22 +369,57 @@ class ReviewPhoto extends StatelessWidget {
   }
 }
 
-/// Place number in a ranking — cups for the podium.
+/// Place number in a ranking, big; the podium in full colour.
 class RankBadge extends StatelessWidget {
   final int rank;
   const RankBadge({super.key, required this.rank});
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (rank) { 1 => doenerOrange, 2 => Colors.grey, 3 => Colors.brown, _ => Colors.transparent };
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: color.withValues(alpha: 0.15),
-      child: rank <= 3
-          ? Icon(Icons.emoji_events, size: 18, color: color)
-          : Text('$rank', style: const TextStyle(fontWeight: FontWeight.bold)),
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 40,
+      child: Text('$rank', style: numberStyle.copyWith(fontSize: rank < 10 ? 44 : 34, color: rank <= 3 ? scheme.onSurface : scheme.outline)),
     );
   }
+}
+
+/// A score with its number of reviews, big as the rank next to it.
+class ScoreBlock extends StatelessWidget {
+  final double average;
+  final int count;
+  final double size;
+  const ScoreBlock({super.key, required this.average, required this.count, this.size = 32});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(formatRating(average), style: numberStyle.copyWith(fontSize: size, color: theme.colorScheme.onSurface)),
+        const SizedBox(height: 2),
+        Text('$count Bew.', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+      ],
+    );
+  }
+}
+
+/// A tappable row with a hairline below, for lists of places.
+class HairlineRow extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  const HairlineRow({super.key, required this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
+          child: child,
+        ),
+      );
 }
 
 class EmptyState extends StatelessWidget {
@@ -301,19 +452,16 @@ class EmptyState extends StatelessWidget {
 }
 
 class SectionTitle extends StatelessWidget {
-  final IconData icon;
   final String title;
   final Widget? trailing;
-  const SectionTitle({super.key, required this.icon, required this.title, this.trailing});
+  const SectionTitle({super.key, required this.title, this.trailing});
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: doenerOrange),
-            const SizedBox(width: 8),
-            Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+            Expanded(child: Text(title, style: displayStyle.copyWith(fontSize: 22, color: Theme.of(context).colorScheme.onSurface))),
             ?trailing,
           ],
         ),
@@ -329,7 +477,7 @@ class Pill extends StatelessWidget {
   Widget build(BuildContext context) => Material(
         elevation: 3,
         shape: const StadiumBorder(),
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: InkWell(
           customBorder: const StadiumBorder(),
           onTap: onTap,
@@ -379,10 +527,10 @@ IconData achievementIcon(AchievementType type) => switch (type) {
       AchievementType.socialButterfly => Icons.groups,
     };
 
-Color tierColor(StampTier tier) => switch (tier) {
+Color tierColor(BuildContext context, StampTier tier) => switch (tier) {
       StampTier.doenerneuling => Colors.grey,
       StampTier.doenerfreund => Colors.brown,
-      StampTier.doenerfan => doenerOrange,
+      StampTier.doenerfan => context.accent,
       StampTier.doenerprofi => Colors.red,
       StampTier.doenermeister => Colors.purple,
       StampTier.doenerlegende => Colors.amber,

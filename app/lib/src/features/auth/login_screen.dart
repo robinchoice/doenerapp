@@ -85,6 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final expired = context.watch<Session>().expired;
     return Scaffold(
+      bottomNavigationBar: const SafeArea(top: false, child: PleasanceFooter()),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -93,9 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(24),
               shrinkWrap: true,
               children: [
-                Center(
-                  child: ClipOval(child: Image.asset('assets/logo.jpg', width: 96, height: 96, fit: BoxFit.cover)),
-                ),
+                const Center(child: BrandTile(size: 72)),
                 const SizedBox(height: 20),
                 if (widget.inviteCode != null) ...[
                   InviterBanner(code: widget.inviteCode!),

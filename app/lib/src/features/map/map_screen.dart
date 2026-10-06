@@ -123,7 +123,7 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 GoogleMap(
                   initialCameraPosition: CameraPosition(target: userPosition ?? fallbackLocation, zoom: 14),
-                  style: mapStyle,
+                  style: mapStyle(Theme.of(context).brightness),
                   myLocationEnabled: userPosition != null,
                   myLocationButtonEnabled: false,
                   mapToolbarEnabled: false,
@@ -144,7 +144,7 @@ class _MapScreenState extends State<MapScreen> {
                               ? BitmapDescriptor.hueRose
                               : (visitCounts[place.placeId] ?? 0) > 0
                                   ? BitmapDescriptor.hueGreen
-                                  : BitmapDescriptor.hueOrange,
+                                  : pinHue,
                         ),
                         alpha: _knownToFit(place, diet) ? 1 : 0.4,
                         onTap: () => showPlaceDetail(context, place),
@@ -186,7 +186,7 @@ class _MapScreenState extends State<MapScreen> {
                                   const SizedBox(width: 6),
                                   Flexible(child: Text(_error!, overflow: TextOverflow.ellipsis)),
                                   const SizedBox(width: 6),
-                                  const Icon(Icons.refresh, size: 18, color: doenerOrange),
+                                  Icon(Icons.refresh, size: 18, color: context.accent),
                                 ]),
                               )
                             : const SizedBox.shrink(),

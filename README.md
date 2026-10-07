@@ -278,7 +278,7 @@ cd app && flutter test
 |---|---|---|
 | `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres) und App |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
-| `mobile.yml` | Push auf `main` (`app/`, `packages/`), manuell | iOS → TestFlight, Android → signiertes App Bundle als Artefakt |
+| `mobile.yml` | Push auf `main` (`app/`, `packages/`), manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
 
 Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, alles andere ist die Web-App.
 
@@ -287,6 +287,7 @@ Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, alles ande
 - Google Maps: `GOOGLE_MAPS_IOS_KEY`, `GOOGLE_MAPS_ANDROID_KEY`, `GOOGLE_MAPS_WEB_KEY`
 - iOS: `ASC_KEY_P8` (Base64), `ASC_KEY_ID`, `ASC_ISSUER_ID`, dazu `IOS_DEV_CERTIFICATE` (Base64-PKCS12 eines festen „Apple Development“-Zertifikats, läuft am 04.10.2027 ab) und `IOS_DEV_CERTIFICATE_PASSWORD`. Ohne festes Zertifikat legt Xcode pro Lauf ein neues an, bis die Zertifikatsgrenze des Teams erreicht ist.
 - Android: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` – ohne sie wird mit Debug-Keys signiert
+- Play: `PLAY_SERVICE_ACCOUNT_JSON` (Dienstkonto mit Release-Rechten für die App in der Play Console) – ohne es bleibt es beim Artefakt. Die API nimmt erst Uploads an, wenn das erste App Bundle von Hand hochgeladen wurde
 
 Die Build-Nummer steigt pro Lauf automatisch (TestFlight lehnt doppelte ab).
 
@@ -342,6 +343,5 @@ Skript über die Datenbank, Ziele nach 4 Wochen:
 ### Voraussetzungen und Offenes
 
 - APNs-Schlüssel im Apple-Developer-Konto (für Push) und eine Subdomain ohne „api“ für die Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
-- Upload ins Play Store (bisher nur das App Bundle als Artefakt)
 - Android-App-Links: Der Intent-Filter steht, es fehlt `/.well-known/assetlinks.json` mit dem SHA-256 des Release-Schlüssels. Bis dahin öffnen Einladungslinks auf Android den Browser, weil die CI ohne Keystore-Secrets mit wechselnden Debug-Keys signiert.
 - Später: Bezirke für Großstädte. Falls Fakes auftauchen, zählen nur noch Bewertungen mit Häkchen voll.

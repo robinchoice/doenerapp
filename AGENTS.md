@@ -17,7 +17,7 @@
 ## Deploy
 
 - Ein Push auf `main`, der `server/`, `packages/`, `app/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
-- Änderungen an `app/` oder `packages/` bauen zusätzlich per `mobile.yml` die iOS- und Android-App.
+- Änderungen an `app/` oder `packages/` bauen zusätzlich per `mobile.yml` die iOS-App für TestFlight und die Android-App für den internen Play-Test.
 - Prüfen: `gh run watch`, dann `curl -s https://doener-api.pleasance.org/api/v1/health`.
 
 ## Fallen

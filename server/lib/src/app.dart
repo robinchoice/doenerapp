@@ -8,6 +8,7 @@ import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
 import 'places.dart';
+import 'privacy.dart';
 import 'ranking.dart';
 import 'social.dart';
 
@@ -45,6 +46,7 @@ Handler buildHandler(Deps deps) {
   final root = Router()
     ..mount('/api/v1/', api.call)
     ..get('/i/<code>', (Request request, String code) => invitePage(deps, request, code))
+    ..get('/datenschutz', privacyPage)
     ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation));
 
   final webDir = Directory(deps.config.webDir);

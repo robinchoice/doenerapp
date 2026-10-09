@@ -20,6 +20,7 @@ ThemeData buildTheme(Brightness brightness) {
   final scheme = ColorScheme.fromSeed(seedColor: accent, brightness: brightness).copyWith(
     primary: accent,
     onPrimary: isDark ? ink : Colors.white,
+    error: isDark ? errorGlow : errorDeep,
     surface: ground,
     onSurface: text,
     onSurfaceVariant: quiet,

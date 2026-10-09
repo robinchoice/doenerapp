@@ -341,7 +341,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
             TextButton(onPressed: () => setState(() => _screenshot = null), child: const Text('Screenshot entfernen')),
           ] else
             OutlinedButton.icon(onPressed: _pick, icon: const Icon(Icons.image_outlined), label: const Text('Screenshot anhängen (optional)')),
-          if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+          if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _sending || _message.text.trim().length < Validation.feedbackMin ? null : _send,

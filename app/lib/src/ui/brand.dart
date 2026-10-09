@@ -37,6 +37,15 @@ const nightText = Color(0xFFF2F0EA);
 const nightMuted = Color(0xFF9A98A3);
 const nightLine = Color(0x14FFFFFF);
 const tileColor = Color(0xFF121117);
+
+// Signal colours, see DESIGN.md in the starter: the same in every product, never the product colour.
+// Filled counters take glow with ink text, text and lines on paper take deep.
+const needsGlow = Color(0xFFF4B44C);
+const needsDeep = Color(0xFF8F5A0C);
+const newGlow = Color(0xFF6CCF8E);
+const newDeep = Color(0xFF1D6A44);
+const errorGlow = Color(0xFFF2545B);
+const errorDeep = Color(0xFFB3262D);
 const displayFont = 'Bricolage Grotesque';
 
 /// Product name, titles and big numbers: narrow and bold.

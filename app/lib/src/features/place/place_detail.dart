@@ -97,7 +97,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
           Row(
             children: [
               if (current != null)
-                TextButton(onPressed: () => Navigator.of(context).pop(''), child: const Text('Löschen', style: TextStyle(color: Colors.red))),
+                TextButton(onPressed: () => Navigator.of(context).pop(''), child: Text('Löschen', style: TextStyle(color: Theme.of(context).colorScheme.error))),
               const Spacer(),
               FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Speichern')),
             ],
@@ -150,7 +150,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                     const SizedBox(height: 6),
                     Wrap(spacing: 6, runSpacing: 6, children: [
                       if (place.openedOn case final opened? when DateTime.now().difference(opened).inDays < 30)
-                        _Fact('🎉 Neu seit ${formatDay(opened)}', Colors.red.shade700),
+                        _Fact('🎉 Neu seit ${formatDay(opened)}', theme.brightness == Brightness.dark ? newGlow : newDeep),
                       if (place.veganOptions == true) _Fact('🌱 Vegane Optionen', Colors.green.shade700),
                       if (place.veganOptions == false) _Fact('Nichts Veganes', theme.colorScheme.outline),
                       if (diet != Diet.vegan && summary?.ayranHomemade == true) _Fact('🥛 Ayran selbstgemacht', context.accent),

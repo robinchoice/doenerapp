@@ -91,7 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.group,
                   label: 'Freunde',
                   trailing: [
-                    if (friends.incoming.isNotEmpty) Badge(label: Text('${friends.incoming.length}')),
+                    if (friends.incoming.isNotEmpty) Badge(backgroundColor: needsGlow, textColor: ink, label: Text('${friends.incoming.length}')),
                     const SizedBox(width: 8),
                     Text('${friends.accepted.length}', style: TextStyle(color: theme.colorScheme.outline)),
                   ],

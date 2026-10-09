@@ -182,7 +182,7 @@ class _MapScreenState extends State<MapScreen> {
                             ? Pill(
                                 onTap: () => _load(force: true),
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                  const Icon(Icons.warning_amber, color: Colors.red, size: 18),
+                                  Icon(Icons.warning_amber, color: Theme.of(context).colorScheme.error, size: 18),
                                   const SizedBox(width: 6),
                                   Flexible(child: Text(_error!, overflow: TextOverflow.ellipsis)),
                                   const SizedBox(width: 6),

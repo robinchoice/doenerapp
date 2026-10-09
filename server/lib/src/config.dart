@@ -34,6 +34,9 @@ class Config {
   /// Where tester feedback is mailed. Without it, feedback is only stored.
   final String? feedbackEmail;
 
+  /// Commit of the build (`APP_VERSION`); `/health` reports it so the deploy can wait for it.
+  final String revision;
+
   const Config({
     required this.database,
     this.databaseTls = false,
@@ -46,6 +49,7 @@ class Config {
     this.corsOrigin,
     this.appDownloadUrl,
     this.feedbackEmail,
+    this.revision = 'dev',
   });
 
   factory Config.fromEnvironment(Map<String, String> env) {
@@ -55,6 +59,10 @@ class Config {
     }
 
     final smtpHost = get('SMTP_HOST');
+    // The image sets APP_ENV=production. Without SMTP the log would hand out login codes and links.
+    if (smtpHost == null && get('APP_ENV') == 'production') {
+      throw StateError('SMTP_HOST is required in production, otherwise login codes would end up in the log');
+    }
     return Config(
       database: Endpoint(
         host: get('DB_HOST') ?? 'localhost',
@@ -81,6 +89,7 @@ class Config {
       corsOrigin: get('CORS_ORIGIN'),
       appDownloadUrl: get('APP_DOWNLOAD_URL'),
       feedbackEmail: get('FEEDBACK_EMAIL'),
+      revision: get('APP_VERSION') ?? 'dev',
     );
   }
 }

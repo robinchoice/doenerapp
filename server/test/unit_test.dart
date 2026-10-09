@@ -21,6 +21,12 @@ void main() {
     expect(response.statusCode, 503);
   });
 
+  test('production refuses to start without SMTP', () {
+    expect(() => Config.fromEnvironment({'APP_ENV': 'production'}), throwsStateError);
+    expect(Config.fromEnvironment({'APP_ENV': 'production', 'SMTP_HOST': 'smtp.test'}).smtp?.host, 'smtp.test');
+    expect(Config.fromEnvironment({}).smtp, isNull);
+  });
+
   test('iOS finds the app for invite links', () async {
     final config = Config(database: Endpoint(host: 'localhost', port: 1, database: 'doener'), webDir: '/nonexistent');
     final db = openPool(config);

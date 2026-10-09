@@ -29,10 +29,11 @@ const _appSiteAssociation = {
 /// API under `/api/v1`, the Flutter web build (if present) everywhere else.
 Handler buildHandler(Deps deps) {
   final api = Router(notFoundHandler: (_) => json({'error': 'Nicht gefunden'}, status: 404))
+    // The deploy job waits until the public URL reports its commit as revision.
     ..get('/health', (Request _) async {
       try {
         await deps.db.execute('SELECT 1');
-        return json({'status': 'ok'});
+        return json({'status': 'ok', 'revision': deps.config.revision});
       } catch (e) {
         print('Health check failed: $e');
         return json({'status': 'database unavailable'}, status: 503);

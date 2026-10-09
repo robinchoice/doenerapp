@@ -39,6 +39,7 @@ jobs:
           platforms: linux/arm64
           provenance: false
           build-args: |
+            APP_VERSION=${{ github.sha }}
             GOOGLE_MAPS_WEB_KEY=${{ secrets.GOOGLE_MAPS_WEB_KEY }}
             SENTRY_DSN=${{ vars.SENTRY_DSN }}
           tags: |
@@ -62,3 +63,13 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"docker_registry_image_tag\": \"${{ github.sha }}\"}"
           coolify -X POST "https://coolify.pleasance.org/api/v1/deploy?uuid=$APP_UUID&force=true"
+
+          # Done means the public URL serves this commit, which also catches a proxy route lost on recreate.
+          for _ in {1..60}; do
+            revision=$(curl --silent --max-time 10 https://doener-api.pleasance.org/api/v1/health | jq -r '.revision // empty' 2>/dev/null || true)
+            echo "Public revision: ${revision:-none}"
+            [ "$revision" = "${{ github.sha }}" ] && exit 0
+            sleep 10
+          done
+          echo "https://doener-api.pleasance.org/api/v1/health does not serve ${{ github.sha }}" >&2
+          exit 1

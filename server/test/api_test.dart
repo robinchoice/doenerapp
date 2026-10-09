@@ -163,7 +163,7 @@ void main() {
   test('health checks the database', () async {
     final (status, body) = await call('GET', '/health');
     expect(status, 200);
-    expect(body, {'status': 'ok'});
+    expect(body, {'status': 'ok', 'revision': 'dev'});
   });
 
   group('auth', () {

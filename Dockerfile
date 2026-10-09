@@ -36,6 +36,8 @@ COPY --from=busybox:1.37-musl /bin/busybox /bin/sh
 COPY --from=busybox:1.37-musl /bin/busybox /bin/wget
 COPY --from=server /server /app/server
 COPY --from=web /src/app/build/web /app/web
-ENV WEB_DIR=/app/web PORT=8080
+ARG APP_VERSION=dev
+# APP_ENV=production makes SMTP_HOST mandatory; the local compose overrides it.
+ENV WEB_DIR=/app/web PORT=8080 APP_ENV=production APP_VERSION=$APP_VERSION
 EXPOSE 8080
 ENTRYPOINT ["/app/server"]

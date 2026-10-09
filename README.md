@@ -254,7 +254,9 @@ cd app && flutter test
 | `PORT` | `8080` | HTTP-Port |
 | `PUBLIC_URL` | – | Basis für Magic-Links (`/login?token=…`) und Einladungslinks (`/i/…`); ohne steht nur der Code in der Mail |
 | `GOOGLE_PLACES_API_KEY` | – | Ohne Key nur bereits bekannte Läden |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SSL` | –, `587` | Mailversand; ohne Host stehen Codes im Log |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SSL` | –, `587` | Mailversand; ohne Host stehen Codes im Log, in Produktion startet der Server dann nicht |
+| `APP_ENV` | – (`production` im Image) | `production` macht `SMTP_HOST` zur Pflicht; die lokale Compose setzt `development` |
+| `APP_VERSION` | `dev` (Commit im Image) | Von `/api/v1/health` als `revision` gemeldet |
 | `MAIL_FROM` | `Döner App <noreply@localhost>` | Absender |
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |

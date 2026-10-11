@@ -7,21 +7,29 @@ double? _doubleOrNull(Object? v) => (v as num?)?.toDouble();
 DateTime? _dateOrNull(Object? v) => v == null ? null : DateTime.parse(v as String);
 T? _enumOrNull<T extends Enum>(List<T> values, Object? name) => name == null ? null : values.byName(name as String);
 
-/// Sauce, meat and bread travel as fields of their own (as before there were
-/// other items), everything else in `items`.
-Map<RatingItem, int> _ratingsFromJson(Json j) => {
-      RatingItem.sauce: ?j['sauceRating'] as int?,
-      RatingItem.fleisch: ?j['fleischRating'] as int?,
-      RatingItem.brot: ?j['brotRating'] as int?,
-      for (final e in ((j['items'] as Map?) ?? const {}).entries) RatingItem.values.byName(e.key as String): e.value as int,
+/// Ratings go in half steps. Shipped clients read whole numbers from
+/// `sauceRating`, `fleischRating`, `brotRating` and `items` (sauce, meat and
+/// bread as fields of their own, as before there were other items), so those
+/// carry rounded values and `ratings` the exact ones.
+Map<RatingItem, double> _ratingsFromJson(Json j) => j['ratings'] is Map
+    ? {for (final e in (j['ratings'] as Map).entries) RatingItem.values.byName(e.key as String): (e.value as num).toDouble()}
+    : {
+        RatingItem.sauce: ?_doubleOrNull(j['sauceRating']),
+        RatingItem.fleisch: ?_doubleOrNull(j['fleischRating']),
+        RatingItem.brot: ?_doubleOrNull(j['brotRating']),
+        for (final e in ((j['items'] as Map?) ?? const {}).entries) RatingItem.values.byName(e.key as String): (e.value as num).toDouble(),
+      };
+
+Json _ratingsToJson(Map<RatingItem, double> ratings) => {
+      'sauceRating': ratings[RatingItem.sauce]?.round(),
+      'fleischRating': ratings[RatingItem.fleisch]?.round(),
+      'brotRating': ratings[RatingItem.brot]?.round(),
+      'items': {for (final e in ratings.entries) if (!e.key.isDoener) e.key.name: e.value.round()},
+      'ratings': {for (final e in ratings.entries) e.key.name: e.value},
     };
 
-Json _ratingsToJson(Map<RatingItem, int> ratings) => {
-      'sauceRating': ratings[RatingItem.sauce],
-      'fleischRating': ratings[RatingItem.fleisch],
-      'brotRating': ratings[RatingItem.brot],
-      'items': {for (final e in ratings.entries) if (!e.key.isDoener) e.key.name: e.value},
-    };
+/// A score in half steps: `score` exact, `rating` rounded for shipped clients.
+double? _scoreFromJson(Json j) => _doubleOrNull(j.containsKey('score') ? j['score'] : j['rating']);
 
 List<Ingredient>? _ingredientsFromJson(Object? v) =>
     v == null ? null : [for (final name in v as List) Ingredient.values.byName(name as String)];
@@ -288,8 +296,8 @@ class ReviewDto {
   final String userName;
   final String placeId;
   final String placeName;
-  final int? rating;
-  final Map<RatingItem, int> ratings;
+  final double? rating;
+  final Map<RatingItem, double> ratings;
   final bool? veganOptions;
   final bool? ayranHomemade;
   final List<Ingredient>? ingredients;
@@ -329,7 +337,7 @@ class ReviewDto {
 
   /// What the review shows to someone with [diet]. For the Döner the stored
   /// [rating] counts: older reviews may only have that one, or one set by hand.
-  double? headline(Diet diet) => diet == Diet.all && rating != null ? rating!.toDouble() : diet.headline(ratings);
+  double? headline(Diet diet) => diet == Diet.all && rating != null ? rating! : diet.headline(ratings);
 
   factory ReviewDto.fromJson(Json j) => ReviewDto(
         id: j['id'] as String,
@@ -337,7 +345,7 @@ class ReviewDto {
         userName: j['userName'] as String,
         placeId: j['placeId'] as String,
         placeName: j['placeName'] as String,
-        rating: j['rating'] as int?,
+        rating: _scoreFromJson(j),
         ratings: _ratingsFromJson(j),
         veganOptions: j['veganOptions'] as bool?,
         ayranHomemade: j['ayranHomemade'] as bool?,
@@ -358,7 +366,8 @@ class ReviewDto {
         'userName': userName,
         'placeId': placeId,
         'placeName': placeName,
-        'rating': rating,
+        'rating': rating?.round(),
+        'score': rating,
         ..._ratingsToJson(ratings),
         'veganOptions': veganOptions,
         'ayranHomemade': ayranHomemade,
@@ -377,7 +386,7 @@ class ReviewDto {
 /// One review per user and place — PUT replaces the previous one. The scores
 /// are derived on the server.
 class UpsertReviewRequest {
-  final Map<RatingItem, int> ratings;
+  final Map<RatingItem, double> ratings;
   final bool? veganOptions;
   final bool? ayranHomemade;
 
@@ -511,8 +520,8 @@ class FeedItem {
   final bool fromFriend;
 
   /// The review's Döner score, the only one reviews from before the single items have.
-  final int? rating;
-  final Map<RatingItem, int> ratings;
+  final double? rating;
+  final Map<RatingItem, double> ratings;
   final String? text;
   final String? foodType;
 
@@ -536,7 +545,7 @@ class FeedItem {
   });
 
   /// See [ReviewDto.headline].
-  double? headline(Diet diet) => diet == Diet.all && rating != null ? rating!.toDouble() : diet.headline(ratings);
+  double? headline(Diet diet) => diet == Diet.all && rating != null ? rating! : diet.headline(ratings);
 
   factory FeedItem.fromJson(Json j) => FeedItem(
         id: j['id'] as String,
@@ -545,7 +554,7 @@ class FeedItem {
         place: PlaceDto.fromJson(j['place'] as Json),
         timestamp: _date(j['timestamp']),
         fromFriend: j['fromFriend'] as bool,
-        rating: j['rating'] as int?,
+        rating: _scoreFromJson(j),
         ratings: _ratingsFromJson(j),
         text: j['text'] as String?,
         foodType: j['foodType'] as String?,
@@ -560,7 +569,8 @@ class FeedItem {
         'place': place.toJson(),
         'timestamp': timestamp.toUtc().toIso8601String(),
         'fromFriend': fromFriend,
-        'rating': rating,
+        'rating': rating?.round(),
+        'score': rating,
         ..._ratingsToJson(ratings),
         'text': text,
         'foodType': foodType,
@@ -622,12 +632,11 @@ class LiveStatusDto {
 /// A friend's rating of a ranked place, in what the ranking sorts by.
 class FriendRatingDto {
   final UserDto user;
-  final int rating;
+  final double rating;
   const FriendRatingDto({required this.user, required this.rating});
 
-  factory FriendRatingDto.fromJson(Json j) =>
-      FriendRatingDto(user: UserDto.fromJson(j['user'] as Json), rating: j['rating'] as int);
-  Json toJson() => {'user': user.toJson(), 'rating': rating};
+  factory FriendRatingDto.fromJson(Json j) => FriendRatingDto(user: UserDto.fromJson(j['user'] as Json), rating: _scoreFromJson(j)!);
+  Json toJson() => {'user': user.toJson(), 'rating': rating.round(), 'score': rating};
 }
 
 /// [average] and [count] are the real numbers; the order comes from [weightedRating].

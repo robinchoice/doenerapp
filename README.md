@@ -48,7 +48,7 @@ Danach kommt ein Drehrad mit den Essenstypen, die zur Ernährung passen (Döner,
 
 ### Bewertungen
 
-Ein Bogen, alle Punkte 1–5 und optional. Oben der Döner mit Soße, Fleisch und Brot. Die Gesamtnote ist ihr Durchschnitt, ohne manuelles Überschreiben. Sie zählt erst, wenn Soße oder Fleisch benotet ist, Brot allein ist keine Döner-Note. Darunter:
+Ein Bogen, alle Punkte 1–5 in halben Schritten und optional. Ein Tipp auf die linke Hälfte eines Bestecks gibt den halben Punkt. Oben der Döner mit Soße, Fleisch und Brot. Die Gesamtnote ist ihr Durchschnitt, auf halbe Punkte gerundet, ohne manuelles Überschreiben. Sie zählt erst, wenn Soße oder Fleisch benotet ist, Brot allein ist keine Döner-Note. Darunter:
 
 - „Was gab's noch?“: Falafel, Halloumi, Pizza, Pide, Lahmacun, Seele. Ein Tipp öffnet die Zeile, jedes Gericht hat eine eigene Rangliste und zählt nicht in die Gesamtnote
 - „Vegane Optionen?“ (Ja/Nein/Weiß nicht): Bei Ja lassen sich veganer Döner (Seitan oder Soja), vegane Soße und Hummus bewerten. „Nein“ zeigt der Laden als „Nichts Veganes“

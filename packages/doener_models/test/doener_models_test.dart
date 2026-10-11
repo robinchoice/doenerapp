@@ -79,6 +79,9 @@ void main() {
       expect(Validation.isValidRating(null), isTrue);
       expect(Validation.isValidRating(0), isFalse);
       expect(Validation.isValidRating(5), isTrue);
+      expect(Validation.isValidRating(4.5), isTrue);
+      expect(Validation.isValidRating(4.2), isFalse, reason: 'half steps only');
+      expect((13 / 3).halfStep, 4.5);
       expect(Validation.clean('  '), isNull);
     });
 
@@ -148,21 +151,21 @@ void main() {
     });
 
     test('main scores need the dish they are about', () {
-      const ratings = {RatingItem.sauce: 5, RatingItem.fleisch: 4, RatingItem.brot: 3, RatingItem.ayran: 1};
+      const ratings = {RatingItem.sauce: 5.0, RatingItem.fleisch: 4.0, RatingItem.brot: 3.0, RatingItem.ayran: 1.0};
       expect(Diet.all.score(ratings), 4, reason: 'ayran is no part of the Döner');
       expect(Diet.vegan.score(ratings), isNull);
       expect(Diet.all.score(const {RatingItem.brot: 5}), isNull, reason: 'bread alone is no Döner rating');
-      expect(Diet.vegan.score(const {RatingItem.falafel: 4, RatingItem.hummus: 5, RatingItem.brot: 3}), 4);
-      expect(Diet.vegetarian.score(const {RatingItem.halloumi: 5, RatingItem.sauce: 3}), 4);
+      expect(Diet.vegan.score(const {RatingItem.falafel: 4.0, RatingItem.hummus: 5.0, RatingItem.brot: 3.0}), 4);
+      expect(Diet.vegetarian.score(const {RatingItem.halloumi: 5.0, RatingItem.sauce: 3.0}), 4);
     });
 
     test('headline falls back to what the review is about', () {
-      const vegan = {RatingItem.veganDoener: 5, RatingItem.brot: 3};
+      const vegan = {RatingItem.veganDoener: 5.0, RatingItem.brot: 3.0};
       expect(Diet.all.headline(vegan), 4, reason: 'no Döner score, so the vegan one');
-      expect(Diet.all.headline(const {RatingItem.pizza: 2, RatingItem.ayran: 5}), 2, reason: 'drinks only count alone');
-      expect(Diet.all.headline(const {RatingItem.ayran: 5}), 5);
+      expect(Diet.all.headline(const {RatingItem.pizza: 2.0, RatingItem.ayran: 5.0}), 2, reason: 'drinks only count alone');
+      expect(Diet.all.headline(const {RatingItem.ayran: 5.0}), 5);
       expect(Diet.vegan.headline(const {}), isNull);
-      expect(Diet.vegan.headline(const {RatingItem.sauce: 5, RatingItem.fleisch: 4}), isNull, reason: 'nothing vegan in it');
+      expect(Diet.vegan.headline(const {RatingItem.sauce: 5.0, RatingItem.fleisch: 4.0}), isNull, reason: 'nothing vegan in it');
       expect(Diet.vegetarian.headline(const {RatingItem.fleisch: 2, RatingItem.sauce: 4}), 4, reason: 'only the sauce fits');
     });
 
@@ -215,8 +218,8 @@ void main() {
       userName: 'Robin',
       placeId: 'p',
       placeName: 'Laden',
-      rating: 4,
-      ratings: const {RatingItem.sauce: 5, RatingItem.brot: 3, RatingItem.ayran: 5},
+      rating: 4.5,
+      ratings: const {RatingItem.sauce: 4.5, RatingItem.brot: 3, RatingItem.ayran: 5},
       ayranHomemade: true,
       ingredients: const [Ingredient.granatapfel, Ingredient.mais],
       meat: Meat.kalb,
@@ -224,15 +227,18 @@ void main() {
       updatedAt: DateTime.utc(2026, 10, 4),
     );
     final json = review.toJson();
-    expect(json['sauceRating'], 5);
+    expect(json['sauceRating'], 5, reason: 'older apps read whole numbers');
     expect(json['items'], {'ayran': 5});
+    expect(json['rating'], 5);
     final back = ReviewDto.fromJson(json);
     expect(back.ratings, review.ratings);
+    expect(back.rating, 4.5);
     expect(back.ingredients, review.ingredients);
     expect(back.meat, Meat.kalb);
 
-    final legacy = ReviewDto.fromJson({...json}..remove('items')..remove('ingredients')..remove('meat'));
+    final legacy = ReviewDto.fromJson({...json}..remove('items')..remove('ratings')..remove('score')..remove('ingredients')..remove('meat'));
     expect(legacy.ratings, {RatingItem.sauce: 5, RatingItem.brot: 3}, reason: 'reviews stored by older builds');
+    expect(legacy.rating, 5);
     expect(() => UpsertReviewRequest.fromJson({'items': {'zwiebel': 3}}), throwsArgumentError);
   });
 

@@ -19,7 +19,7 @@ class MyActivityScreen extends StatelessWidget {
     final diet = context.watch<Session>().diet;
     final entries = [
       for (final v in data.visits)
-        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, score: null as double?, ratings: const <RatingItem, int>{}, food: v.dto.foodType, photoId: null as String?, photo: null as Uint8List?, onSite: false, pending: v.pending),
+        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, score: null as double?, ratings: const <RatingItem, double>{}, food: v.dto.foodType, photoId: null as String?, photo: null as Uint8List?, onSite: false, pending: v.pending),
       for (final r in data.reviews.values)
         (type: FeedItemType.review, placeId: r.dto.placeId, placeName: r.dto.placeName, at: r.dto.updatedAt, text: r.dto.text, score: r.dto.headline(diet), ratings: r.dto.ratings, food: null as String?, photoId: r.dto.photoId, photo: r.photo, onSite: r.dto.onSite, pending: r.pending),
     ]..sort((a, b) => b.at.compareTo(a.at));
@@ -88,7 +88,7 @@ class _MyPlacesScreenState extends State<MyPlacesScreen> {
     final places = [
       for (final id in ids)
         if (data.places[id] case final place?)
-          (place: place, visits: data.visitsAt(id), rating: data.reviews[id]?.dto.headline(diet)?.round()),
+          (place: place, visits: data.visitsAt(id), rating: data.reviews[id]?.dto.headline(diet)),
     ];
     switch (_sort) {
       case _Sort.rating:

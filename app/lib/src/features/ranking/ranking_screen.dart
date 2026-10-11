@@ -173,7 +173,7 @@ class _RankingRow extends StatelessWidget {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        entry.friends.map((f) => '${f.user.displayName} ${f.rating}').join(' · '),
+                        entry.friends.map((f) => '${f.user.displayName} ${f.rating % 1 == 0 ? f.rating.toInt() : formatRating(f.rating)}').join(' · '),
                         style: theme.textTheme.bodySmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

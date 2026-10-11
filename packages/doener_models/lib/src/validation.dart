@@ -34,7 +34,7 @@ abstract final class Validation {
   /// True for the placeholder name a new account starts with.
   static bool isGeneratedName(String name) => _generatedName.hasMatch(name.trim());
 
-  static bool isValidRating(int? value) => value == null || (value >= 1 && value <= 5);
+  static bool isValidRating(double? value) => value == null || (value >= 1 && value <= 5 && value.halfStep == value);
 
   /// MIME type of a review photo by its first bytes; null for anything but JPEG, PNG and WebP.
   static String? photoType(List<int> bytes) {
@@ -51,4 +51,9 @@ abstract final class Validation {
     final trimmed = value?.trim();
     return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
   }
+}
+
+extension HalfStep on double {
+  /// Ratings and the scores stored from them go in half steps.
+  double get halfStep => (this * 2).round() / 2;
 }

@@ -32,7 +32,7 @@ enum Diet {
 
   /// Main score of one review: the average of its [scoreItems], or null if
   /// it rates none of [scoreRequires].
-  double? score(Map<RatingItem, int> ratings) {
+  double? score(Map<RatingItem, double> ratings) {
     if (!scoreRequires.any(ratings.containsKey)) return null;
     final rated = [for (final item in scoreItems) ?ratings[item]];
     return rated.reduce((a, b) => a + b) / rated.length;
@@ -41,7 +41,7 @@ enum Diet {
   /// The score a review shows to someone with this diet — only from food the
   /// diet eats: the own main score, else a stricter diet's one, else the
   /// average of the fitting dishes (drinks only when nothing else is rated).
-  double? headline(Map<RatingItem, int> ratings) {
+  double? headline(Map<RatingItem, double> ratings) {
     for (final diet in Diet.values.skip(index)) {
       final value = diet.score(ratings);
       if (value != null) return value;
@@ -53,8 +53,8 @@ enum Diet {
   }
 }
 
-/// Everything a review can rate, 1–5 each. Sauce, meat and bread are the
-/// Döner itself, everything else is optional.
+/// Everything a review can rate, 1–5 each in half steps. Sauce, meat and
+/// bread are the Döner itself, everything else is optional.
 enum RatingItem {
   sauce('Soße', '🥣', Diet.vegetarian),
   fleisch('Fleisch', '🥩', Diet.all),

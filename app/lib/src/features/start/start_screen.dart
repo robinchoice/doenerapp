@@ -383,7 +383,7 @@ class _PlaceCard extends StatelessWidget {
             const Spacer(),
             if (score.average != null)
               Row(children: [
-                DoenerRating(value: score.average!.round(), size: 12),
+                DoenerRating(value: score.average!, size: 12),
                 const SizedBox(width: 4),
                 Text(formatRating(score.average!), style: numberStyle.copyWith(color: context.accent, fontSize: 15)),
                 Text(' (${score.count})', style: Theme.of(context).textTheme.labelSmall),

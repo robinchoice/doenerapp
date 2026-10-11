@@ -116,6 +116,27 @@ void main() {
     expect(find.text('Okay'), findsOneWidget); // (4 + 2) / 2 = 3
   });
 
+  testWidgets('the left half of an icon rates a half step', (tester) async {
+    final data = await tester.runAsync(_appData);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [ChangeNotifierProvider.value(value: data!), ChangeNotifierProvider.value(value: data.session)],
+        child: const MaterialApp(home: Scaffold(body: ReviewSheet(place: _place))),
+      ),
+    );
+
+    final empty = find.byIcon(Icons.restaurant_outlined);
+    final sauce5 = tester.getRect(empty.at(4));
+    final meat4 = tester.getCenter(empty.at(8));
+    await tester.tapAt(Offset(sauce5.left + sauce5.width / 4, sauce5.center.dy)); // Soße: 4,5
+    await tester.pumpAndSettle();
+    await tester.tapAt(meat4); // Fleisch: 4
+    await tester.pumpAndSettle();
+
+    expect(find.byWidgetPredicate((w) => w is Align && w.widthFactor == 0.5), findsNWidgets(2), reason: 'Soße and Gesamt show a half icon');
+    expect(find.text('Ausgezeichnet'), findsOneWidget); // (4,5 + 4) / 2 = 4,25, shown as 4,5
+  });
+
   testWidgets('vegans rate vegan food, without meat or ayran', (tester) async {
     final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin', diet: Diet.vegan));
     expect(find.text('🌱 Vegan'), findsOneWidget);

@@ -342,6 +342,12 @@ void main() {
       expect(updated['rating'], 5, reason: 'derived from sauce, meat and bread');
       expect(updated['text'], 'Top Soße');
       expect((await call('PUT', '/places/place-kebap/review', body: {'sauceRating': 6}, token: anna)).$1, 400);
+      expect((await call('PUT', '/places/place-kebap/review', body: {'ratings': {'sauce': 4.3}}, token: anna)).$1, 400);
+      final (_, halves) = await call('PUT', '/places/place-kebap/review', body: {'ratings': {'sauce': 4.5, 'fleisch': 4, 'falafel': 3.5}}, token: anna);
+      expect(halves['score'], 4.5, reason: 'the average 4.25 in half steps');
+      expect(halves['ratings'], {'sauce': 4.5, 'fleisch': 4.0, 'falafel': 3.5});
+      expect([halves['rating'], halves['sauceRating'], halves['items']['falafel']], [5, 5, 4], reason: 'whole numbers for shipped clients');
+      await call('PUT', '/places/place-kebap/review', body: {...review, 'fleischRating': 5}, token: anna);
 
       final (_, place) = await call('GET', '/places/place-kebap');
       expect(place['reviewCount'], 1);
@@ -404,7 +410,7 @@ void main() {
       final place = PlaceDto.fromJson((await call('GET', '/places/place-kebap')).$2 as Map<String, dynamic>);
       expect(place.score(Diet.all), (average: 5.0, count: 1), reason: "only Anna's review rates the Döner");
       expect(place.score(Diet.vegan), (average: 4.0, count: 1));
-      expect(place.score(Diet.vegetarian), (average: 4.0, count: 1));
+      expect(place.score(Diet.vegetarian), (average: 3.5, count: 1), reason: 'falafel and bread');
       expect(place.veganOptions, isTrue);
 
       final summary = PlaceSummaryDto.fromJson((await call('GET', '/places/place-kebap/summary')).$2 as Map<String, dynamic>);
@@ -567,7 +573,7 @@ void main() {
       expect(ranking.city, 'Testheim');
       // A single 5 doesn't beat 5, 5 and 4; unrated and other cities' places are left out.
       expect(ranking.entries.map((e) => e.place.placeId), ['t-steady', 't-solo', 't-meh']);
-      expect(ranking.entries.first.average, closeTo(14 / 3, 1e-9));
+      expect(ranking.entries.first.average, closeTo(4.5, 1e-9), reason: '4.5, 4 and 5');
       expect(ranking.entries.first.count, 3);
       expect(ranking.by, RankBy.overall);
       expect(ranking.entries.first.friends.map((f) => (f.user.displayName, f.rating)), [('Vic', 4)]);
@@ -630,7 +636,7 @@ void main() {
       final vegan = RankingDto.fromJson(body as Map<String, dynamic>);
       expect(vegan.by, const RankBy.score(Diet.vegan));
       expect(vegan.entries.map((e) => e.place.placeId), ['t-meh', 't-steady']);
-      expect(vegan.entries.first.average, closeTo(5, 1e-9), reason: 'falafel, sauce and bread: 4.67, stored as 5');
+      expect(vegan.entries.first.average, closeTo(4.5, 1e-9), reason: 'falafel, sauce and bread: 4.67, stored as 4.5');
       expect(vegan.entries[1].friends.single.rating, 3, reason: "Vic's falafel");
 
       final (_, falafel) = await call('GET', '/ranking?lat=50&lon=8&by=falafel', token: ute);

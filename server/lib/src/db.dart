@@ -210,6 +210,31 @@ final migrations = <List<String>>[
       created_at timestamptz NOT NULL DEFAULT now()
     )''',
   ],
+  [
+    // Ratings go in half steps. The view reads the columns, so it is rebuilt.
+    'DROP VIEW place_view',
+    'ALTER TABLE reviews ALTER COLUMN rating TYPE real, ALTER COLUMN vegetarian_rating TYPE real, '
+        'ALTER COLUMN vegan_rating TYPE real, ALTER COLUMN sauce_rating TYPE real, '
+        'ALTER COLUMN fleisch_rating TYPE real, ALTER COLUMN brot_rating TYPE real',
+    'ALTER TABLE review_items ALTER COLUMN rating TYPE real',
+    '''CREATE VIEW place_view AS
+      SELECT p.*, s.avg_rating, COALESCE(s.review_count, 0) AS review_count,
+        s.avg_vegetarian, COALESCE(s.vegetarian_count, 0) AS vegetarian_count,
+        s.avg_vegan, COALESCE(s.vegan_count, 0) AS vegan_count, s.vegan_options
+      FROM places p
+      LEFT JOIN (
+        SELECT place_id,
+          avg(rating)::float8 AS avg_rating, count(rating)::int AS review_count,
+          avg(vegetarian_rating)::float8 AS avg_vegetarian, count(vegetarian_rating)::int AS vegetarian_count,
+          avg(vegan_rating)::float8 AS avg_vegan, count(vegan_rating)::int AS vegan_count,
+          CASE WHEN count(*) FILTER (WHERE vegan_options) > count(*) FILTER (WHERE NOT vegan_options) THEN true
+               WHEN count(*) FILTER (WHERE NOT vegan_options) > count(*) FILTER (WHERE vegan_options) THEN false
+          END AS vegan_options
+        FROM reviews GROUP BY place_id
+      ) s ON s.place_id = p.id
+      WHERE p.business_status IS DISTINCT FROM 'FUTURE_OPENING'
+    ''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

@@ -50,7 +50,7 @@ void mountSocial(Router router, Deps deps) {
       deps.db,
       '$friendIdsCte SELECT * FROM ('
       '  SELECT \'visit\' AS type, v.id, v.user_id, v.place_id, v.visited_at AS ts, NULL::text AS text,'
-      '         NULL::int AS rating, NULL::int AS sauce_rating, NULL::int AS fleisch_rating, NULL::int AS brot_rating,'
+      '         NULL::real AS rating, NULL::real AS sauce_rating, NULL::real AS fleisch_rating, NULL::real AS brot_rating,'
       '         NULL::jsonb AS items, NULL::uuid AS photo_id, false AS on_site,'
       '         v.food_type, true AS from_friend'
       '  FROM visits v WHERE v.user_id IN (SELECT id FROM friends)'
@@ -85,7 +85,7 @@ void mountSocial(Router router, Deps deps) {
           place: places[r['place_id']]!,
           timestamp: r['ts'] as DateTime,
           fromFriend: r['from_friend'] as bool,
-          rating: r['rating'] as int?,
+          rating: r['rating'] as double?,
           ratings: ratingsFromRow(r),
           text: r['text'] as String?,
           foodType: r['food_type'] as String?,

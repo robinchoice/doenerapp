@@ -42,11 +42,12 @@ PlaceDto placeFromRow(Map<String, dynamic> row) => PlaceDto(
 
 /// Sauce, meat and bread come from their columns, everything else from
 /// `items` (the review's review_items as JSON, see [reviewItemsJson]).
-Map<RatingItem, int> ratingsFromRow(Map<String, dynamic> row) => {
-      RatingItem.sauce: ?row['sauce_rating'] as int?,
-      RatingItem.fleisch: ?row['fleisch_rating'] as int?,
-      RatingItem.brot: ?row['brot_rating'] as int?,
-      for (final e in ((row['items'] as Map?) ?? const {}).entries) RatingItem.values.byName(e.key as String): e.value as int,
+Map<RatingItem, double> ratingsFromRow(Map<String, dynamic> row) => {
+      RatingItem.sauce: ?row['sauce_rating'] as double?,
+      RatingItem.fleisch: ?row['fleisch_rating'] as double?,
+      RatingItem.brot: ?row['brot_rating'] as double?,
+      for (final e in ((row['items'] as Map?) ?? const {}).entries)
+        RatingItem.values.byName(e.key as String): (e.value as num).toDouble(),
     };
 
 /// Select expression for the items of review `r`.
@@ -62,7 +63,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       userName: row['display_name'] as String,
       placeId: row['google_place_id'] as String,
       placeName: row['place_name'] as String,
-      rating: row['rating'] as int?,
+      rating: row['rating'] as double?,
       ratings: ratingsFromRow(row),
       veganOptions: row['vegan_options'] as bool?,
       ayranHomemade: row['ayran_homemade'] as bool?,
@@ -224,7 +225,7 @@ void mountPlaces(Router router, Deps deps) {
     final user = await requireUser(deps, request);
     final body = await readBody(request, UpsertReviewRequest.fromJson);
     final ratings = body.ratings;
-    if (!ratings.values.every(Validation.isValidRating)) throw const ApiException.badRequest('Bewertungen müssen 1–5 sein');
+    if (!ratings.values.every(Validation.isValidRating)) throw const ApiException.badRequest('Bewertungen müssen 1–5 in halben Schritten sein');
     final text = Validation.clean(body.text);
     if ((text?.length ?? 0) > Validation.reviewTextMax) throw const ApiException.badRequest('Text zu lang');
 
@@ -259,8 +260,8 @@ void mountPlaces(Router router, Deps deps) {
         tx,
         'INSERT INTO reviews (user_id, place_id, rating, vegetarian_rating, vegan_rating, sauce_rating, fleisch_rating, '
         'brot_rating, vegan_options, ayran_homemade, ingredients, meat, skewer, bread, text) '
-        'VALUES (@user:uuid, @place:uuid, @rating:int4, @vegetarian:int4, @vegan:int4, @sauce:int4, @fleisch:int4, '
-        '@brot:int4, @veganOptions:boolean, @ayran:boolean, @ingredients:_text, @meat:text, @skewer:text, @bread:text, @text) '
+        'VALUES (@user:uuid, @place:uuid, @rating:float4, @vegetarian:float4, @vegan:float4, @sauce:float4, @fleisch:float4, '
+        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @ingredients:_text, @meat:text, @skewer:text, @bread:text, @text) '
         // Older reviews may only have an overall rating, without sauce, meat or
         // bread. It stays until the review rates the Döner itself.
         'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = CASE WHEN num_nonnulls(EXCLUDED.sauce_rating, '
@@ -274,10 +275,10 @@ void mountPlaces(Router router, Deps deps) {
         {
           'user': user.id,
           'place': place['id'],
-          'rating': Diet.all.score(ratings)?.round(),
-          'vegetarian': Diet.vegetarian.score(ratings)?.round(),
+          'rating': Diet.all.score(ratings)?.halfStep,
+          'vegetarian': Diet.vegetarian.score(ratings)?.halfStep,
           // Whoever found nothing vegan rated no vegan food, a falafel included.
-          'vegan': veganOptions == false ? null : Diet.vegan.score(ratings)?.round(),
+          'vegan': veganOptions == false ? null : Diet.vegan.score(ratings)?.halfStep,
           'sauce': ratings[RatingItem.sauce],
           'fleisch': ratings[RatingItem.fleisch],
           'brot': ratings[RatingItem.brot],
@@ -293,7 +294,7 @@ void mountPlaces(Router router, Deps deps) {
       await tx.execute(Sql.named('DELETE FROM review_items WHERE review_id = @id:uuid'), parameters: {'id': row!['id']});
       for (final e in items.entries) {
         await tx.execute(
-          Sql.named('INSERT INTO review_items (review_id, item, rating) VALUES (@id:uuid, @item, @rating:int4)'),
+          Sql.named('INSERT INTO review_items (review_id, item, rating) VALUES (@id:uuid, @item, @rating:float4)'),
           parameters: {'id': row['id'], 'item': e.key, 'rating': e.value},
         );
       }
@@ -560,7 +561,7 @@ const _scoreColumns = {
 
 /// What the community says about a place, from its review rows.
 PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews) {
-  final values = <RatingItem, List<int>>{};
+  final values = <RatingItem, List<double>>{};
   for (final review in reviews) {
     for (final e in ratingsFromRow(review).entries) {
       (values[e.key] ??= []).add(e.value);

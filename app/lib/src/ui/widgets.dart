@@ -153,32 +153,46 @@ class GlassCard extends StatelessWidget {
       );
 }
 
-/// 1–5 rating shown as fork-and-knife icons.
+/// 1–5 rating in half steps shown as fork-and-knife icons; averages show
+/// rounded to half steps. Tapping the left half of an icon gives the half step.
 class DoenerRating extends StatelessWidget {
-  final int value;
+  final double value;
   final double size;
-  final ValueChanged<int>? onChanged;
+  final ValueChanged<double>? onChanged;
   const DoenerRating({super.key, required this.value, this.size = 16, this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     final inactive = Theme.of(context).colorScheme.outlineVariant;
+    final shown = value.halfStep;
+    final padding = size * 0.08;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 1; i <= 5; i++)
           GestureDetector(
-            onTap: onChanged == null ? null : () => onChanged!(i),
+            onTapUp: onChanged == null ? null : (d) => onChanged!(d.localPosition.dx < padding + size / 2 ? i - 0.5 : i.toDouble()),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: size * 0.08),
+              padding: EdgeInsets.symmetric(horizontal: padding),
               child: AnimatedScale(
-                scale: onChanged != null && i == value ? 1.12 : 1,
+                scale: onChanged != null && (i == shown || i - 0.5 == shown) ? 1.12 : 1,
                 duration: const Duration(milliseconds: 200),
-                child: Icon(
-                  i <= value ? Icons.restaurant : Icons.restaurant_outlined,
-                  size: size,
-                  color: i <= value ? context.accent : inactive,
-                ),
+                child: i - 0.5 == shown
+                    ? Stack(children: [
+                        Icon(Icons.restaurant_outlined, size: size, color: inactive),
+                        ClipRect(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: 0.5,
+                            child: Icon(Icons.restaurant, size: size, color: context.accent),
+                          ),
+                        ),
+                      ])
+                    : Icon(
+                        i <= shown ? Icons.restaurant : Icons.restaurant_outlined,
+                        size: size,
+                        color: i <= shown ? context.accent : inactive,
+                      ),
               ),
             ),
           ),
@@ -189,7 +203,7 @@ class DoenerRating extends StatelessWidget {
 
 class DimensionChip extends StatelessWidget {
   final String label;
-  final int value;
+  final double value;
   const DimensionChip({super.key, required this.label, required this.value});
 
   @override
@@ -205,7 +219,7 @@ class DimensionChip extends StatelessWidget {
 
 /// What a review rated, as small chips — only the food [diet] eats.
 class RatingChips extends StatelessWidget {
-  final Map<RatingItem, int> ratings;
+  final Map<RatingItem, double> ratings;
   final Diet diet;
   const RatingChips({super.key, required this.ratings, required this.diet});
 
@@ -227,7 +241,7 @@ class ActivityCard extends StatelessWidget {
   final String subtitle;
   final DateTime timestamp;
   final double? score;
-  final Map<RatingItem, int> ratings;
+  final Map<RatingItem, double> ratings;
   final Diet diet;
   final String? text;
   final String? foodType;
@@ -304,7 +318,7 @@ class ActivityCard extends StatelessWidget {
                 Text(relativeTime(timestamp), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
               ],
             ),
-            if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!.round(), size: 14)],
+            if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!, size: 14)],
             if (ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: ratings, diet: diet)],
             if (text != null && text!.isNotEmpty) ...[
               const SizedBox(height: 6),

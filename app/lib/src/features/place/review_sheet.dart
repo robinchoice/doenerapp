@@ -75,7 +75,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
     super.dispose();
   }
 
-  void _rate(RatingItem item, int value) => setState(() {
+  void _rate(RatingItem item, double value) => setState(() {
         if (value == 0) {
           _ratings.remove(item);
           return;
@@ -266,7 +266,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
     // An older review may only have an overall rating; it shows until sauce, meat or bread get one.
     final keepsOld = _diet == Diet.all &&
         !RatingItem.doenerItems.any((i) => _ratings.containsKey(i) || (_existing?.ratings.containsKey(i) ?? false));
-    final score = _diet.score(_ratings)?.round() ?? (keepsOld ? _existing?.rating : null) ?? 0;
+    final score = _diet.score(_ratings)?.halfStep ?? (keepsOld ? _existing?.rating : null) ?? 0;
     return ListView(
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -290,7 +290,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
                   if (score > 0)
                     Flexible(
                       child: Text(
-                        _labels[score],
+                        _labels[score.round()],
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: context.accent, fontWeight: FontWeight.w600),
                       ),

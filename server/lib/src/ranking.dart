@@ -70,7 +70,7 @@ void mountRanking(Router router, Deps deps) {
       for (final f in friendRows) {
         friends.putIfAbsent(f['place_id'] as String, () => []).add(FriendRatingDto(
               user: UserDto(id: f['id'] as String, displayName: f['display_name'] as String),
-              rating: f['value'] as int,
+              rating: f['value'] as double,
             ));
       }
     }

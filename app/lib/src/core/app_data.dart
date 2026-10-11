@@ -232,7 +232,7 @@ class AppData extends ChangeNotifier {
       placeName: place.name,
       // As on the server: an older overall rating stays until sauce, meat or bread are rated.
       rating: RatingItem.doenerItems.any((i) => request.ratings.containsKey(i) || (previous?.ratings.containsKey(i) ?? false))
-          ? Diet.all.score(request.ratings)?.round()
+          ? Diet.all.score(request.ratings)?.halfStep
           : previous?.rating,
       ratings: request.ratings,
       veganOptions: request.veganOptions,

@@ -111,7 +111,7 @@ void main() {
 
   test('community summary of a place', () {
     expect(summarize(const []).items, isEmpty);
-    Map<String, dynamic> row({int? sauce, int? fleisch, Map<String, int>? items, bool? ayran, List<String>? ingredients, String? meat, String? bread}) => {
+    Map<String, dynamic> row({double? sauce, double? fleisch, Map<String, num>? items, bool? ayran, List<String>? ingredients, String? meat, String? bread}) => {
           'sauce_rating': sauce,
           'fleisch_rating': fleisch,
           'brot_rating': null,

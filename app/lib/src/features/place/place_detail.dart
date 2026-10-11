@@ -365,7 +365,7 @@ class _MenuRow extends StatelessWidget {
               ],
             ),
           ),
-          DoenerRating(value: average.round(), size: 13),
+          DoenerRating(value: average, size: 13),
           SizedBox(width: 36, child: Text('$count', textAlign: TextAlign.right, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline))),
           SizedBox(
             width: 44,
@@ -438,7 +438,7 @@ class ReviewCard extends StatelessWidget {
           Row(
             children: [
               if (showAuthor) ...[Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(width: 8)],
-              if (review.headline(diet) case final score?) DoenerRating(value: score.round(), size: 14),
+              if (review.headline(diet) case final score?) DoenerRating(value: score, size: 14),
               if (review.onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
               const Spacer(),
               if (onEdit != null) Icon(Icons.edit, size: 16, color: theme.colorScheme.outline),

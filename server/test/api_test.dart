@@ -760,6 +760,23 @@ void main() {
     expect((await call('GET', '/places/place-unused')).$1, 404, reason: 'unused stale place is dropped');
   });
 
+  test('a schedule runs once per period, and again an hour after a failed run', () async {
+    var runs = 0;
+    Future<void> run() => runSchedule(db, 'place_cache', const Duration(hours: 24), () async => runs++);
+    await Future.wait([run(), run()]);
+    expect(runs, 1, reason: 'claimed by one worker only');
+    await run();
+    expect(runs, 1, reason: 'not due again yet');
+    final next = await db.execute("SELECT next_run_at > now() + interval '23 hours' FROM schedules WHERE name = 'place_cache'");
+    expect(next.first.first, isTrue);
+
+    await db.execute("UPDATE schedules SET next_run_at = now() WHERE name = 'place_cache'");
+    await expectLater(runSchedule(db, 'place_cache', const Duration(hours: 24), () => throw StateError('down')), throwsStateError);
+    final retry = await db.execute("SELECT next_run_at BETWEEN now() + interval '59 minutes' AND now() + interval '1 hour' "
+        "FROM schedules WHERE name = 'place_cache'");
+    expect(retry.first.first, isTrue);
+  });
+
   test('announced openings become news once they open', () async {
     await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city, business_status, opening_date) VALUES "
         "('place-announced', 'Neuer Grill', 48.003, 7.853, 'Freiburg', 'FUTURE_OPENING', to_char(current_date, 'YYYY-MM-DD')), "

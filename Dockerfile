@@ -26,6 +26,7 @@ COPY server/pubspec.* ./server/
 RUN cd server && dart pub get
 COPY server ./server
 RUN cd server && dart compile exe bin/server.dart -o /server
+RUN cd server && dart compile exe bin/worker.dart -o /worker
 
 FROM scratch
 COPY --from=server /runtime/ /
@@ -35,6 +36,8 @@ COPY --from=server /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certific
 COPY --from=busybox:1.37-musl /bin/busybox /bin/sh
 COPY --from=busybox:1.37-musl /bin/busybox /bin/wget
 COPY --from=server /server /app/server
+# The worker container starts /app/worker instead (Coolify: --entrypoint).
+COPY --from=server /worker /app/worker
 COPY --from=web /src/app/build/web /app/web
 ARG APP_VERSION=dev
 # APP_ENV=production makes SMTP_HOST mandatory; the local compose overrides it.

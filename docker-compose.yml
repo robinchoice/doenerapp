@@ -1,4 +1,4 @@
-# Local stack: API + web app on http://localhost:8080, Postgres on :5434.
+# Local stack: API + web app on http://localhost:8080, worker, Postgres on :5434.
 # Without SMTP_HOST, login codes are printed to the app log.
 services:
   app:
@@ -21,6 +21,21 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - MAIL_FROM=${MAIL_FROM:-Döner App <noreply@localhost>}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+    entrypoint: /app/worker
+    environment:
+      - DB_HOST=db
+      - DB_NAME=doener
+      - DB_USER=doener
+      - DB_PASSWORD=${DB_PASSWORD:-doener}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy

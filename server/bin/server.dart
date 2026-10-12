@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:doener_server/doener_server.dart';
@@ -35,17 +34,6 @@ Future<void> startServer() async {
   }
 
   final deps = Deps(db: db, config: config, mailer: mailer, httpClient: http.Client());
-
-  Future<void> maintain() async {
-    try {
-      await maintainPlaceCache(deps);
-    } catch (error, stackTrace) {
-      print('Place cache maintenance failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-  }
-  unawaited(maintain());
-  Timer.periodic(const Duration(hours: 24), (_) => maintain());
   final server = await io.serve(buildHandler(deps), InternetAddress.anyIPv4, config.port);
   print('Listening on :${server.port}');
 

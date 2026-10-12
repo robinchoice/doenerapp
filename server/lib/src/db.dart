@@ -235,20 +235,47 @@ final migrations = <List<String>>[
       WHERE p.business_status IS DISTINCT FROM 'FUTURE_OPENING'
     ''',
   ],
+  [
+    // Jobs the worker runs on a schedule (runSchedule). Claimed atomically,
+    // so with several workers each run happens once.
+    'CREATE TABLE schedules (name text PRIMARY KEY, next_run_at timestamptz NOT NULL)',
+    "INSERT INTO schedules (name, next_run_at) VALUES ('place_cache', now())",
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {
-  await db.execute('CREATE TABLE IF NOT EXISTS schema_migrations '
-      '(version int PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  final applied = await db.execute('SELECT coalesce(max(version), 0) FROM schema_migrations');
-  final current = applied.first.first as int;
+  // API and worker start together: the lock makes one wait until the other has migrated.
+  await db.runTx((tx) async {
+    await tx.execute('SELECT pg_advisory_xact_lock(hashtext(\'schema_migrations\'))');
+    await tx.execute('CREATE TABLE IF NOT EXISTS schema_migrations '
+        '(version int PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
+    final applied = await tx.execute('SELECT coalesce(max(version), 0) FROM schema_migrations');
+    final current = applied.first.first as int;
 
-  for (var version = current + 1; version <= migrations.length; version++) {
-    await db.runTx((tx) async {
+    for (var version = current + 1; version <= migrations.length; version++) {
       for (final statement in migrations[version - 1]) {
         await tx.execute(statement);
       }
       await tx.execute(Sql.named('INSERT INTO schema_migrations (version) VALUES (@v)'), parameters: {'v': version});
-    });
-  }
+    }
+  });
+}
+
+/// Runs [job] if the schedule [name] is due, then again after [every].
+/// The claim moves the schedule on by an hour first: only one worker gets it,
+/// and if that one dies mid-run, the job runs again an hour later.
+Future<void> runSchedule(Session db, String name, Duration every, Future<void> Function() job) async {
+  final claimed = await db.execute(
+    Sql.named("UPDATE schedules SET next_run_at = now() + interval '1 hour' "
+        'WHERE name = @name AND next_run_at <= now() RETURNING name'),
+    parameters: {'name': name},
+  );
+  if (claimed.isEmpty) return;
+  print('Schedule $name: running');
+  await job();
+  await db.execute(
+    Sql.named("UPDATE schedules SET next_run_at = now() + @seconds:int4 * interval '1 second' WHERE name = @name"),
+    parameters: {'name': name, 'seconds': every.inSeconds},
+  );
+  print('Schedule $name: done');
 }

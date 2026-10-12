@@ -24,6 +24,7 @@ void main() {
   test('production refuses to start without SMTP', () {
     expect(() => Config.fromEnvironment({'APP_ENV': 'production'}), throwsStateError);
     expect(Config.fromEnvironment({'APP_ENV': 'production', 'SMTP_HOST': 'smtp.test'}).smtp?.host, 'smtp.test');
+    expect(Config.fromEnvironment({'APP_ENV': 'production'}, needsMail: false).smtp, isNull, reason: 'worker');
     expect(Config.fromEnvironment({}).smtp, isNull);
   });
 

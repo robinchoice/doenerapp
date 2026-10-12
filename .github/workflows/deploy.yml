@@ -50,6 +50,7 @@ jobs:
         env:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
           APP_UUID: ${{ secrets.COOLIFY_UUID }}
+          WORKER_UUID: ${{ secrets.COOLIFY_WORKER_UUID }}
         run: |
           # Zeigt Status + Antwort, statt Fehler wie `curl -f` zu verschlucken.
           coolify() {
@@ -59,10 +60,13 @@ jobs:
           }
           # Coolify auf den konkreten Commit-SHA-Tag setzen (umgeht den 'latest'-Image-Cache,
           # der sonst das alte Image behält), dann force-deployen.
-          coolify -X PATCH "https://coolify.pleasance.org/api/v1/applications/$APP_UUID" \
-            -H "Content-Type: application/json" \
-            -d "{\"docker_registry_image_tag\": \"${{ github.sha }}\"}"
-          coolify -X POST "https://coolify.pleasance.org/api/v1/deploy?uuid=$APP_UUID&force=true"
+          # API and worker run the same image.
+          for uuid in "$APP_UUID" "$WORKER_UUID"; do
+            coolify -X PATCH "https://coolify.pleasance.org/api/v1/applications/$uuid" \
+              -H "Content-Type: application/json" \
+              -d "{\"docker_registry_image_tag\": \"${{ github.sha }}\"}"
+            coolify -X POST "https://coolify.pleasance.org/api/v1/deploy?uuid=$uuid&force=true"
+          done
 
           # Done means the public URL serves this commit, which also catches a proxy route lost on recreate.
           for _ in {1..60}; do

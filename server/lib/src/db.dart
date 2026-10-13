@@ -236,15 +236,15 @@ final migrations = <List<String>>[
     ''',
   ],
   [
-    // Jobs the worker runs on a schedule (runSchedule). Claimed atomically,
-    // so with several workers each run happens once.
+    // Scheduled jobs (runSchedule). Claimed atomically, so with several API
+    // instances each run happens once.
     'CREATE TABLE schedules (name text PRIMARY KEY, next_run_at timestamptz NOT NULL)',
     "INSERT INTO schedules (name, next_run_at) VALUES ('place_cache', now())",
   ],
 ];
 
 Future<void> migrate(Pool<void> db) async {
-  // API and worker start together: the lock makes one wait until the other has migrated.
+  // Several instances may start together: the lock makes the others wait until one has migrated.
   await db.runTx((tx) async {
     await tx.execute('SELECT pg_advisory_xact_lock(hashtext(\'schema_migrations\'))');
     await tx.execute('CREATE TABLE IF NOT EXISTS schema_migrations '
@@ -262,7 +262,7 @@ Future<void> migrate(Pool<void> db) async {
 }
 
 /// Runs [job] if the schedule [name] is due, then again after [every].
-/// The claim moves the schedule on by an hour first: only one worker gets it,
+/// The claim moves the schedule on by an hour first: only one instance gets it,
 /// and if that one dies mid-run, the job runs again an hour later.
 Future<void> runSchedule(Session db, String name, Duration every, Future<void> Function() job) async {
   final claimed = await db.execute(

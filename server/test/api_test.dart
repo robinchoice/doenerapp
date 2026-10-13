@@ -764,7 +764,7 @@ void main() {
     var runs = 0;
     Future<void> run() => runSchedule(db, 'place_cache', const Duration(hours: 24), () async => runs++);
     await Future.wait([run(), run()]);
-    expect(runs, 1, reason: 'claimed by one worker only');
+    expect(runs, 1, reason: 'claimed by one instance only');
     await run();
     expect(runs, 1, reason: 'not due again yet');
     final next = await db.execute("SELECT next_run_at > now() + interval '23 hours' FROM schedules WHERE name = 'place_cache'");

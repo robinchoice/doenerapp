@@ -52,8 +52,7 @@ class Config {
     this.revision = 'dev',
   });
 
-  /// The worker sends no mail and runs without SMTP ([needsMail] false).
-  factory Config.fromEnvironment(Map<String, String> env, {bool needsMail = true}) {
+  factory Config.fromEnvironment(Map<String, String> env) {
     String? get(String key) {
       final value = env[key]?.trim();
       return (value == null || value.isEmpty) ? null : value;
@@ -61,7 +60,7 @@ class Config {
 
     final smtpHost = get('SMTP_HOST');
     // The image sets APP_ENV=production. Without SMTP the log would hand out login codes and links.
-    if (needsMail && smtpHost == null && get('APP_ENV') == 'production') {
+    if (smtpHost == null && get('APP_ENV') == 'production') {
       throw StateError('SMTP_HOST is required in production, otherwise login codes would end up in the log');
     }
     return Config(

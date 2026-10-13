@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:doener_server/doener_server.dart';
@@ -34,6 +35,18 @@ Future<void> startServer() async {
   }
 
   final deps = Deps(db: db, config: config, mailer: mailer, httpClient: http.Client());
+
+  // Every instance polls; the claim in runSchedule lets one of them run it.
+  Future<void> runDueJobs() async {
+    try {
+      await runSchedule(db, 'place_cache', const Duration(hours: 24), () => maintainPlaceCache(deps));
+    } catch (error, stackTrace) {
+      print('Place cache maintenance failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
+  }
+  unawaited(runDueJobs());
+  Timer.periodic(const Duration(minutes: 1), (_) => runDueJobs());
   final server = await io.serve(buildHandler(deps), InternetAddress.anyIPv4, config.port);
   print('Listening on :${server.port}');
 

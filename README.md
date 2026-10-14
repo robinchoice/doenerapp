@@ -280,7 +280,7 @@ cd app && flutter test
 |---|---|---|
 | `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres) und App |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
-| `mobile.yml` | Push auf `main` (`app/`, `packages/`), manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
+| `mobile.yml` | Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
 
 Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, alles andere ist die Web-App.
 

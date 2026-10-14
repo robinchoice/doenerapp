@@ -1,24 +1,19 @@
 name: Mobile
 
-# Android → AAB als Artefakt und in den internen Play-Test, bei jedem Push auf main.
-# iOS → TestFlight nur bei Tags `v*` und per workflow_dispatch: macOS-Minuten zählen 10-fach.
+# Android → AAB als Artefakt und in den internen Play-Test, iOS → TestFlight.
+# Beides nur bei Tags `v*` und per workflow_dispatch: Die Minuten gehen vom Kontingent
+# des privaten Repos ab (macOS 10-fach), ein Build pro Push auf main war zu teuer.
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
     tags: ['v*']
-    paths:
-      - 'app/**'
-      - 'packages/**'
-      - '.github/workflows/mobile.yml'
 
 env:
   FLUTTER_VERSION: 3.47.5
 
 jobs:
   ios:
-    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +98,6 @@ jobs:
             -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
 
   android:
-    if: github.ref_type != 'tag'
     runs-on: ubuntu-latest
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}

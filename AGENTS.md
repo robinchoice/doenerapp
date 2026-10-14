@@ -17,8 +17,8 @@
 ## Deploy
 
 - Ein Push auf `main`, der `server/`, `packages/`, `app/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
-- Änderungen an `app/` oder `packages/` bauen zusätzlich per `mobile.yml` die Android-App für den internen Play-Test.
-- TestFlight-Release (iOS) nur auf Anstoß, weil macOS-Minuten 10-fach zählen: Tag pushen (`git tag v1.2.3 && git push origin v1.2.3`, baut nur iOS) oder `gh workflow run Mobile` (baut iOS und Android).
+- Tags `v*` (und manuelle Läufe) bauen per `mobile.yml` die Android-App für den internen Play-Test und die iOS-App für TestFlight. Pushes auf `main` bauen keine App mehr, das sparte Actions-Minuten.
+- TestFlight-Release (iOS) nur auf Anstoß, weil macOS-Minuten 10-fach zählen: Tag pushen (`git tag v1.2.3 && git push origin v1.2.3`) oder `gh workflow run Mobile`, beides baut iOS und Android.
 - Prüfen: `gh run watch`. Der Deploy-Job ist erst grün, wenn `https://doener-api.pleasance.org/api/v1/health` den Commit als `revision` meldet.
 
 ## Fallen

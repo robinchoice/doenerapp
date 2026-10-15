@@ -21,6 +21,9 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - MAIL_FROM=${MAIL_FROM:-Döner App <noreply@localhost>}
+      - SIGNUP_OPEN=${SIGNUP_OPEN:-true}
+      - SIGNUP_ALLOWLIST=${SIGNUP_ALLOWLIST:-}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
     depends_on:
       db:
         condition: service_healthy

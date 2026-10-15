@@ -36,11 +36,22 @@ List<Ingredient>? _ingredientsFromJson(Object? v) =>
 
 // MARK: - Auth
 
+/// [inviteCode] of a friend's link lets a new address in while sign-up is closed.
 class LoginRequest {
   final String email;
-  const LoginRequest({required this.email});
+  final String? inviteCode;
+  const LoginRequest({required this.email, this.inviteCode});
 
-  factory LoginRequest.fromJson(Json j) => LoginRequest(email: j['email'] as String);
+  factory LoginRequest.fromJson(Json j) => LoginRequest(email: j['email'] as String, inviteCode: j['inviteCode'] as String?);
+  Json toJson() => {'email': email, if (inviteCode != null) 'inviteCode': inviteCode};
+}
+
+/// An admin creates the account of a tester while sign-up is closed.
+class InviteRequest {
+  final String email;
+  const InviteRequest({required this.email});
+
+  factory InviteRequest.fromJson(Json j) => InviteRequest(email: j['email'] as String);
   Json toJson() => {'email': email};
 }
 
@@ -115,16 +126,26 @@ class AccountDto extends UserDto {
   /// Asks and shows what "mit allem" means, meat, skewer and bread.
   final bool expertMode;
 
-  const AccountDto({required super.id, required super.displayName, this.diet = Diet.all, this.expertMode = false});
+  /// May invite testers while sign-up is closed (`ADMIN_EMAILS` on the server).
+  final bool admin;
+
+  const AccountDto({
+    required super.id,
+    required super.displayName,
+    this.diet = Diet.all,
+    this.expertMode = false,
+    this.admin = false,
+  });
 
   factory AccountDto.fromJson(Json j) => AccountDto(
         id: j['id'] as String,
         displayName: j['displayName'] as String,
         diet: _enumOrNull(Diet.values, j['diet']) ?? Diet.all,
         expertMode: j['expertMode'] as bool? ?? false,
+        admin: j['admin'] as bool? ?? false,
       );
   @override
-  Json toJson() => {...super.toJson(), 'diet': diet.name, 'expertMode': expertMode};
+  Json toJson() => {...super.toJson(), 'diet': diet.name, 'expertMode': expertMode, 'admin': admin};
 }
 
 // MARK: - Place

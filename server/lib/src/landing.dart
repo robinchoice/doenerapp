@@ -52,11 +52,10 @@ Future<void> _mailTesterRequest(Deps deps, String to, String email, String platf
     await deps.mailer.send(
       to: to,
       subject: 'Testanfrage ${ios ? 'iOS' : 'Android'}: $email',
-      text: ios
-          ? '$email möchte die iOS-App testen.\n\nIn App Store Connect unter TestFlight → Externe Tester hinzufügen, '
-                'Apple schickt die Einladung.'
-          : '$email möchte die Android-App testen.\n\nIn der Play Console unter Interner Test → Tester zur Liste hinzufügen '
-                'und mit einer Antwort auf diese Mail den Link zum Test schicken.',
+      text: '${ios ? '$email möchte die iOS-App testen.\n\nIn App Store Connect unter TestFlight → Externe Tester hinzufügen, '
+              'Apple schickt die Einladung.' : '$email möchte die Android-App testen.\n\nIn der Play Console unter Interner Test → '
+              'Tester zur Liste hinzufügen und mit einer Antwort auf diese Mail den Link zum Test schicken.'}\n\n'
+          'Die Registrierung ist geschlossen: In der App unter Profil → Tester einladen das Konto anlegen.',
       replyTo: email,
     );
   } catch (e) {

@@ -34,6 +34,16 @@ class Config {
   /// Where tester feedback is mailed. Without it, feedback is only stored.
   final String? feedbackEmail;
 
+  /// Sign-up stays closed until Robin opens it (`SIGNUP_OPEN=true`): existing
+  /// accounts log in, new ones only for [signupAllowlist], a friend's invite
+  /// link or an admin's invite.
+  final bool signupOpen;
+  final Set<String> signupAllowlist;
+
+  /// May invite testers (`ADMIN_EMAILS`). admin@pleasance.org, the agents'
+  /// account, never goes in here.
+  final Set<String> adminEmails;
+
   /// Commit of the build (`APP_VERSION`); `/health` reports it so the deploy can wait for it.
   final String revision;
 
@@ -49,6 +59,9 @@ class Config {
     this.corsOrigin,
     this.appDownloadUrl,
     this.feedbackEmail,
+    this.signupOpen = false,
+    this.signupAllowlist = const {},
+    this.adminEmails = const {},
     this.revision = 'dev',
   });
 
@@ -57,6 +70,9 @@ class Config {
       final value = env[key]?.trim();
       return (value == null || value.isEmpty) ? null : value;
     }
+
+    Set<String> list(String key) =>
+        {for (final entry in (get(key) ?? '').split(',')) if (entry.trim().isNotEmpty) entry.trim().toLowerCase()};
 
     final smtpHost = get('SMTP_HOST');
     // The image sets APP_ENV=production. Without SMTP the log would hand out login codes and links.
@@ -89,6 +105,9 @@ class Config {
       corsOrigin: get('CORS_ORIGIN'),
       appDownloadUrl: get('APP_DOWNLOAD_URL'),
       feedbackEmail: get('FEEDBACK_EMAIL'),
+      signupOpen: get('SIGNUP_OPEN') == 'true',
+      signupAllowlist: list('SIGNUP_ALLOWLIST'),
+      adminEmails: list('ADMIN_EMAILS'),
       revision: get('APP_VERSION') ?? 'dev',
     );
   }

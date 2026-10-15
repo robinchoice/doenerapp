@@ -24,11 +24,21 @@ String randomToken() =>
 
 String randomCode() => _random.nextInt(1000000).toString().padLeft(6, '0');
 
-AccountDto accountFromRow(Map<String, dynamic> row) => AccountDto(
+/// Shipped clients show `error` as is, and the app has no language switch, so
+/// the message carries both languages.
+const signupClosed = ApiException.forbidden(
+  'Die Registrierung ist noch geschlossen, für diese Adresse gibt es noch kein Konto.\n'
+  'Sign-up is still closed, there is no account for this address yet.',
+);
+
+const _accountColumns = 'id, email, display_name, diet, expert_mode';
+
+AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       id: row['id'] as String,
       displayName: row['display_name'] as String,
       diet: Diet.values.byName(row['diet'] as String),
       expertMode: row['expert_mode'] as bool,
+      admin: deps.config.adminEmails.contains(row['email']),
     );
 
 class AuthUser {
@@ -45,12 +55,12 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   if (header == null || !header.startsWith('Bearer ')) throw const ApiException.unauthorized();
   final row = await queryOne(
     deps.db,
-    'SELECT u.id, u.display_name, u.diet, u.expert_mode FROM sessions s JOIN users u ON u.id = s.user_id '
+    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode FROM sessions s JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
     {'hash': hashToken(header.substring(7).trim())},
   );
   if (row == null) throw const ApiException.unauthorized('Sitzung abgelaufen');
-  return AuthUser(accountFromRow(row));
+  return AuthUser(accountFromRow(deps, row));
 }
 
 void mountAuth(Router router, Deps deps) {
@@ -58,51 +68,40 @@ void mountAuth(Router router, Deps deps) {
     final body = await readBody(request, LoginRequest.fromJson);
     if (!Validation.isValidEmail(body.email)) throw const ApiException.badRequest('Ungültige E-Mail-Adresse');
     final email = Validation.normalizeEmail(body.email);
+    // Strangers get no mail. Shipped clients send no invite code, their friends'
+    // links only work from the next build on.
+    final hasAccount = await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) != null;
+    if (!hasAccount && !await _maySignUp(deps, email, Validation.clean(body.inviteCode))) throw signupClosed;
+    await _mailLoginCode(deps, email, inviteCode: Validation.clean(body.inviteCode));
+    return noContent();
+  });
 
-    await deps.db.execute("DELETE FROM login_requests WHERE created_at < now() - interval '1 day'");
-    await deps.db.execute('DELETE FROM sessions WHERE expires_at < now()');
-
-    final recent = await queryOne(
-      deps.db,
-      "SELECT count(*)::int AS n FROM login_requests WHERE email = @email AND created_at > now() - interval '1 hour'",
-      {'email': email},
-    );
-    if ((recent!['n'] as int) >= maxLoginRequestsPerHour) {
-      throw const ApiException(429, 'Zu viele Anfragen – bitte später erneut versuchen.');
+  // POST /auth/invite {email} — admins let single testers past the closed
+  // sign-up: the account exists first, then the tester logs in like any other.
+  router.post('/auth/invite', (Request request) async {
+    final user = await requireUser(deps, request);
+    if (!user.account.admin) throw const ApiException.forbidden('Nur für Admins');
+    final body = await readBody(request, InviteRequest.fromJson);
+    if (!Validation.isValidEmail(body.email)) throw const ApiException.badRequest('Ungültige E-Mail-Adresse');
+    final email = Validation.normalizeEmail(body.email);
+    if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) == null) {
+      await _createUser(deps, email, null);
     }
-
-    final code = randomCode();
-    final token = randomToken();
-    await deps.db.execute(
-      Sql.named('INSERT INTO login_requests (email, code_hash, token_hash, expires_at) '
-          'VALUES (@email, @code, @token, @expires)'),
-      parameters: {
-        'email': email,
-        'code': hashToken(code),
-        'token': hashToken(token),
-        'expires': DateTime.now().toUtc().add(loginRequestTtl),
-      },
-    );
-
-    final publicUrl = deps.config.publicUrl;
-    await deps.mailer.send(
-      to: email,
-      subject: 'Dein Login-Code: $code',
-      text: 'Dein Code für die Döner App: $code\n\n'
-          '${publicUrl == null ? '' : 'Oder direkt im Browser anmelden:\n$publicUrl/login?token=$token\n\n'}'
-          'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '
-          'Falls du das nicht angefordert hast, ignoriere diese Mail einfach.',
-    );
+    await _mailLoginCode(deps, email, invitedBy: user.displayName);
     return noContent();
   });
 
   router.post('/auth/verify', (Request request) async {
     final body = await readBody(request, VerifyRequest.fromJson);
-    final email = await _consumeLoginRequest(deps, body);
+    final (email, storedInvite) = await _consumeLoginRequest(deps, body);
 
-    var user = await queryOne(deps.db, 'SELECT id, display_name, diet, expert_mode FROM users WHERE email = @email', {'email': email});
+    var user = await queryOne(deps.db, 'SELECT $_accountColumns FROM users WHERE email = @email', {'email': email});
     final isNewUser = user == null;
-    user ??= await _createUser(deps, email, Validation.clean(body.inviteCode));
+    if (isNewUser) {
+      final inviteCode = Validation.clean(body.inviteCode) ?? storedInvite;
+      if (!await _maySignUp(deps, email, inviteCode)) throw signupClosed;
+      user = await _createUser(deps, email, inviteCode);
+    }
 
     final token = randomToken();
     await deps.db.execute(
@@ -113,7 +112,7 @@ void mountAuth(Router router, Deps deps) {
         'expires': DateTime.now().toUtc().add(sessionTtl),
       },
     );
-    return json(AuthResponse(token: token, user: accountFromRow(user), isNewUser: isNewUser).toJson());
+    return json(AuthResponse(token: token, user: accountFromRow(deps, user), isNewUser: isNewUser).toJson());
   });
 
   router.get('/auth/me', (Request request) async {
@@ -139,10 +138,10 @@ void mountAuth(Router router, Deps deps) {
         deps.db,
         'UPDATE users SET display_name = coalesce(@name:text, display_name), diet = coalesce(@diet:text, diet), '
         'expert_mode = coalesce(@expert:boolean, expert_mode) WHERE id = @id:uuid '
-        'RETURNING id, display_name, diet, expert_mode',
+        'RETURNING $_accountColumns',
         {'name': body.displayName?.trim(), 'diet': body.diet?.name, 'expert': body.expertMode, 'id': user.id},
       );
-      return json(accountFromRow(row!).toJson());
+      return json(accountFromRow(deps, row!).toJson());
     } on UniqueViolationException {
       throw const ApiException.conflict('Der Name ist schon vergeben.');
     }
@@ -156,18 +155,80 @@ void mountAuth(Router router, Deps deps) {
   });
 }
 
-/// Validates a code or magic-link token and returns the verified email.
-Future<String> _consumeLoginRequest(Deps deps, VerifyRequest body) async {
+/// Landing page requests from before sign-up closed keep their way in; the
+/// 90-day cleanup of `tester_requests` ends this by itself.
+final signupClosedAt = DateTime.utc(2026, 10, 15, 14, 30);
+
+/// Closed until Robin opens it: new accounts only for the allowlist, early
+/// tester requests or with a friend's valid invite code. An unknown code opens nothing.
+Future<bool> _maySignUp(Deps deps, String email, String? inviteCode) async {
+  final config = deps.config;
+  if (config.signupOpen || config.signupAllowlist.contains(email)) return true;
+  return await queryOne(
+        deps.db,
+        'SELECT 1 WHERE EXISTS (SELECT 1 FROM users WHERE invite_code = @code::text) '
+        'OR EXISTS (SELECT 1 FROM tester_requests WHERE email = @email AND created_at < @closed '
+        "AND created_at > now() - interval '90 days')",
+        {'code': inviteCode, 'email': email, 'closed': signupClosedAt},
+      ) !=
+      null;
+}
+
+/// Mails a code and a magic link; [invitedBy] turns it into an invitation.
+Future<void> _mailLoginCode(Deps deps, String email, {String? invitedBy, String? inviteCode}) async {
+  await deps.db.execute("DELETE FROM login_requests WHERE created_at < now() - interval '1 day'");
+  await deps.db.execute('DELETE FROM sessions WHERE expires_at < now()');
+
+  final recent = await queryOne(
+    deps.db,
+    "SELECT count(*)::int AS n FROM login_requests WHERE email = @email AND created_at > now() - interval '1 hour'",
+    {'email': email},
+  );
+  if ((recent!['n'] as int) >= maxLoginRequestsPerHour) {
+    throw const ApiException(429, 'Zu viele Anfragen – bitte später erneut versuchen.');
+  }
+
+  final code = randomCode();
+  final token = randomToken();
+  await deps.db.execute(
+    Sql.named('INSERT INTO login_requests (email, code_hash, token_hash, expires_at, invite_code) '
+        'VALUES (@email, @code, @token, @expires, @invite:text)'),
+    parameters: {
+      'invite': inviteCode,
+      'email': email,
+      'code': hashToken(code),
+      'token': hashToken(token),
+      'expires': DateTime.now().toUtc().add(loginRequestTtl),
+    },
+  );
+
+  final publicUrl = deps.config.publicUrl;
+  final appUrl = deps.config.appDownloadUrl;
+  await deps.mailer.send(
+    to: email,
+    subject: invitedBy == null ? 'Dein Login-Code: $code' : '$invitedBy lädt dich in die Döner App ein',
+    text: '${invitedBy == null ? '' : '$invitedBy hat dir ein Konto in der Döner App angelegt.\n\n'}'
+        'Dein Code für die Döner App: $code\n\n'
+        '${publicUrl == null ? '' : 'Oder direkt im Browser anmelden:\n$publicUrl/login?token=$token\n\n'}'
+        '${invitedBy == null || appUrl == null ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
+        'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '
+        '${invitedBy == null ? 'Falls du das nicht angefordert hast, ignoriere diese Mail einfach.' : 'Danach meldest du dich jederzeit mit dieser Adresse an.'}',
+  );
+}
+
+/// Validates a code or magic-link token and returns the verified email with
+/// the invite code given at the login request.
+Future<(String, String?)> _consumeLoginRequest(Deps deps, VerifyRequest body) async {
   final token = Validation.clean(body.token);
   if (token != null) {
     final row = await queryOne(
       deps.db,
       'UPDATE login_requests SET used_at = now() '
-      'WHERE token_hash = @hash AND used_at IS NULL AND expires_at > now() RETURNING email',
+      'WHERE token_hash = @hash AND used_at IS NULL AND expires_at > now() RETURNING email, invite_code',
       {'hash': hashToken(token)},
     );
     if (row == null) throw const ApiException.unauthorized('Link ungültig oder abgelaufen.');
-    return row['email'] as String;
+    return (row['email'] as String, row['invite_code'] as String?);
   }
 
   final email = body.email == null ? null : Validation.normalizeEmail(body.email!);
@@ -177,7 +238,7 @@ Future<String> _consumeLoginRequest(Deps deps, VerifyRequest body) async {
   const invalid = ApiException.unauthorized('Code ungültig oder abgelaufen.');
   final row = await queryOne(
     deps.db,
-    'SELECT id, code_hash, attempts FROM login_requests '
+    'SELECT id, code_hash, attempts, invite_code FROM login_requests '
     'WHERE email = @email AND used_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1',
     {'email': email},
   );
@@ -196,11 +257,11 @@ Future<String> _consumeLoginRequest(Deps deps, VerifyRequest body) async {
     {'id': row['id']},
   );
   if (used == null) throw invalid;
-  return email;
+  return (email, row['invite_code'] as String?);
 }
 
 /// New accounts get a random unique name; the app asks to change it afterwards.
-/// An unknown [inviteCode] is ignored — the account is created either way.
+/// [inviteCode] records whose link brought the account in, if it is known.
 Future<Map<String, dynamic>> _createUser(Deps deps, String email, String? inviteCode) async {
   for (var attempt = 0; attempt < 10; attempt++) {
     final name = '${Validation.generatedNamePrefix}${1000 + _random.nextInt(9000)}';
@@ -209,7 +270,7 @@ Future<Map<String, dynamic>> _createUser(Deps deps, String email, String? invite
         deps.db,
         'INSERT INTO users (email, display_name, invited_by) '
         'VALUES (@email, @name, (SELECT id FROM users WHERE invite_code = @invite:text)) '
-        'RETURNING id, display_name, diet, expert_mode',
+        'RETURNING $_accountColumns',
         {'email': email, 'name': name, 'invite': inviteCode},
       ))!;
     } on UniqueViolationException catch (e) {

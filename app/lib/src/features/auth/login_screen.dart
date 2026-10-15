@@ -64,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _sendCode() => _run(() async {
         if (!Validation.isValidEmail(_email.text)) throw const ApiException(400, 'Bitte gib eine gültige E-Mail ein.');
-        await context.read<Session>().requestCode(Validation.normalizeEmail(_email.text));
+        await context.read<Session>().requestCode(Validation.normalizeEmail(_email.text), inviteCode: widget.inviteCode);
         setState(() => _codeSent = true);
       });
 

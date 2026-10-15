@@ -18,6 +18,7 @@ Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der S
 - Geteilt: `packages/doener_models` – DTOs, Validierung und Gamification-Regeln für App und Server
 - Läden: Google Places API (New), serverseitig abgefragt und gecacht
 - Login: E-Mail-Code bzw. Magic-Link, kein Passwort; Pflicht, samt eigenem Anzeigenamen statt „Döner-Fan-1234“
+- Registrierung geschlossen wie in starter („Registrierung öffnen“): Bestehende Konten melden sich an, neue nur über `SIGNUP_ALLOWLIST`, den Einladungslink eines Freundes oder eine Einladung von Robin (Profil → Tester einladen, für `ADMIN_EMAILS`). Wer vor der Schließung (15.10.2026, 16:30) über die Landingpage um einen Test gebeten hat, kommt ebenfalls herein, bis die Anfrage nach 90 Tagen gelöscht ist. Fremde bekommen eine Meldung auf Deutsch und Englisch, es geht keine Mail raus. Geöffnet wird mit `SIGNUP_OPEN=true`, das entscheidet Robin.
 
 ---
 
@@ -173,6 +174,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 |---|---|---|
 | POST | `/auth/login` | Login-Code + Magic-Link per Mail schicken |
 | POST | `/auth/verify` | Code oder Link-Token einlösen → Sitzung |
+| POST | `/auth/invite` | Admin legt ein Tester-Konto an und mailt den Login-Code |
 | POST | `/auth/logout` | Sitzung beenden |
 | GET | `/auth/me` | Aktueller User mit Ernährung und Expertenmodus |
 | PATCH | `/users/me` | Anzeigename, Ernährung oder Expertenmodus ändern |
@@ -271,6 +273,9 @@ cd app && flutter test
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
 | `APP_DOWNLOAD_URL` | – | Ziel von „App holen“ auf der Einladungsseite (z. B. öffentlicher TestFlight-Link); ohne nur Web-App |
 | `FEEDBACK_EMAIL` | – | Empfänger der Tester-Meldungen und Testanfragen; ohne werden sie nur gespeichert |
+| `SIGNUP_OPEN` | – (lokale Compose: `true`) | `true` öffnet die Registrierung für alle, nur nach Robins Go |
+| `SIGNUP_ALLOWLIST` | – | Kommagetrennte Adressen, die ohne Einladung ein neues Konto bekommen |
+| `ADMIN_EMAILS` | – | Kommagetrennte Adressen, die Tester einladen (robin@pleasance.org, nie admin@pleasance.org) |
 
 **App (`--dart-define`):**
 

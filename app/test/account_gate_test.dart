@@ -21,6 +21,7 @@ const _ina = UserDto(id: 'u2', displayName: 'Ina');
 class FakeServer {
   String name;
   String? verifiedWithInvite;
+  String? loginWithInvite;
   Map<String, dynamic>? feedback;
   final requests = <String>[];
   FakeServer(this.name);
@@ -30,6 +31,9 @@ class FakeServer {
     requests.add('${request.method} $path');
     http.Response json(Object body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json'});
     switch (path) {
+      case '/auth/login':
+        loginWithInvite = (jsonDecode(request.body) as Map<String, dynamic>)['inviteCode'] as String?;
+        return http.Response('', 204);
       case '/auth/verify':
         verifiedWithInvite = (jsonDecode(request.body) as Map<String, dynamic>)['inviteCode'] as String?;
         return json(AuthResponse(token: 't', user: AccountDto(id: 'u1', displayName: name), isNewUser: true).toJson());
@@ -158,6 +162,7 @@ void main() {
     await tester.enterText(find.byType(TextField).last, '123456');
     await submit();
 
+    expect(server.loginWithInvite, 'abc', reason: 'the link lets a new address past the closed sign-up');
     expect(server.verifiedWithInvite, 'abc');
     expect(find.text('Wie heißt du?'), findsOneWidget);
     expect(server.requests, isNot(contains('POST /invites/abc/accept')), reason: 'friends only meet the chosen name');

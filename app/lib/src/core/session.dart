@@ -51,7 +51,8 @@ class Session extends ChangeNotifier {
     }
   }
 
-  Future<void> requestCode(String email) => api.post('/auth/login', LoginRequest(email: email).toJson());
+  Future<void> requestCode(String email, {String? inviteCode}) =>
+      api.post('/auth/login', LoginRequest(email: email, inviteCode: inviteCode).toJson());
 
   Future<AuthResponse> verify(VerifyRequest request) async {
     final response = AuthResponse.fromJson(await api.post('/auth/verify', request.toJson()) as Map<String, dynamic>);
@@ -76,6 +77,7 @@ class Session extends ChangeNotifier {
       displayName: previous.displayName,
       diet: diet ?? previous.diet,
       expertMode: expertMode ?? previous.expertMode,
+      admin: previous.admin,
     ));
     try {
       final json = await api.patch('/users/me', UpdateMeRequest(diet: diet, expertMode: expertMode).toJson());

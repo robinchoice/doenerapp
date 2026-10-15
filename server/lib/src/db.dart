@@ -251,6 +251,11 @@ final migrations = <List<String>>[
       UNIQUE (email, platform)
     )''',
   ],
+  [
+    // A friend's invite code lets a new address past the closed sign-up; the
+    // magic link carries only the token, so the login request remembers it.
+    'ALTER TABLE login_requests ADD COLUMN invite_code text',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

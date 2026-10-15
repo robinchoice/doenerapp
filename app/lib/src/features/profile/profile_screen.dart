@@ -98,6 +98,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
                 ),
                 _MenuRow(icon: Icons.qr_code_2, label: 'Freunde einladen', onTap: () => showAppSheet(context, (_) => const InviteSheet())),
+                if (context.watch<Session>().user?.admin ?? false)
+                  _MenuRow(
+                    icon: Icons.person_add_alt,
+                    label: 'Tester einladen',
+                    onTap: () => showAppSheet(context, (_) => const _InviteTesterSheet()),
+                  ),
                 _MenuRow(
                   icon: Icons.history,
                   label: 'Meine Aktivität',
@@ -139,6 +145,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const PleasanceFooter(),
         ],
       ),
+    );
+  }
+}
+
+/// Sign-up is closed: admins create a tester's account, the tester gets a login mail.
+class _InviteTesterSheet extends StatefulWidget {
+  const _InviteTesterSheet();
+
+  @override
+  State<_InviteTesterSheet> createState() => _InviteTesterSheetState();
+}
+
+class _InviteTesterSheetState extends State<_InviteTesterSheet> {
+  final _email = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final email = Validation.normalizeEmail(_email.text);
+    setState(() => _busy = true);
+    try {
+      await context.read<Session>().api.post('/auth/invite', InviteRequest(email: email).toJson());
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      showMessage(context, 'Einladung an $email verschickt');
+    } catch (e) {
+      if (mounted) showMessage(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      children: [
+        Text('Tester einladen', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        const Text('Legt das Konto an und schickt einen Login-Code. Danach meldet sich der Tester wie jedes Konto an.'),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          decoration: const InputDecoration(labelText: 'E-Mail', prefixIcon: Icon(Icons.mail_outline)),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: _busy || !Validation.isValidEmail(_email.text) ? null : _send,
+          child: const Text('Einladen'),
+        ),
+      ],
     );
   }
 }

@@ -246,6 +246,13 @@ void main() {
     final account = AccountDto.fromJson(const {'id': 'u', 'displayName': 'Robin'});
     expect(account.diet, Diet.all);
     expect(account.expertMode, isFalse);
+    expect(account.admin, isFalse);
     expect(const UpdateMeRequest(diet: Diet.vegan).toJson(), {'diet': 'vegan'});
+  });
+
+  test('login requests from shipped clients carry no invite code', () {
+    expect(LoginRequest.fromJson(const {'email': 'a@b.de'}).inviteCode, isNull);
+    expect(const LoginRequest(email: 'a@b.de').toJson(), {'email': 'a@b.de'});
+    expect(const LoginRequest(email: 'a@b.de', inviteCode: 'x').toJson(), {'email': 'a@b.de', 'inviteCode': 'x'});
   });
 }

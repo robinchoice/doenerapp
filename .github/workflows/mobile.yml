@@ -2,8 +2,8 @@ name: Mobile
 
 # Android → AAB als Artefakt und in den internen Play-Test, dazu eine signierte APK
 # zum direkten Verschicken an Tester; iOS → TestFlight.
-# iOS baut bei jedem Push auf main, der die App ändert (öffentliches Repo, Minuten frei),
-# Android nur bei Tags `v*` und per workflow_dispatch.
+# Beides bei jedem Push auf main, der die App ändert (öffentliches Repo, Minuten frei),
+# dazu bei Tags `v*` und per workflow_dispatch.
 # `gh workflow run Mobile -f platform=android` baut nur Android.
 
 on:
@@ -108,7 +108,6 @@ jobs:
             -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
 
   android:
-    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}

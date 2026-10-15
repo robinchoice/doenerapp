@@ -2,8 +2,8 @@ name: Mobile
 
 # Android → AAB als Artefakt und in den internen Play-Test, dazu eine signierte APK
 # zum direkten Verschicken an Tester; iOS → TestFlight.
-# Beides nur bei Tags `v*` und per workflow_dispatch: Die Minuten gehen vom Kontingent
-# des privaten Repos ab (macOS 10-fach), ein Build pro Push auf main war zu teuer.
+# iOS baut bei jedem Push auf main, der die App ändert (öffentliches Repo, Minuten frei),
+# Android nur bei Tags `v*` und per workflow_dispatch.
 # `gh workflow run Mobile -f platform=android` baut nur Android.
 
 on:
@@ -14,7 +14,9 @@ on:
         options: [all, android]
         default: all
   push:
+    branches: [main]
     tags: ['v*']
+    paths: ['app/**', 'packages/**', '.github/workflows/mobile.yml']
 
 env:
   FLUTTER_VERSION: 3.47.5
@@ -106,6 +108,7 @@ jobs:
             -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
 
   android:
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}

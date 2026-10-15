@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:postgres/postgres.dart';
 
 class SmtpConfig {
@@ -27,8 +29,7 @@ class Config {
   /// Allowed CORS origin for local web development (e.g. `http://localhost:5000`).
   final String? corsOrigin;
 
-  /// Where the invite page's "App holen" button leads (e.g. a public TestFlight link).
-  /// Without it, the page only offers the web app.
+  /// The app link in the mail of an admin's invite (e.g. a public TestFlight link).
   final String? appDownloadUrl;
 
   /// Where tester feedback is mailed. Without it, feedback is only stored.
@@ -43,6 +44,10 @@ class Config {
   /// May invite testers (`ADMIN_EMAILS`). admin@pleasance.org, the agents'
   /// account, never goes in here.
   final Set<String> adminEmails;
+
+  /// App Store Connect key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` as base64)
+  /// for the TestFlight group `TESTFLIGHT_GROUP`. Without it, nothing goes to TestFlight.
+  final AscConfig? asc;
 
   /// Commit of the build (`APP_VERSION`); `/health` reports it so the deploy can wait for it.
   final String revision;
@@ -62,6 +67,7 @@ class Config {
     this.signupOpen = false,
     this.signupAllowlist = const {},
     this.adminEmails = const {},
+    this.asc,
     this.revision = 'dev',
   });
 
@@ -108,7 +114,29 @@ class Config {
       signupOpen: get('SIGNUP_OPEN') == 'true',
       signupAllowlist: list('SIGNUP_ALLOWLIST'),
       adminEmails: list('ADMIN_EMAILS'),
+      asc: switch ((get('ASC_KEY_ID'), get('ASC_ISSUER_ID'), get('ASC_KEY_P8'))) {
+        (final keyId?, final issuerId?, final key?) => AscConfig(
+            keyId: keyId,
+            issuerId: issuerId,
+            privateKey: utf8.decode(base64.decode(key)),
+            group: get('TESTFLIGHT_GROUP') ?? 'Erste Tester',
+          ),
+        _ => null,
+      },
       revision: get('APP_VERSION') ?? 'dev',
     );
   }
+}
+
+class AscConfig {
+  final String keyId;
+  final String issuerId;
+
+  /// The .p8 key as PEM.
+  final String privateKey;
+
+  /// External TestFlight group that gets the testers and every new build.
+  final String group;
+
+  const AscConfig({required this.keyId, required this.issuerId, required this.privateKey, this.group = 'Erste Tester'});
 }

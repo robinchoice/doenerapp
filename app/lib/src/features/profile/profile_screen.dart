@@ -101,8 +101,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (context.watch<Session>().user?.admin ?? false)
                   _MenuRow(
                     icon: Icons.person_add_alt,
-                    label: 'Tester einladen',
-                    onTap: () => showAppSheet(context, (_) => const _InviteTesterSheet()),
+                    label: 'Tester',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _TestersScreen())),
                   ),
                 _MenuRow(
                   icon: Icons.history,
@@ -149,17 +149,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-/// Sign-up is closed: admins create a tester's account, the tester gets a login mail.
-class _InviteTesterSheet extends StatefulWidget {
-  const _InviteTesterSheet();
+/// Sign-up is closed: admins let testers in — from the requests on the landing
+/// page or by address. Each gets an account and a login mail, iPhones also the
+/// TestFlight invite.
+class _TestersScreen extends StatefulWidget {
+  const _TestersScreen();
 
   @override
-  State<_InviteTesterSheet> createState() => _InviteTesterSheetState();
+  State<_TestersScreen> createState() => _TestersScreenState();
 }
 
-class _InviteTesterSheetState extends State<_InviteTesterSheet> {
+class _TestersScreenState extends State<_TestersScreen> {
   final _email = TextEditingController();
-  bool _busy = false;
+  String _platform = 'ios';
+  List<TesterRequestDto>? _requests;
+  String? _error;
+  final _busy = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -167,44 +178,131 @@ class _InviteTesterSheetState extends State<_InviteTesterSheet> {
     super.dispose();
   }
 
-  Future<void> _send() async {
-    final email = Validation.normalizeEmail(_email.text);
-    setState(() => _busy = true);
+  Future<void> _load() async {
     try {
-      await context.read<Session>().api.post('/auth/invite', InviteRequest(email: email).toJson());
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      showMessage(context, 'Einladung an $email verschickt');
+      final json = await context.read<Session>().api.get('/tester-requests') as List;
+      if (mounted) setState(() => _requests = [for (final r in json) TesterRequestDto.fromJson(r as Map<String, dynamic>)]);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  /// [key] marks what is running: a request id or the address field.
+  Future<void> _run(String key, Future<String> Function() action) async {
+    setState(() => _busy.add(key));
+    try {
+      final message = await action();
+      if (mounted) showMessage(context, message);
     } catch (e) {
       if (mounted) showMessage(context, e.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busy.remove(key));
     }
+  }
+
+  static String _done(String email, InviteResult result) => switch (result.testFlight) {
+        null => 'Login-Mail an $email verschickt',
+        true => 'Login-Mail an $email verschickt, TestFlight-Einladung kommt von Apple',
+        false => 'Login-Mail an $email verschickt. TestFlight hat nicht geklappt, bitte in App Store Connect einladen',
+      };
+
+  Future<void> _letIn(TesterRequestDto request) => _run(request.id, () async {
+        final json = await context.read<Session>().api.post('/tester-requests/${request.id}/invite');
+        setState(() => _requests?.removeWhere((r) => r.email == request.email));
+        return _done(request.email, InviteResult.fromJson(json as Map<String, dynamic>));
+      });
+
+  Future<void> _turnDown(TesterRequestDto request) => _run(request.id, () async {
+        await context.read<Session>().api.delete('/tester-requests/${request.id}');
+        setState(() => _requests?.remove(request));
+        return 'Anfrage von ${request.email} gelöscht';
+      });
+
+  Future<void> _invite() {
+    final email = Validation.normalizeEmail(_email.text);
+    return _run('address', () async {
+      final json = await context.read<Session>().api.post('/auth/invite', InviteRequest(email: email, platform: _platform).toJson());
+      _email.clear();
+      return _done(email, InviteResult.fromJson(json as Map<String, dynamic>));
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      children: [
-        Text('Tester einladen', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        const Text('Legt das Konto an und schickt einen Login-Code. Danach meldet sich der Tester wie jedes Konto an.'),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _email,
-          keyboardType: TextInputType.emailAddress,
-          autocorrect: false,
-          decoration: const InputDecoration(labelText: 'E-Mail', prefixIcon: Icon(Icons.mail_outline)),
-          onChanged: (_) => setState(() {}),
+    final theme = Theme.of(context);
+    final requests = _requests;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tester')),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SectionTitle(title: requests == null || requests.isEmpty ? 'Bewerbungen' : 'Bewerbungen (${requests.length})'),
+            if (_error != null)
+              Text(_error!, style: TextStyle(color: theme.colorScheme.error))
+            else if (requests == null)
+              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+            else if (requests.isEmpty)
+              Text('Gerade bewirbt sich niemand. Die Bewerbung steht auf der Landingpage.', style: TextStyle(color: theme.colorScheme.outline))
+            else
+              for (final r in requests)
+                HairlineRow(
+                  child: Row(
+                    children: [
+                      Icon(r.platform == 'ios' ? Icons.phone_iphone : Icons.android, color: context.accent),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(r.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text(
+                              [formatDate(r.createdAt), if (r.invitedBy != null) 'über ${r.invitedBy}'].join(' · '),
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_busy.contains(r.id))
+                        const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      else ...[
+                        IconButton(icon: const Icon(Icons.close), tooltip: 'Ablehnen', onPressed: () => _turnDown(r)),
+                        FilledButton(onPressed: () => _letIn(r), child: const Text('Freischalten')),
+                      ],
+                    ],
+                  ),
+                ),
+            const SizedBox(height: 28),
+            const SectionTitle(title: 'Per Adresse einladen'),
+            Text('Legt das Konto an und schickt einen Login-Code, bei iPhone auch die TestFlight-Einladung.',
+                style: TextStyle(color: theme.colorScheme.outline)),
+            const SizedBox(height: 12),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'ios', label: Text('iPhone'), icon: Icon(Icons.phone_iphone)),
+                ButtonSegment(value: 'android', label: Text('Android'), icon: Icon(Icons.android)),
+                ButtonSegment(value: 'web', label: Text('Nur Web'), icon: Icon(Icons.language)),
+              ],
+              selected: {_platform},
+              onSelectionChanged: (s) => setState(() => _platform = s.first),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'E-Mail', prefixIcon: Icon(Icons.mail_outline)),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _busy.contains('address') || !Validation.isValidEmail(_email.text) ? null : _invite,
+              child: const Text('Einladen'),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: _busy || !Validation.isValidEmail(_email.text) ? null : _send,
-          child: const Text('Einladen'),
-        ),
-      ],
+      ),
     );
   }
 }

@@ -848,24 +848,18 @@ void main() {
       expect((await verify('liste@example.org')).$2['isNewUser'], isTrue);
     });
 
-    test("a friend's invite link lets a new address in", () async {
+    test("a friend's invite link opens no account, testers can't bring in others", () async {
       final (frieda, _) = await signUp('frieda@example.org', 'Frieda');
       final code = (await call('GET', '/me/invite', token: frieda)).$2['code'] as String;
-      expect((await login('freund@example.org', inviteCode: code)).$1, 204);
-      final (status, body) = await verify('freund@example.org', inviteCode: code);
-      expect(status, 200);
-      expect(body['isNewUser'], isTrue);
+      final before = mailer.sent.length;
+      expect((await login('freund@example.org', inviteCode: code)).$1, 403);
+      expect(mailer.sent.length, before);
 
-      // The magic link carries only the token, the login request remembers the code.
-      expect((await login('link@example.org', inviteCode: code)).$1, 204);
-      final (linkStatus, link) = await call('POST', '/auth/verify', body: {'token': lastLinkToken()}, closed: true);
-      expect(linkStatus, 200);
-      expect(link['isNewUser'], isTrue);
-
-      // A reset link stops working between login and verify.
-      expect((await login('spaeter@example.org', inviteCode: code)).$1, 204);
-      await call('POST', '/me/invite/reset', token: frieda);
-      expect((await verify('spaeter@example.org', inviteCode: code)).$1, 403, reason: 'verify checks again');
+      // The way in is the tester request, which remembers whose link it was.
+      expect((await call('POST', '/tester-requests', body: {'email': 'freund@example.org', 'platform': 'ios', 'inviteCode': code})).$1,
+          204);
+      await db.execute("UPDATE tester_requests SET created_at = '2026-10-16 10:00+00' WHERE email = 'freund@example.org'");
+      expect((await login('freund@example.org')).$1, 403, reason: 'a request after the closing opens nothing by itself');
     });
 
     test('admins invite testers, everyone else may not', () async {
@@ -877,7 +871,8 @@ void main() {
       expect((await call('POST', '/auth/invite', body: {'email': 'tess@example.org'})).$1, 401);
       expect((await call('POST', '/auth/invite', body: {'email': 'tess@example.org'}, token: gast)).$1, 403);
       expect((await call('POST', '/auth/invite', body: {'email': 'kaputt'}, token: robin)).$1, 400);
-      expect((await call('POST', '/auth/invite', body: {'email': ' Tess@Example.org'}, token: robin, closed: true)).$1, 204);
+      final (invited, result) = await call('POST', '/auth/invite', body: {'email': ' Tess@Example.org'}, token: robin, closed: true);
+      expect((invited, result['testFlight']), (200, null), reason: 'no iPhone, no TestFlight');
       expect(mailer.sent.last.to, 'tess@example.org');
       expect(mailer.sent.last.subject, 'Robin lädt dich in die Döner App ein');
 
@@ -885,8 +880,35 @@ void main() {
       expect(status, 200);
       expect(body['isNewUser'], isFalse, reason: 'the invite created the account');
       expect((await login('tess@example.org')).$1, 204, reason: 'logs in like any account later on');
-      expect((await call('POST', '/auth/invite', body: {'email': 'tess@example.org'}, token: robin)).$1, 204,
+      expect((await call('POST', '/auth/invite', body: {'email': 'tess@example.org'}, token: robin)).$1, 200,
           reason: 'inviting twice mails again');
+      final (_, iphone) = await call('POST', '/auth/invite', body: {'email': 'ida@example.org', 'platform': 'ios'}, token: robin);
+      expect(iphone['testFlight'], isFalse, reason: 'without an App Store Connect key nothing goes to TestFlight');
+    });
+
+    test('admins see tester requests with the inviter and let them in or turn them down', () async {
+      final (robin, _) = await signUp('robin@doener.test', 'Robin');
+      final (gast, _) = await signUp('gast2@example.org', 'Gastgeber');
+      final code = (await call('GET', '/me/invite', token: gast)).$2['code'] as String;
+      await call('POST', '/tester-requests', body: {'email': 'neu@example.org', 'platform': 'android', 'inviteCode': code});
+      await call('POST', '/tester-requests', body: {'email': 'nein@example.org', 'platform': 'ios'});
+
+      expect((await call('GET', '/tester-requests', token: gast)).$1, 403);
+      final (_, list) = await call('GET', '/tester-requests', token: robin);
+      final requests = [for (final r in list as List) TesterRequestDto.fromJson(r as Map<String, dynamic>)];
+      final neu = requests.firstWhere((r) => r.email == 'neu@example.org');
+      expect((neu.platform, neu.invitedBy), ('android', 'Gastgeber'));
+      final nein = requests.firstWhere((r) => r.email == 'nein@example.org');
+
+      expect((await call('POST', '/tester-requests/${neu.id}/invite', token: gast)).$1, 403);
+      final (status, result) = await call('POST', '/tester-requests/${neu.id}/invite', token: robin);
+      expect((status, result['testFlight']), (200, null));
+      expect(mailer.sent.last.to, 'neu@example.org');
+      expect((await login('neu@example.org')).$1, 204, reason: 'the account exists now');
+
+      expect((await call('DELETE', '/tester-requests/${nein.id}', token: robin)).$1, 204);
+      final (_, after) = await call('GET', '/tester-requests', token: robin);
+      expect((after as List).map((r) => r['email']), isNot(anyOf(contains('neu@example.org'), contains('nein@example.org'))));
     });
   });
 

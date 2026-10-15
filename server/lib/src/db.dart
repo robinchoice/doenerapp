@@ -298,6 +298,12 @@ final migrations = <List<String>>[
     'CREATE INDEX best_of_place ON best_of (place_id)',
     "INSERT INTO schedules (name, next_run_at) VALUES ('best_of', now())",
   ],
+  [
+    // Whose invite link brought a tester request; testers can't let others in themselves.
+    'ALTER TABLE tester_requests ADD COLUMN invited_by uuid REFERENCES users(id) ON DELETE SET NULL',
+    // Hands each new iOS build to the external TestFlight group (only with an App Store Connect key).
+    "INSERT INTO schedules (name, next_run_at) VALUES ('testflight', now())",
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

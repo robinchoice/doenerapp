@@ -9,6 +9,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'deps.dart';
 import 'http.dart';
+import 'testflight.dart';
 
 const loginRequestTtl = Duration(minutes: 15);
 const sessionTtl = Duration(days: 180);
@@ -26,9 +27,10 @@ String randomCode() => _random.nextInt(1000000).toString().padLeft(6, '0');
 
 /// Shipped clients show `error` as is, and the app has no language switch, so
 /// the message carries both languages.
+/// The app offers the tester request on the landing page for it.
 const signupClosed = ApiException.forbidden(
-  'Die Registrierung ist noch geschlossen, für diese Adresse gibt es noch kein Konto.\n'
-  'Sign-up is still closed, there is no account for this address yet.',
+  'Die Registrierung ist noch geschlossen, für diese Adresse gibt es noch kein Konto. Bewirb dich als Tester.\n'
+  'Sign-up is still closed, there is no account for this address yet. Apply as a tester.',
 );
 
 const _accountColumns = 'id, email, display_name, diet, expert_mode';
@@ -71,24 +73,18 @@ void mountAuth(Router router, Deps deps) {
     // Strangers get no mail. Shipped clients send no invite code, their friends'
     // links only work from the next build on.
     final hasAccount = await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) != null;
-    if (!hasAccount && !await _maySignUp(deps, email, Validation.clean(body.inviteCode))) throw signupClosed;
+    if (!hasAccount && !await _maySignUp(deps, email)) throw signupClosed;
     await _mailLoginCode(deps, email, inviteCode: Validation.clean(body.inviteCode));
     return noContent();
   });
 
-  // POST /auth/invite {email} — admins let single testers past the closed
-  // sign-up: the account exists first, then the tester logs in like any other.
+  // POST /auth/invite {email, platform?} — admins let single testers past the
+  // closed sign-up: the account exists first, then the tester logs in like any other.
   router.post('/auth/invite', (Request request) async {
-    final user = await requireUser(deps, request);
-    if (!user.account.admin) throw const ApiException.forbidden('Nur für Admins');
+    final admin = await requireAdmin(deps, request);
     final body = await readBody(request, InviteRequest.fromJson);
     if (!Validation.isValidEmail(body.email)) throw const ApiException.badRequest('Ungültige E-Mail-Adresse');
-    final email = Validation.normalizeEmail(body.email);
-    if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) == null) {
-      await _createUser(deps, email, null);
-    }
-    await _mailLoginCode(deps, email, invitedBy: user.displayName);
-    return noContent();
+    return json((await inviteTester(deps, Validation.normalizeEmail(body.email), admin, platform: body.platform)).toJson());
   });
 
   router.post('/auth/verify', (Request request) async {
@@ -99,7 +95,7 @@ void mountAuth(Router router, Deps deps) {
     final isNewUser = user == null;
     if (isNewUser) {
       final inviteCode = Validation.clean(body.inviteCode) ?? storedInvite;
-      if (!await _maySignUp(deps, email, inviteCode)) throw signupClosed;
+      if (!await _maySignUp(deps, email)) throw signupClosed;
       user = await _createUser(deps, email, inviteCode);
     }
 
@@ -160,18 +156,44 @@ void mountAuth(Router router, Deps deps) {
 final signupClosedAt = DateTime.utc(2026, 10, 15, 14, 30);
 
 /// Closed until Robin opens it: new accounts only for the allowlist, early
-/// tester requests or with a friend's valid invite code. An unknown code opens nothing.
-Future<bool> _maySignUp(Deps deps, String email, String? inviteCode) async {
+/// tester requests or an admin's invite ([inviteTester]). A friend's invite
+/// link only makes friends, so testers can't bring in others.
+Future<bool> _maySignUp(Deps deps, String email) async {
   final config = deps.config;
   if (config.signupOpen || config.signupAllowlist.contains(email)) return true;
   return await queryOne(
         deps.db,
-        'SELECT 1 WHERE EXISTS (SELECT 1 FROM users WHERE invite_code = @code::text) '
-        'OR EXISTS (SELECT 1 FROM tester_requests WHERE email = @email AND created_at < @closed '
-        "AND created_at > now() - interval '90 days')",
-        {'code': inviteCode, 'email': email, 'closed': signupClosedAt},
+        'SELECT 1 FROM tester_requests WHERE email = @email AND created_at < @closed '
+        "AND created_at > now() - interval '90 days'",
+        {'email': email, 'closed': signupClosedAt},
       ) !=
       null;
+}
+
+Future<AuthUser> requireAdmin(Deps deps, Request request) async {
+  final user = await requireUser(deps, request);
+  if (!user.account.admin) throw const ApiException.forbidden('Nur für Admins');
+  return user;
+}
+
+/// Creates the account if needed and mails the login code. With [platform]
+/// `ios`, Apple also mails the TestFlight invite; a failure there leaves the
+/// account in place and shows in the result.
+Future<InviteResult> inviteTester(Deps deps, String email, AuthUser admin, {String? platform}) async {
+  if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) == null) {
+    await _createUser(deps, email, null);
+  }
+  await _mailLoginCode(deps, email, invitedBy: admin.displayName);
+  if (platform != 'ios') return const InviteResult();
+  final asc = deps.config.asc;
+  if (asc == null) return const InviteResult(testFlight: false);
+  try {
+    await TestFlight(asc, deps.httpClient).invite(email);
+    return const InviteResult(testFlight: true);
+  } catch (e) {
+    print('TestFlight invite for $email failed: $e');
+    return const InviteResult(testFlight: false);
+  }
 }
 
 /// Mails a code and a magic link; [invitedBy] turns it into an invitation.

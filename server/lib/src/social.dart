@@ -376,13 +376,14 @@ Future<UserDto?> _inviter(Deps deps, String code) async {
 }
 
 /// `/i/<code>` — what a shared invite link shows without the app: a page with
-/// a chat preview (Open Graph) that leads into the web app.
+/// a chat preview (Open Graph). Logged-in browsers go on to the web app and
+/// make friends there; everyone else may only apply as a tester, a friend's
+/// link opens no account (the request remembers whose link it was).
 Future<Response> invitePage(Deps deps, Request request, String code) async {
   // All attributes below are double-quoted; slashes stay readable for link previews.
   const escape = HtmlEscape(HtmlEscapeMode.attribute);
   final inviter = await _inviter(deps, code);
   final base = escape.convert(_publicBase(deps, request));
-  final appUrl = deps.config.appDownloadUrl;
 
   // Only known codes are echoed into the page, and those consist of [_inviteAlphabet] only.
   final title = inviter == null
@@ -390,9 +391,10 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
       : '${escape.convert(inviter.displayName)} lädt dich in die Döner App ein';
   final content = inviter == null
       ? '<p>Der Link wurde zurückgesetzt oder ist falsch.</p><a class="button" href="/">Zur Döner App</a>'
-      : '<p>Sieh, wo deine Freunde gerade Döner essen – und iss mit.</p>'
-          '<a class="button" href="/app?invite=$code">Im Browser loslegen</a>'
-          '${appUrl == null ? '' : '<a class="button secondary" href="${escape.convert(appUrl)}">App holen</a>'}';
+      : '<p>Sieh, wo deine Freunde gerade Döner essen – und iss mit. Die App ist noch im Test: '
+          'Bewirb dich, dann schalten wir dich frei.</p>'
+          '<a class="button" href="/?von=$code#test">Als Tester bewerben</a>'
+          '<a class="button secondary" href="/app?invite=$code">Ich habe schon ein Konto</a>';
 
   return Response(
     inviter == null ? 404 : 200,
@@ -402,6 +404,7 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${inviter == null ? '' : '<script>if (localStorage.getItem("FlutterSecureStorage.session_token")) location.replace("/app?invite=$code");</script>'}
 <title>$title</title>
 <meta property="og:title" content="$title">
 <meta property="og:description" content="Sieh, wo deine Freunde gerade Döner essen – und iss mit.">

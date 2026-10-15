@@ -1,6 +1,7 @@
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api.dart';
 import '../../core/app_data.dart';
@@ -39,6 +40,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   String? _error;
 
+  /// The address has no account and sign-up is closed: the way in is the tester request.
+  bool _signupClosed = false;
+
   @override
   void dispose() {
     _email.dispose();
@@ -50,11 +54,17 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _signupClosed = false;
     });
     try {
       await action();
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _signupClosed = e.status == 403;
+        });
+      }
     } on OfflineException catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -79,6 +89,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ));
         await data.onSignedIn(response.user.id);
       });
+
+  /// The form on the landing page; with an invite code, the request tells whose link it was.
+  Future<void> _applyAsTester() async {
+    final page = Uri.parse(context.read<Session>().apiBase).resolve('/');
+    final code = widget.inviteCode;
+    final uri = page.replace(queryParameters: code == null ? null : {'von': code}, fragment: 'test');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +155,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (_error != null) ...[
                   const SizedBox(height: 8),
                   Text(_error!, style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center),
+                ],
+                if (_signupClosed) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _applyAsTester,
+                    icon: const Icon(Icons.science_outlined),
+                    label: const Text('Als Tester bewerben'),
+                  ),
                 ],
                 const SizedBox(height: 16),
                 FilledButton(

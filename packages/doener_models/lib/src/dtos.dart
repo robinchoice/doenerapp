@@ -59,12 +59,53 @@ class LoginRequest {
 }
 
 /// An admin creates the account of a tester while sign-up is closed.
+/// An admin lets a tester in. With [platform] `ios`, the address also gets a TestFlight invite.
 class InviteRequest {
   final String email;
-  const InviteRequest({required this.email});
+  final String? platform;
+  const InviteRequest({required this.email, this.platform});
 
-  factory InviteRequest.fromJson(Json j) => InviteRequest(email: j['email'] as String);
-  Json toJson() => {'email': email};
+  factory InviteRequest.fromJson(Json j) => InviteRequest(email: j['email'] as String, platform: j['platform'] as String?);
+  Json toJson() => {'email': email, 'platform': ?platform};
+}
+
+/// What an invite did: [testFlight] is null without an iPhone, false if Apple refused or isn't set up.
+class InviteResult {
+  final bool? testFlight;
+  const InviteResult({this.testFlight});
+
+  factory InviteResult.fromJson(Json j) => InviteResult(testFlight: j['testFlight'] as bool?);
+  Json toJson() => {'testFlight': testFlight};
+}
+
+/// A request from the landing page to join the test, for admins. [invitedBy]
+/// is the friend whose invite link brought the person there.
+class TesterRequestDto {
+  final String id;
+  final String email;
+
+  /// `ios` or `android`.
+  final String platform;
+  final String? invitedBy;
+  final DateTime createdAt;
+
+  const TesterRequestDto({required this.id, required this.email, required this.platform, this.invitedBy, required this.createdAt});
+
+  factory TesterRequestDto.fromJson(Json j) => TesterRequestDto(
+        id: j['id'] as String,
+        email: j['email'] as String,
+        platform: j['platform'] as String,
+        invitedBy: j['invitedBy'] as String?,
+        createdAt: _date(j['createdAt']),
+      );
+
+  Json toJson() => {
+        'id': id,
+        'email': email,
+        'platform': platform,
+        'invitedBy': invitedBy,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+      };
 }
 
 /// Either [email] + [code] (typed in by the user) or [token] (from the

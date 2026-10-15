@@ -27,7 +27,6 @@ Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) asyn
     return _html(404, '<title>Laden nicht gefunden</title></head><body><main><h1>Laden nicht gefunden</h1></main></body>');
   }
   final place = await _place(deps, placeId);
-  final appUrl = deps.config.appDownloadUrl;
   final name = place == null ? null : _escape.convert(place['name'] as String);
   final city = place?['city'] as String?;
   final title = name == null ? 'Wie war dein Döner?' : 'Wie war dein Döner bei $name?';
@@ -36,7 +35,7 @@ Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) asyn
       '<p>Gib Soße, Fleisch, Salat und Brot eine Note. Aus allen Bewertungen entsteht das Ranking'
       '${city == null ? ' deiner Stadt' : ' von ${_escape.convert(city)}'}.</p>'
       '<a class="button" href="/app?review=$placeId">Jetzt bewerten</a>'
-      '${appUrl == null ? '' : '<a class="button secondary" href="${_escape.convert(appUrl)}">App holen</a>'}'
+      '<a class="button secondary" href="/#test">Noch kein Konto? Als Tester bewerben</a>'
       '${name == null ? '' : '<p class="source">Ortsdaten: Google Maps</p>'}';
   return _html(
     200,

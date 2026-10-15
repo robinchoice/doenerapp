@@ -5,18 +5,21 @@ import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
+import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
 
 const maxTesterRequestsPerHour = 30;
 
 void mountTesterRequests(Router router, Deps deps) {
-  // POST /tester-requests {email, platform: ios|android} — from the landing page,
-  // no account needed. Robin gets a mail and invites the address by hand.
+  // POST /tester-requests {email, platform: ios|android, inviteCode?} — from the
+  // landing page, no account needed. Robin gets a mail and lets the address in
+  // under Profil → Tester. The invite code tells whose link brought the person.
   router.post('/tester-requests', (Request request) async {
     final body = await readJson(request);
     final email = body['email'];
     final platform = body['platform'];
+    final inviteCode = body['inviteCode'] is String ? Validation.clean(body['inviteCode'] as String) : null;
     if (email is! String || !Validation.isValidEmail(email)) {
       throw const ApiException.badRequest('Ungültige E-Mail-Adresse');
     }
@@ -34,13 +37,53 @@ void mountTesterRequests(Router router, Deps deps) {
     final normalized = Validation.normalizeEmail(email);
     final inserted = await deps.db.execute(
       Sql.named(
-        'INSERT INTO tester_requests (email, platform) VALUES (@email, @platform) '
+        'INSERT INTO tester_requests (email, platform, invited_by) '
+        'VALUES (@email, @platform, (SELECT id FROM users WHERE invite_code = @code::text)) '
         'ON CONFLICT (email, platform) DO NOTHING RETURNING id',
       ),
-      parameters: {'email': normalized, 'platform': platform},
+      parameters: {'email': normalized, 'platform': platform, 'code': inviteCode},
     );
     final to = deps.config.feedbackEmail;
     if (inserted.isNotEmpty && to != null) await _mailTesterRequest(deps, to, normalized, platform as String);
+    return noContent();
+  });
+
+  // GET /tester-requests — open requests for admins, oldest first.
+  router.get('/tester-requests', (Request request) async {
+    await requireAdmin(deps, request);
+    final rows = await query(
+      deps.db,
+      'SELECT t.id, t.email, t.platform, t.created_at, u.display_name FROM tester_requests t '
+      "LEFT JOIN users u ON u.id = t.invited_by WHERE t.created_at > now() - interval '90 days' "
+      'AND NOT EXISTS (SELECT 1 FROM users a WHERE a.email = t.email) ORDER BY t.created_at',
+    );
+    return json([
+      for (final r in rows)
+        TesterRequestDto(
+          id: r['id'] as String,
+          email: r['email'] as String,
+          platform: r['platform'] as String,
+          invitedBy: r['display_name'] as String?,
+          createdAt: r['created_at'] as DateTime,
+        ).toJson(),
+    ]);
+  });
+
+  // POST /tester-requests/<id>/invite — lets the person in like /auth/invite,
+  // with the TestFlight invite for iPhones. The request is done then.
+  router.post('/tester-requests/<id>/invite', (Request request, String id) async {
+    final admin = await requireAdmin(deps, request);
+    final row = await queryOne(deps.db, 'SELECT email, platform FROM tester_requests WHERE id = @id:uuid', {'id': requireUuid(id)});
+    if (row == null) throw const ApiException.notFound('Anfrage nicht gefunden');
+    final result = await inviteTester(deps, row['email'] as String, admin, platform: row['platform'] as String);
+    await deps.db.execute(Sql.named('DELETE FROM tester_requests WHERE email = @email'), parameters: {'email': row['email']});
+    return json(result.toJson());
+  });
+
+  // DELETE /tester-requests/<id> — turned down, without a mail.
+  router.delete('/tester-requests/<id>', (Request request, String id) async {
+    await requireAdmin(deps, request);
+    await deps.db.execute(Sql.named('DELETE FROM tester_requests WHERE id = @id:uuid'), parameters: {'id': requireUuid(id)});
     return noContent();
   });
 }
@@ -52,10 +95,9 @@ Future<void> _mailTesterRequest(Deps deps, String to, String email, String platf
     await deps.mailer.send(
       to: to,
       subject: 'Testanfrage ${ios ? 'iOS' : 'Android'}: $email',
-      text: '${ios ? '$email möchte die iOS-App testen.\n\nIn App Store Connect unter TestFlight → Externe Tester hinzufügen, '
-              'Apple schickt die Einladung.' : '$email möchte die Android-App testen.\n\nIn der Play Console unter Interner Test → '
-              'Tester zur Liste hinzufügen und mit einer Antwort auf diese Mail den Link zum Test schicken.'}\n\n'
-          'Die Registrierung ist geschlossen: In der App unter Profil → Tester einladen das Konto anlegen.',
+      text: '$email möchte die ${ios ? 'iOS' : 'Android'}-App testen.\n\n'
+          'Freischalten in der App unter Profil → Tester. Das legt das Konto an und schickt die Login-Mail, '
+          '${ios ? 'Apple schickt die TestFlight-Einladung.' : 'die APK bzw. den Link zum Play-Test schickst du mit einer Antwort auf diese Mail.'}',
       replyTo: email,
     );
   } catch (e) {
@@ -493,7 +535,8 @@ $features
       const res = await fetch('/api/v1/tester-requests', {
         method: 'POST',
         headers: {'content-type': 'application/json'},
-        body: JSON.stringify({email: form.querySelector('input').value, platform}),
+        // From a friend's invite page (/i/<code>): whose link it was.
+        body: JSON.stringify({email: form.querySelector('input').value, platform, inviteCode: new URLSearchParams(location.search).get('von')}),
       });
       if (!res.ok) throw res.status;
       form.hidden = true;

@@ -36,6 +36,7 @@
 
 ## Abweichungen vom Standard
 
-- Registrierung: Neben `SIGNUP_ALLOWLIST` und der Admin-Einladung (Profil → Tester einladen statt `/invite`) legt auch ein gültiger Freundes-Link (`inviteCode`, `/i/<code>`) ein neues Konto an, Robins Entscheidung vom 15.10.2026. Ein unbekannter Code öffnet nichts. Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`. Ausgelieferte App-Builds vor dieser Änderung schicken den Code erst bei `/auth/verify`, über deren Freundes-Links kommen neue Adressen also erst ab dem nächsten Build herein.
+- Registrierung: Neue Konten nur über `SIGNUP_ALLOWLIST` und Robins Freischaltung (Profil → Tester statt `/invite`, Bewerbungen von der Landingpage). Freundes-Links verbinden nur bestehende Konten, damit Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026, nimmt die vom Vormittag zurück). Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`.
+- TestFlight läuft über den Server statt die CI (kostet keine macOS-Minuten): Schedule `testflight` verteilt neue Builds, das Freischalten lädt iPhones ein. Der App-Store-Connect-Key liegt dafür auch in Coolify (`ASC_*`).
 
 - Zeitpläne laufen in der API statt in einem eigenen Worker: Jede Instanz fragt jede Minute `runSchedule` (Tabelle `schedules`), der atomare Claim lässt genau eine den Job ausführen. Ein neuer Job bekommt seine Zeile per Migration. Ein Worker als zweite Coolify-Anwendung bräuchte Kopien von DB-Zugang und Google-Key, die Agenten über die Coolify-API nicht lesen können.

@@ -43,6 +43,7 @@ jobs:
           build-args: |
             APP_VERSION=${{ github.sha }}
             GOOGLE_MAPS_WEB_KEY=${{ secrets.GOOGLE_MAPS_WEB_KEY }}
+            FIREBASE_WEB_KEY=${{ secrets.FIREBASE_WEB_KEY }}
             SENTRY_DSN=${{ vars.SENTRY_DSN }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

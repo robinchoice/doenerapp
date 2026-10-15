@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -12,6 +13,7 @@ import 'deps.dart';
 import 'google_places.dart';
 import 'http.dart';
 import 'moderation.dart';
+import 'push.dart';
 
 const liveStatusDuration = Duration(hours: 1);
 const _maxSyncSpanDeg = 0.5;
@@ -394,6 +396,7 @@ void mountPlaces(Router router, Deps deps) {
             'WHERE id = @user:uuid'),
         parameters: {'place': place['id'], 'until': liveUntil, 'food': body.foodType, 'user': user.id},
       );
+      unawaited(pushCheckIn(deps, user, place, body.foodType));
     }
 
     final row = await queryOne(deps.db, '$_visitSelect WHERE v.id = @id:uuid', {'id': id});
@@ -586,6 +589,7 @@ Future<void> maintainPlaceCache(Deps deps) async {
     "DELETE FROM places p WHERE synced_at < now() - interval '30 days' AND NOT ($activity) RETURNING id",
   );
   if (deleted.isNotEmpty) print('Place cache: dropped ${deleted.length} places older than 30 days');
+  await pushOpenings(deps);
 }
 
 (double, double) _degreeDeltas(double lat, double radiusMeters) {

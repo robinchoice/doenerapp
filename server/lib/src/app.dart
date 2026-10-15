@@ -12,6 +12,7 @@ import 'landing.dart';
 import 'moderation.dart';
 import 'places.dart';
 import 'privacy.dart';
+import 'push.dart';
 import 'ranking.dart';
 import 'shop_pages.dart';
 import 'social.dart';
@@ -66,6 +67,7 @@ Handler buildHandler(Deps deps) {
   mountRanking(api, deps);
   mountSocial(api, deps);
   mountModeration(api, deps);
+  mountPush(api, deps);
   mountTesterRequests(api, deps);
 
   final root = Router()

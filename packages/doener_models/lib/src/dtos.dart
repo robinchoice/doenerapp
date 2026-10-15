@@ -148,14 +148,24 @@ class UpdateMeRequest {
   final String? displayName;
   final Diet? diet;
   final bool? expertMode;
-  const UpdateMeRequest({this.displayName, this.diet, this.expertMode});
+  final bool? pushFriends;
+  final bool? pushNewPlaces;
+  const UpdateMeRequest({this.displayName, this.diet, this.expertMode, this.pushFriends, this.pushNewPlaces});
 
   factory UpdateMeRequest.fromJson(Json j) => UpdateMeRequest(
         displayName: j['displayName'] as String?,
         diet: _enumOrNull(Diet.values, j['diet']),
         expertMode: j['expertMode'] as bool?,
+        pushFriends: j['pushFriends'] as bool?,
+        pushNewPlaces: j['pushNewPlaces'] as bool?,
       );
-  Json toJson() => {'displayName': ?displayName, 'diet': ?diet?.name, 'expertMode': ?expertMode};
+  Json toJson() => {
+        'displayName': ?displayName,
+        'diet': ?diet?.name,
+        'expertMode': ?expertMode,
+        'pushFriends': ?pushFriends,
+        'pushNewPlaces': ?pushNewPlaces,
+      };
 }
 
 // MARK: - User
@@ -192,12 +202,18 @@ class AccountDto extends UserDto {
   /// May invite testers while sign-up is closed (`ADMIN_EMAILS` on the server).
   final bool admin;
 
+  /// Push when friends check in, and when a shop opens in the user's city.
+  final bool pushFriends;
+  final bool pushNewPlaces;
+
   const AccountDto({
     required super.id,
     required super.displayName,
     this.diet = Diet.all,
     this.expertMode = false,
     this.admin = false,
+    this.pushFriends = true,
+    this.pushNewPlaces = true,
   });
 
   factory AccountDto.fromJson(Json j) => AccountDto(
@@ -206,9 +222,18 @@ class AccountDto extends UserDto {
         diet: _enumOrNull(Diet.values, j['diet']) ?? Diet.all,
         expertMode: j['expertMode'] as bool? ?? false,
         admin: j['admin'] as bool? ?? false,
+        pushFriends: j['pushFriends'] as bool? ?? true,
+        pushNewPlaces: j['pushNewPlaces'] as bool? ?? true,
       );
   @override
-  Json toJson() => {...super.toJson(), 'diet': diet.name, 'expertMode': expertMode, 'admin': admin};
+  Json toJson() => {
+        ...super.toJson(),
+        'diet': diet.name,
+        'expertMode': expertMode,
+        'admin': admin,
+        'pushFriends': pushFriends,
+        'pushNewPlaces': pushNewPlaces,
+      };
 }
 
 // MARK: - Place
@@ -934,12 +959,16 @@ class FriendshipDto {
   final FriendshipDirection direction;
   final DateTime createdAt;
 
+  /// The user gets no push when this friend checks in.
+  final bool muted;
+
   const FriendshipDto({
     required this.id,
     required this.user,
     required this.status,
     required this.direction,
     required this.createdAt,
+    this.muted = false,
   });
 
   factory FriendshipDto.fromJson(Json j) => FriendshipDto(
@@ -948,6 +977,7 @@ class FriendshipDto {
         status: FriendshipStatus.values.byName(j['status'] as String),
         direction: FriendshipDirection.values.byName(j['direction'] as String),
         createdAt: _date(j['createdAt']),
+        muted: j['muted'] as bool? ?? false,
       );
 
   Json toJson() => {
@@ -956,6 +986,7 @@ class FriendshipDto {
         'status': status.name,
         'direction': direction.name,
         'createdAt': createdAt.toUtc().toIso8601String(),
+        'muted': muted,
       };
 }
 
@@ -1103,4 +1134,24 @@ class ProfileDto {
         'checkIns': checkIns,
         'visits': visits?.map((v) => v.toJson()).toList(),
       };
+}
+
+// MARK: - Push
+
+/// The device's FCM token. With a position the server learns the user's city
+/// for "a new shop opened".
+class PushTokenRequest {
+  final String token;
+  final String platform;
+  final double? latitude;
+  final double? longitude;
+  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude});
+
+  factory PushTokenRequest.fromJson(Json j) => PushTokenRequest(
+        token: j['token'] as String,
+        platform: j['platform'] as String,
+        latitude: _doubleOrNull(j['latitude']),
+        longitude: _doubleOrNull(j['longitude']),
+      );
+  Json toJson() => {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude};
 }

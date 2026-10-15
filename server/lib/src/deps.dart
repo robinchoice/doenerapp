@@ -3,14 +3,16 @@ import 'package:postgres/postgres.dart';
 
 import 'config.dart';
 import 'mailer.dart';
+import 'push.dart';
 
 class Deps {
   final Pool<void> db;
   final Config config;
   final Mailer mailer;
   final http.Client httpClient;
+  final Pusher pusher;
 
-  const Deps({required this.db, required this.config, required this.mailer, required this.httpClient});
+  const Deps({required this.db, required this.config, required this.mailer, required this.httpClient, this.pusher = const LogPusher()});
 }
 
 /// Rows as column maps — the only way handlers read query results.

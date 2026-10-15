@@ -29,6 +29,18 @@ class CapturingMailer implements Mailer {
       sent.add((to: to, subject: subject, text: text, replyTo: replyTo, attachment: attachment));
 }
 
+class CapturingPusher implements Pusher {
+  final sent = <({List<String> tokens, String title, String body, Map<String, String> data})>[];
+
+  /// Tokens FCM reports as uninstalled.
+  final gone = <String>{};
+  @override
+  Future<List<String>> send(List<String> tokens, {required String title, required String body, Map<String, String> data = const {}}) async {
+    sent.add((tokens: tokens, title: title, body: body, data: data));
+    return [for (final t in tokens) if (gone.contains(t)) t];
+  }
+}
+
 void main() {
   final env = Platform.environment;
   final port = int.tryParse(env['TEST_DB_PORT'] ?? '');
@@ -42,6 +54,7 @@ void main() {
   late Deps deps;
   late Pool<void> db;
   final mailer = CapturingMailer();
+  final pusher = CapturingPusher();
   var googleCalls = 0;
 
   setUpAll(() async {
@@ -85,6 +98,10 @@ void main() {
             'displayName': {'text': id == 'place-announced' ? 'Neuer Grill' : 'Kebap Haus'},
             'location': {'latitude': 48.0, 'longitude': 7.85},
             if (id == 'place-announced') 'businessStatus': 'OPERATIONAL',
+            if (id == 'place-announced')
+              'addressComponents': [
+                {'longText': 'Freiburg', 'types': ['locality']},
+              ],
           }),
           200,
           headers: {'content-type': 'application/json'},
@@ -123,7 +140,7 @@ void main() {
       return http.Response(jsonEncode({'places': places}), 200, headers: {'content-type': 'application/json'});
     });
 
-    deps = Deps(db: db, config: config, mailer: mailer, httpClient: google);
+    deps = Deps(db: db, config: config, mailer: mailer, httpClient: google, pusher: pusher);
     handler = buildHandler(deps);
     final closed = Config(
       database: config.database,
@@ -344,6 +361,62 @@ void main() {
       final (_, live) = await call('GET', '/feed/live', token: bob);
       expect((live as List).single['placeName'], 'Kebap Haus');
       expect(live.single['foodType'], 'yufka');
+    });
+
+    test('push: friends hear about a check-in happening now, at most every 3 hours', () async {
+      final token = {'token': 'tok-bob', 'platform': 'android', 'latitude': 48.0, 'longitude': 7.85};
+      expect((await call('PUT', '/me/push-token', body: token, token: bob)).$1, 204);
+      final city = await db.execute(Sql.named('SELECT city FROM users WHERE id = @id:uuid'), parameters: {'id': bobUser.id});
+      expect(city.first.first, 'Berlin', reason: 'the city of the nearest shop');
+
+      var n = 0;
+      Future<void> checkIn({Duration ago = Duration.zero}) async {
+        n++;
+        final visit = {
+          'id': '22222222-2222-4222-8222-${'$n'.padLeft(12, '0')}',
+          'visitedAt': DateTime.now().toUtc().subtract(ago).toIso8601String(),
+          'foodType': 'yufka',
+        };
+        expect((await call('POST', '/places/place-kebap/visits', body: visit, token: anna)).$1, 201);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+
+      final before = pusher.sent.length;
+      await checkIn(ago: const Duration(hours: 2));
+      expect(pusher.sent.length, before, reason: 'a check-in synced late is no news');
+      await checkIn();
+      expect(pusher.sent.length, before + 1);
+      final push = pusher.sent.last;
+      expect(push.tokens, ['tok-bob']);
+      expect(push.title, 'Anna isst gerade 🌯');
+      expect(push.body, startsWith('bei Kebap Haus'));
+      expect(push.data, {'placeId': 'place-kebap'});
+      await checkIn();
+      expect(pusher.sent.length, before + 1, reason: 'at most every 3 hours');
+
+      Future<void> resetLimit() =>
+          db.execute(Sql.named('UPDATE users SET check_in_pushed_at = NULL WHERE id = @id:uuid'), parameters: {'id': annaUser.id});
+      await resetLimit();
+      expect((await call('PUT', '/me/mutes/${annaUser.id}', token: bob)).$1, 204);
+      final (_, friends) = await call('GET', '/friends', token: bob);
+      expect((friends as List).single['muted'], isTrue);
+      await checkIn();
+      expect(pusher.sent.length, before + 1, reason: 'muted');
+      expect((await call('DELETE', '/me/mutes/${annaUser.id}', token: bob)).$1, 204);
+      expect((await call('PATCH', '/users/me', body: {'pushFriends': false}, token: bob)).$2['pushFriends'], isFalse);
+      await checkIn();
+      expect(pusher.sent.length, before + 1, reason: 'switched off');
+      await call('PATCH', '/users/me', body: {'pushFriends': true}, token: bob);
+
+      pusher.gone.add('tok-bob');
+      await checkIn();
+      expect(pusher.sent.length, before + 2);
+      final tokens = await db.execute('SELECT count(*)::int FROM push_tokens');
+      expect(tokens.first.first, 0, reason: 'a token FCM no longer knows is dropped');
+      pusher.gone.clear();
+      await call('PUT', '/me/push-token', body: token, token: bob);
+      expect((await call('DELETE', '/me/push-tokens/tok-bob', token: bob)).$1, 204);
+      expect((await db.execute('SELECT count(*)::int FROM push_tokens')).first.first, 0);
     });
 
     test('reviews upsert and feed community data', () async {
@@ -1077,8 +1150,17 @@ void main() {
     expect(before.upcoming.map((p) => p.placeId), ['place-announced', 'place-later']);
     expect(before.upcoming.last.opensOn, '2099-01');
     expect((await call('GET', '/places/place-announced')).$1, 404, reason: 'not open yet');
+    final (olga, _) = await signUp('olga@example.org', 'Olga');
+    await call('PUT', '/me/push-token', body: {'token': 'tok-olga', 'platform': 'ios', 'latitude': 48.003, 'longitude': 7.853}, token: olga);
+    final pushes = pusher.sent.length;
 
     await maintainPlaceCache(deps);
+    expect(pusher.sent.length, pushes + 1);
+    expect(pusher.sent.last.tokens, ['tok-olga'], reason: 'everyone in the city');
+    expect(pusher.sent.last.title, 'Neuer Döner in Freiburg');
+    expect(pusher.sent.last.body, 'Neuer Grill hat aufgemacht');
+    await maintainPlaceCache(deps);
+    expect(pusher.sent.length, pushes + 1, reason: 'once per opening');
 
     final after = NewPlacesDto.fromJson((await call('GET', '/places/new?lat=48&lon=7.85')).$2 as Map<String, dynamic>);
     expect(after.opened.single.placeId, 'place-announced');

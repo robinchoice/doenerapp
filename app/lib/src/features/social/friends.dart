@@ -4,6 +4,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/push.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../profile/profile_view.dart';
@@ -50,6 +51,18 @@ class Friends extends ChangeNotifier {
   Future<void> accept(String id) => _guard(() async {
         final f = FriendshipDto.fromJson(await _session.api.post('/friends/$id/accept') as Map<String, dynamic>);
         all = [for (final x in all) x.id == id ? f : x];
+      });
+
+  /// No pushes about [f]'s check-ins.
+  Future<void> setMuted(FriendshipDto f, bool muted) => _guard(() async {
+        final path = '/me/mutes/${f.user.id}';
+        muted ? await _session.api.put(path, null) : await _session.api.delete(path);
+        all = [
+          for (final x in all)
+            x.id == f.id
+                ? FriendshipDto(id: x.id, user: x.user, status: x.status, direction: x.direction, createdAt: x.createdAt, muted: muted)
+                : x,
+        ];
       });
 
   Future<void> remove(String id) => _guard(() async {
@@ -157,22 +170,33 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 title: Text(f.user.displayName),
                 subtitle: TierLabel(f.user.tier),
                 onTap: () => showUserProfile(context, f.user),
-                trailing: IconButton(
-                  tooltip: 'Entfernen',
-                  icon: const Icon(Icons.person_remove_outlined),
-                  onPressed: () async {
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text('${f.user.displayName} entfernen?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
-                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Entfernen')),
-                        ],
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (context.read<Push?>() != null)
+                      IconButton(
+                        tooltip: f.muted ? 'Stumm, tippen für Benachrichtigungen' : 'Stummschalten',
+                        icon: Icon(f.muted ? Icons.notifications_off_outlined : Icons.notifications_none),
+                        onPressed: () => friends.setMuted(f, !f.muted),
                       ),
-                    );
-                    if (ok == true) friends.remove(f.id);
-                  },
+                    IconButton(
+                      tooltip: 'Entfernen',
+                      icon: const Icon(Icons.person_remove_outlined),
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('${f.user.displayName} entfernen?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+                              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Entfernen')),
+                            ],
+                          ),
+                        );
+                        if (ok == true) friends.remove(f.id);
+                      },
+                    ),
+                  ],
                 ),
               ),
           ],

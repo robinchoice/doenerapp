@@ -8,3 +8,4 @@ export 'src/deps.dart' show Deps;
 export 'src/mailer.dart';
 export 'src/places.dart' show maintainPlaceCache;
 export 'src/testflight.dart' show TestFlight;
+export 'src/push.dart' show Pusher, LogPusher, FcmPusher;

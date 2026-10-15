@@ -34,7 +34,16 @@ Future<void> startServer() async {
     print('WARNING: GOOGLE_PLACES_API_KEY not set — only already known places are returned.');
   }
 
-  final deps = Deps(db: db, config: config, mailer: mailer, httpClient: http.Client());
+  final httpClient = http.Client();
+  final fcm = config.fcmServiceAccount;
+  if (fcm == null) print('WARNING: FCM_SERVICE_ACCOUNT not set — pushes are printed to the log instead of sent.');
+  final deps = Deps(
+    db: db,
+    config: config,
+    mailer: mailer,
+    httpClient: httpClient,
+    pusher: fcm == null ? const LogPusher() : FcmPusher(fcm, httpClient),
+  );
 
   // Every instance polls; the claim in runSchedule lets one of them run it.
   Future<void> runDueJobs() async {

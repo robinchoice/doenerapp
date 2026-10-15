@@ -154,7 +154,10 @@ void mountSocial(Router router, Deps deps) {
     final me = await requireUser(deps, request);
     final rows = await query(deps.db, '$_friendshipSelect WHERE f.requester_id = @me:uuid OR f.addressee_id = @me:uuid '
         'ORDER BY f.created_at DESC', {'me': me.id});
-    return json(rows.map((r) => _friendshipFromRow(r, me.id).toJson()).toList());
+    final muted = {
+      for (final m in await query(deps.db, 'SELECT muted_id FROM friend_mutes WHERE user_id = @me:uuid', {'me': me.id})) m['muted_id'],
+    };
+    return json(rows.map((r) => _friendshipFromRow(r, me.id, muted: muted).toJson()).toList());
   });
 
   router.post('/friends/requests', (Request request) async {
@@ -337,9 +340,10 @@ final _friendshipSelect = 'SELECT f.id, f.status, f.created_at, f.requester_id, 
     '${reviewedPlacesOf('r.id')} AS requester_places, ${reviewedPlacesOf('a.id')} AS addressee_places FROM friendships f '
     'JOIN users r ON r.id = f.requester_id JOIN users a ON a.id = f.addressee_id';
 
-FriendshipDto _friendshipFromRow(Map<String, dynamic> row, String me) {
+FriendshipDto _friendshipFromRow(Map<String, dynamic> row, String me, {Set<Object?> muted = const {}}) {
   final outgoing = row['requester_id'] == me;
   return FriendshipDto(
+    muted: muted.contains(outgoing ? row['addressee_id'] : row['requester_id']),
     id: row['id'] as String,
     user: outgoing
         ? UserDto(

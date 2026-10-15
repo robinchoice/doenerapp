@@ -17,12 +17,14 @@ import 'package:sembast/sembast.dart';
 import 'core/api.dart';
 import 'core/app_data.dart';
 import 'core/location.dart';
+import 'core/push.dart';
 import 'core/reminders.dart';
 import 'core/session.dart';
 import 'features/auth/login_screen.dart';
 import 'features/map/map_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/place/check_in_sheet.dart';
+import 'features/place/place_detail.dart';
 import 'features/place/review_sheet.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/ranking/ranking_screen.dart';
@@ -278,6 +280,7 @@ class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
   late final LocationService _location = context.read<LocationService>();
   late final Reminders? _reminders = context.read<Reminders?>();
+  late final Push? _push = context.read<Push?>();
   late final AppData _data = context.read<AppData>();
   LatLng? _loadedAround;
 
@@ -286,12 +289,15 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _location.addListener(_loadAround);
     _loadAround();
-    // A reminder or a shop's review link may have started the app.
+    // A reminder, a push or a shop's review link may have started the app.
     _reminders?.opened.addListener(_openReminder);
+    _push?.opened.addListener(_openPush);
     _data.reviewRequest.addListener(_openReviewRequest);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openReminder();
+      _openPush();
       _openReviewRequest();
+      _registerPush();
     });
   }
 
@@ -299,8 +305,35 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _location.removeListener(_loadAround);
     _reminders?.opened.removeListener(_openReminder);
+    _push?.opened.removeListener(_openPush);
     _data.reviewRequest.removeListener(_openReviewRequest);
     super.dispose();
+  }
+
+  /// Phones ask for permission right away; browsers only allow that on a tap,
+  /// in the settings, so here they only renew a token they already have.
+  Future<void> _registerPush() async {
+    final position = _location.position;
+    try {
+      await _push?.register(context.read<Session>(), latitude: position?.latitude, longitude: position?.longitude, ask: !kIsWeb);
+    } catch (e) {
+      debugPrint('Push registration failed: $e');
+    }
+  }
+
+  /// A tapped push opens its shop.
+  Future<void> _openPush() async {
+    final placeId = _push?.opened.value;
+    if (placeId == null || !mounted) return;
+    _push!.opened.value = null;
+    try {
+      final place = await _data.place(placeId);
+      if (mounted) await showPlaceDetail(context, place);
+    } on OfflineException catch (e) {
+      if (mounted) showMessage(context, e.toString());
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    }
   }
 
   /// A shop's review link opens the review of its place.

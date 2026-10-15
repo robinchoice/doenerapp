@@ -79,7 +79,8 @@ jobs:
 
       - name: Flutter-Build vorbereiten
         working-directory: app
-        run: flutter build ios --release --no-codesign --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+        # Firebase on iOS uses the bundle-restricted Maps key, which also allows FCM registration.
+        run: flutter build ios --release --no-codesign --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.GOOGLE_MAPS_IOS_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - name: Archive bauen
         working-directory: app/ios
@@ -166,7 +167,7 @@ jobs:
         working-directory: app
         env:
           GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
-        run: flutter build appbundle --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+        run: flutter build appbundle --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_ANDROID_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - uses: actions/upload-artifact@v4
         with:
@@ -178,7 +179,7 @@ jobs:
         working-directory: app
         env:
           GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
-        run: flutter build apk --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+        run: flutter build apk --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_ANDROID_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - uses: actions/upload-artifact@v4
         with:

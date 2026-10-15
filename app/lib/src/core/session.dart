@@ -68,9 +68,9 @@ class Session extends ChangeNotifier {
     await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));
   }
 
-  /// Diet and expert mode follow the account. The change shows right away and
-  /// is taken back if the server doesn't take it.
-  Future<void> updateSettings({Diet? diet, bool? expertMode}) async {
+  /// Diet, expert mode and push settings follow the account. The change shows
+  /// right away and is taken back if the server doesn't take it.
+  Future<void> updateSettings({Diet? diet, bool? expertMode, bool? pushFriends, bool? pushNewPlaces}) async {
     final previous = user!;
     await _setUser(AccountDto(
       id: previous.id,
@@ -78,9 +78,14 @@ class Session extends ChangeNotifier {
       diet: diet ?? previous.diet,
       expertMode: expertMode ?? previous.expertMode,
       admin: previous.admin,
+      pushFriends: pushFriends ?? previous.pushFriends,
+      pushNewPlaces: pushNewPlaces ?? previous.pushNewPlaces,
     ));
     try {
-      final json = await api.patch('/users/me', UpdateMeRequest(diet: diet, expertMode: expertMode).toJson());
+      final json = await api.patch(
+        '/users/me',
+        UpdateMeRequest(diet: diet, expertMode: expertMode, pushFriends: pushFriends, pushNewPlaces: pushNewPlaces).toJson(),
+      );
       await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));
     } catch (_) {
       await _setUser(previous);

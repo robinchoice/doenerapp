@@ -33,7 +33,7 @@ const signupClosed = ApiException.forbidden(
   'Sign-up is still closed, there is no account for this address yet. Apply as a tester.',
 );
 
-const _accountColumns = 'id, email, display_name, diet, expert_mode';
+const _accountColumns = 'id, email, display_name, diet, expert_mode, push_friends, push_new_places';
 
 AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       id: row['id'] as String,
@@ -41,6 +41,8 @@ AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       diet: Diet.values.byName(row['diet'] as String),
       expertMode: row['expert_mode'] as bool,
       admin: deps.config.adminEmails.contains(row['email']),
+      pushFriends: row['push_friends'] as bool,
+      pushNewPlaces: row['push_new_places'] as bool,
     );
 
 class AuthUser {
@@ -57,7 +59,8 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   if (header == null || !header.startsWith('Bearer ')) throw const ApiException.unauthorized();
   final row = await queryOne(
     deps.db,
-    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode FROM sessions s JOIN users u ON u.id = s.user_id '
+    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places FROM sessions s '
+    'JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
     {'hash': hashToken(header.substring(7).trim())},
   );
@@ -123,7 +126,7 @@ void mountAuth(Router router, Deps deps) {
     return noContent();
   });
 
-  // PATCH /users/me — name, diet, expert mode; only what is set changes.
+  // PATCH /users/me — name, diet, expert mode, push settings; only what is set changes.
   router.patch('/users/me', (Request request) async {
     final user = await requireUser(deps, request);
     final body = await readBody(request, UpdateMeRequest.fromJson);
@@ -133,9 +136,17 @@ void mountAuth(Router router, Deps deps) {
       final row = await queryOne(
         deps.db,
         'UPDATE users SET display_name = coalesce(@name:text, display_name), diet = coalesce(@diet:text, diet), '
-        'expert_mode = coalesce(@expert:boolean, expert_mode) WHERE id = @id:uuid '
+        'expert_mode = coalesce(@expert:boolean, expert_mode), push_friends = coalesce(@friends:boolean, push_friends), '
+        'push_new_places = coalesce(@places:boolean, push_new_places) WHERE id = @id:uuid '
         'RETURNING $_accountColumns',
-        {'name': body.displayName?.trim(), 'diet': body.diet?.name, 'expert': body.expertMode, 'id': user.id},
+        {
+          'name': body.displayName?.trim(),
+          'diet': body.diet?.name,
+          'expert': body.expertMode,
+          'friends': body.pushFriends,
+          'places': body.pushNewPlaces,
+          'id': user.id,
+        },
       );
       return json(accountFromRow(deps, row!).toJson());
     } on UniqueViolationException {

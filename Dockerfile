@@ -17,7 +17,11 @@ COPY app ./app
 # Referrer-restricted browser key; it ends up in the public JS anyway.
 ARG GOOGLE_MAPS_WEB_KEY=""
 ARG SENTRY_DSN=""
-RUN cd app && flutter build web --release --no-web-resources-cdn --dart-define=GOOGLE_MAPS_WEB_KEY=$GOOGLE_MAPS_WEB_KEY --dart-define=SENTRY_DSN=$SENTRY_DSN
+# Firebase browser key for push, referrer-restricted like the Maps key.
+ARG FIREBASE_WEB_KEY=""
+RUN cd app && flutter build web --release --no-web-resources-cdn --dart-define=GOOGLE_MAPS_WEB_KEY=$GOOGLE_MAPS_WEB_KEY \
+    --dart-define=SENTRY_DSN=$SENTRY_DSN --dart-define=FIREBASE_API_KEY=$FIREBASE_WEB_KEY \
+    && sed -i "s/FIREBASE_WEB_KEY/$FIREBASE_WEB_KEY/" build/web/firebase-messaging-sw.js
 
 FROM dart:3.13 AS server
 WORKDIR /src

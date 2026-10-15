@@ -302,6 +302,30 @@ final migrations = <List<String>>[
     // Whose invite link brought a tester request; testers can't let others in themselves.
     'ALTER TABLE tester_requests ADD COLUMN invited_by uuid REFERENCES users(id) ON DELETE SET NULL',
   ],
+  [
+    // Push through FCM: one token per device, moved along when someone else signs in there.
+    '''CREATE TABLE push_tokens (
+      token text PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      platform text NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )''',
+    'CREATE INDEX push_tokens_user ON push_tokens (user_id)',
+    'ALTER TABLE users ADD COLUMN push_friends boolean NOT NULL DEFAULT true',
+    'ALTER TABLE users ADD COLUMN push_new_places boolean NOT NULL DEFAULT true',
+    // The city of the device's last position, for "a new shop opened".
+    'ALTER TABLE users ADD COLUMN city text',
+    // Friends hear about someone's check-ins at most every 3 hours.
+    'ALTER TABLE users ADD COLUMN check_in_pushed_at timestamptz',
+    '''CREATE TABLE friend_mutes (
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      muted_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, muted_id)
+    )''',
+    // Shops that opened before this migration were news long ago.
+    'ALTER TABLE places ADD COLUMN opening_pushed_at timestamptz',
+    'UPDATE places SET opening_pushed_at = now() WHERE opened_on IS NOT NULL',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

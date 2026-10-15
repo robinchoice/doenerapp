@@ -10,6 +10,8 @@ import 'package:sembast/sembast.dart';
 
 import '../../core/api.dart';
 import '../../core/app_data.dart';
+import '../../core/location.dart';
+import '../../core/push.dart';
 import '../../core/reminders.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
@@ -62,6 +64,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Switching a push on is a tap, so browsers allow asking for permission here.
+  Future<void> _updatePush({bool? pushFriends, bool? pushNewPlaces}) async {
+    final session = context.read<Session>();
+    final push = context.read<Push?>();
+    final position = context.read<LocationService>().position;
+    try {
+      await session.updateSettings(pushFriends: pushFriends, pushNewPlaces: pushNewPlaces);
+      if (pushFriends == true || pushNewPlaces == true) {
+        await push?.register(session, latitude: position?.latitude, longitude: position?.longitude);
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, 'Nicht gespeichert: $e');
+    }
+  }
+
   Future<void> _updateSettings({Diet? diet, bool? expertMode}) async {
     try {
       await context.read<Session>().updateSettings(diet: diet, expertMode: expertMode);
@@ -80,7 +97,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : 'Deine Besuche und Bewertungen bleiben auf dem Server gespeichert.',
     );
     if (!ok || !mounted) return;
-    await context.read<Session>().logout();
+    final session = context.read<Session>();
+    await context.read<Push?>()?.unregister(session);
+    await session.logout();
     await data.clearAccountData();
   }
 
@@ -175,6 +194,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
               ),
             ),
+            if (context.read<Push?>() != null) ...[
+              header('Benachrichtigungen'),
+              SwitchListTile(
+                title: const Text('Freunde checken ein'),
+                subtitle: const Text('Wo deine Freunde gerade essen, höchstens alle 3 Stunden pro Person. Einzelne stellst du unter Freunde stumm.'),
+                value: session.user!.pushFriends,
+                onChanged: (value) => _updatePush(pushFriends: value),
+              ),
+              SwitchListTile(
+                title: const Text('Neue Läden in deiner Stadt'),
+                subtitle: const Text('Sobald ein angekündigter Döner aufmacht.'),
+                value: session.user!.pushNewPlaces,
+                onChanged: (value) => _updatePush(pushNewPlaces: value),
+              ),
+            ],
             header('Bewerten'),
             SwitchListTile(
               title: const Text('Expertenmodus'),

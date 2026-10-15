@@ -33,6 +33,7 @@
 
 - Die Bestenliste eines Jahres friert der Zeitplan `best_of` am 1. Januar einmal ein (`best_of_years` merkt sich das Jahr). Wer die Regeln ändert und ein Jahr neu rechnen will, löscht dessen Zeilen in `best_of` und `best_of_years`, dann rechnet der nächste Lauf es neu.
 - Die Landingpage lädt Schrift und Wortmarke aus dem Flutter-Build (`/assets/assets/…`). Wer Assets in `app/pubspec.yaml` verschiebt, muss die Pfade in `server/lib/src/landing.dart` nachziehen.
+- Push läuft über Firebase. Die Firebase-Konfiguration steht fest in `app/lib/src/core/push.dart`, nur die API-Keys kommen per `--dart-define=FIREBASE_API_KEY` aus der CI. iOS nutzt dafür den Maps-Key `GOOGLE_MAPS_IOS_KEY`, der dazu auch Firebase Installations und FCM-Registrierung erlaubt. Den Web-Key setzt das `Dockerfile` zusätzlich in `firebase-messaging-sw.js` ein.
 
 ## Abweichungen vom Standard
 

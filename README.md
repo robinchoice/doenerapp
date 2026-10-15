@@ -138,6 +138,14 @@ Am 1. Januar friert der Server für jede Stadt die Bestenliste des Vorjahres ein
 - Ist die iOS-App installiert, öffnet der Link sie direkt (Universal Links, Domains in `app/ios/Runner/Runner.entitlements`). Ohne App führt er auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau. Wer im Browser angemeldet ist, geht weiter in die Web-App und ist befreundet, alle anderen bewerben sich als Tester (siehe Registrierung).
 - Freunde per Namenssuche finden (ab 2 Zeichen); wer eine offene Anfrage zurückschickt, nimmt sie damit an
 
+### Push
+
+Über Firebase Cloud Messaging für iOS, Android und Web (Firebase im GCP-Projekt `doener-app-510118`). Zwei Arten, jede mit Schalter unter Einstellungen → Benachrichtigungen:
+- **Freunde checken ein:** „Lena isst gerade 🌯“, darunter „bei X (Nr. 2 in Freiburg)“ mit dem Platz im Döner-Ranking der Stadt. Nur für Check-ins, die gerade passieren, und pro Person höchstens alle 3 Stunden. Einzelne Freunde lassen sich in der Freundesliste mit der Glocke stummschalten
+- **Neue Läden in deiner Stadt:** sobald ein angekündigter Laden aufmacht, einmal an alle in der Stadt. Die Stadt nimmt der Server vom nächsten Laden zur Position, die das Gerät mit seinem Token schickt
+
+Ein Tipp auf den Push öffnet den Laden. Handys fragen beim Start nach der Erlaubnis, Browser erst beim Einschalten eines Schalters, weil sie das nur nach einem Tipp erlauben. Beim Abmelden meldet die App das Gerät ab, Tokens, die FCM nicht mehr kennt, löscht der Server.
+
 ### Melden und Blockieren
 
 Pflicht für die Stores, weil Bewertungen mit Text, Foto und Namen für alle im Umkreis sichtbar sind. Das ⋮ an fremden Bewertungen (Laden, Start) und an Check-ins von Freunden bietet:
@@ -218,6 +226,9 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/me/invite/reset` | Neuer Einladungslink, der alte verfällt |
 | GET | `/invites/:code` | Wer einlädt (ohne Login) |
 | POST | `/invites/:code/accept` | Einladung annehmen → sofort befreundet |
+| PUT | `/me/push-token` | FCM-Token des Geräts, optional mit Position für die Stadt |
+| DELETE | `/me/push-tokens/:token` | Gerät abmelden |
+| PUT, DELETE | `/me/mutes/:userId` | Freund stummschalten, wieder laut |
 | POST | `/feedback` | Feedback mit optionalem Screenshot |
 | POST | `/shop-reports` | Fehlenden Laden melden |
 | POST | `/reviews/:id/report` | Bewertung melden |
@@ -294,6 +305,7 @@ cd app && flutter test
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
 | `APP_DOWNLOAD_URL` | – | App-Link in der Mail einer Admin-Einladung |
+| `FCM_SERVICE_ACCOUNT` | – | JSON-Key (base64) des Dienstkontos, das über FCM sendet; ohne stehen Pushes nur im Log |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` | – | App-Store-Connect-Key (`.p8` als Base64) für TestFlight-Einladungen beim Freischalten; ohne bleibt das Handarbeit |
 | `TESTFLIGHT_GROUP` | `Erste Tester` | Externe TestFlight-Gruppe |
 | `FEEDBACK_EMAIL` | – | Empfänger der Tester-Meldungen und Testanfragen; ohne werden sie nur gespeichert |
@@ -358,7 +370,6 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 ### Phase 1 – Bester Döner der Stadt
 
-- Push für Check-ins von Freunden und neue Läden, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
 - Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
 
 ### Phase 2 – Community
@@ -378,6 +389,6 @@ Skript über die Datenbank, Ziele nach 4 Wochen:
 
 ### Voraussetzungen und Offenes
 
-- APNs-Schlüssel im Apple-Developer-Konto (für Push) und ab 1.0 eine eigene Domain unabhängig von pleasance.org für Landingpage, Web-App und Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
+- APNs-Schlüssel im Apple-Developer-Konto, hochgeladen in Firebase (sonst kommen auf iPhones keine Pushes an), und ab 1.0 eine eigene Domain unabhängig von pleasance.org für Landingpage, Web-App und Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
 - Android-App-Links: Der Intent-Filter steht, es fehlt `/.well-known/assetlinks.json` mit dem SHA-256 des Release-Schlüssels. Bis dahin öffnen Einladungs- und Bewertungslinks auf Android den Browser, weil die CI ohne Keystore-Secrets mit wechselnden Debug-Keys signiert.
 - Später: Bezirke für Großstädte. Falls Fakes auftauchen, zählen nur noch Bewertungen mit Häkchen voll.

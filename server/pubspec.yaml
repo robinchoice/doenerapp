@@ -11,6 +11,7 @@ dependencies:
   dart_jsonwebtoken: ^3.4.1
   doener_models:
     path: ../packages/doener_models
+  googleapis_auth: ^2.3.4
   http: ^1.4.0
   mailer: ^7.2.0
   mime: ^2.0.0

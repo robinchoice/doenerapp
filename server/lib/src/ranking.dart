@@ -1,4 +1,5 @@
 import 'package:doener_models/doener_models.dart';
+import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
@@ -31,6 +32,26 @@ String _ratings(RankBy by) {
       : 'SELECT place_id, user_id, $column AS value FROM reviews WHERE $column IS NOT NULL';
 }
 
+/// The city of the nearest known place within 20 km of [lat]/[lon] — "your" city.
+Future<String?> nearestCity(Session db, double lat, double lon) async => (await queryOne(
+      db,
+      'SELECT city FROM places p WHERE city IS NOT NULL AND ${withinRadius('p')} ORDER BY ${distanceSql('p')} LIMIT 1',
+      radiusParams(lat, lon, _cityRadius),
+    ))?['city'] as String?;
+
+/// Where [place] (a `places` row) stands in its city's Döner ranking, with the city.
+Future<(int, String)?> cityRank(Session db, Map<String, dynamic> place) async {
+  final city = place['city'] as String?;
+  if (city == null) return null;
+  final ranked = rankByWeight(await query(
+    db,
+    'SELECT pv.*, pv.avg_rating AS avg, pv.review_count AS n FROM place_view pv WHERE pv.city = @city AND pv.review_count > 0',
+    {'city': city},
+  ));
+  final index = ranked.indexWhere((r) => r['id'] == place['id']);
+  return index < 0 ? null : (index + 1, city);
+}
+
 void mountRanking(Router router, Deps deps) {
   // GET /ranking?lat&lon&by[&city][&maxPrice] — the rated places of the city
   // around lat/lon or of [city] (by their address), best first, with the
@@ -48,12 +69,7 @@ void mountRanking(Router router, Deps deps) {
     final ratings = _ratings(by);
     final itemParam = {if (by.item case final item? when !RatingItem.classicItems.contains(item)) 'item': item.name};
 
-    final city = request.url.queryParameters['city'] ??
-        (await queryOne(
-          deps.db,
-          'SELECT city FROM places p WHERE city IS NOT NULL AND ${withinRadius('p')} ORDER BY ${distanceSql('p')} LIMIT 1',
-          radiusParams(lat, lon, _cityRadius),
-        ))?['city'] as String?;
+    final city = request.url.queryParameters['city'] ?? await nearestCity(deps.db, lat, lon);
     if (city == null) return json(RankingDto(by: by, entries: const []).toJson());
 
     final rows = rankByWeight(await query(

@@ -49,6 +49,10 @@ class Config {
   /// for the TestFlight group `TESTFLIGHT_GROUP`. Without it, nothing goes to TestFlight.
   final AscConfig? asc;
 
+  /// Key file of the service account that sends pushes through FCM
+  /// (`FCM_SERVICE_ACCOUNT` as base64). Without it, pushes only go to the log.
+  final String? fcmServiceAccount;
+
   /// Commit of the build (`APP_VERSION`); `/health` reports it so the deploy can wait for it.
   final String revision;
 
@@ -68,6 +72,7 @@ class Config {
     this.signupAllowlist = const {},
     this.adminEmails = const {},
     this.asc,
+    this.fcmServiceAccount,
     this.revision = 'dev',
   });
 
@@ -118,6 +123,10 @@ class Config {
         (final keyId?, final issuerId?, final key?) =>
           AscConfig(keyId: keyId, issuerId: issuerId, privateKey: key, group: get('TESTFLIGHT_GROUP') ?? 'Erste Tester'),
         _ => null,
+      },
+      fcmServiceAccount: switch (get('FCM_SERVICE_ACCOUNT')) {
+        final base64Json? => utf8.decode(base64.decode(base64Json)),
+        null => null,
       },
       revision: get('APP_VERSION') ?? 'dev',
     );

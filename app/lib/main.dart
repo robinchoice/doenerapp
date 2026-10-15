@@ -12,6 +12,7 @@ import 'src/core/app_data.dart';
 import 'src/core/db_factory.dart';
 import 'src/core/location.dart';
 import 'src/core/maps.dart';
+import 'src/core/push.dart';
 import 'src/core/reminders.dart';
 import 'src/core/session.dart';
 import 'src/features/social/friends.dart';
@@ -40,6 +41,13 @@ Future<void> startApp() async {
   await session.load();
   final reminders = Reminders.supported ? Reminders(db) : null;
   await reminders?.init();
+  Push? push = Push.supported ? Push() : null;
+  try {
+    await push?.init();
+  } catch (e) {
+    debugPrint('Push unavailable: $e');
+    push = null;
+  }
   final data = AppData(db, session, reminders: reminders);
   await data.load();
   final onboardingDone = await settingsStore.record('onboardingDone').get(db) == true;
@@ -67,6 +75,7 @@ Future<void> startApp() async {
       providers: [
         Provider<Database>.value(value: db),
         Provider<Reminders?>.value(value: reminders),
+        Provider<Push?>.value(value: push),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider.value(value: data),
         ChangeNotifierProvider(create: (_) => LocationService()),

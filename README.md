@@ -351,6 +351,6 @@ Skript über die Datenbank, Ziele nach 4 Wochen:
 
 ### Voraussetzungen und Offenes
 
-- APNs-Schlüssel im Apple-Developer-Konto (für Push) und eine Subdomain ohne „api“ für die Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
+- APNs-Schlüssel im Apple-Developer-Konto (für Push) und ab 1.0 eine eigene Domain unabhängig von pleasance.org für Landingpage, Web-App und Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
 - Android-App-Links: Der Intent-Filter steht, es fehlt `/.well-known/assetlinks.json` mit dem SHA-256 des Release-Schlüssels. Bis dahin öffnen Einladungslinks auf Android den Browser, weil die CI ohne Keystore-Secrets mit wechselnden Debug-Keys signiert.
 - Später: Bezirke für Großstädte. Falls Fakes auftauchen, zählen nur noch Bewertungen mit Häkchen voll.

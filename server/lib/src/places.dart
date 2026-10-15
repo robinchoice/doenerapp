@@ -626,12 +626,13 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, {List<AwardDto> aw
   );
 }
 
-/// The middle value, between the two middle ones for an even count — null without values.
+/// The middle value, between the two middle ones for an even count (rounded
+/// like percentile_cont in the ranking) — null without values.
 int? median(List<int> values) {
   if (values.isEmpty) return null;
   final sorted = [...values]..sort();
   final mid = sorted.length ~/ 2;
-  return sorted.length.isOdd ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) ~/ 2;
+  return sorted.length.isOdd ? sorted[mid] : ((sorted[mid - 1] + sorted[mid]) / 2).round();
 }
 
 /// The most common answer — null if nobody answered or it's a tie.

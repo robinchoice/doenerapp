@@ -736,6 +736,12 @@ void main() {
       final (_, ranking) = await call('GET', '/ranking?lat=52&lon=8&by=salat', token: ute);
       expect([for (final e in ranking['entries'] as List) (e['place']['placeId'], e['average'])], [('t-salad', 3.5)]);
       expect((await call('PUT', '/places/t-salad/review', body: {'price': 50}, token: ute)).$1, 400);
+
+      final (_, cheap) = await call('GET', '/ranking?lat=52&lon=8&maxPrice=700', token: ute);
+      expect([for (final e in cheap['entries'] as List) (e['place']['placeId'], e['price'])], [('t-salad', 700)]);
+      final (_, cheaper) = await call('GET', '/ranking?lat=52&lon=8&maxPrice=600', token: ute);
+      expect(cheaper['entries'], isEmpty);
+      expect((await call('GET', '/ranking?lat=52&lon=8&maxPrice=billig', token: ute)).$1, 400);
     });
 
     test('rankings for vegans and single dishes', () async {

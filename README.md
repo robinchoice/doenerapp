@@ -124,7 +124,8 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens im Umkreis von 20 km. Gerankt wird der Laden, umschaltbar per Chips: zuerst die Note zur Ernährung, dann einzelne Punkte (bei „Alles“ Soße, Fleisch, Salat, Brot, Falafel, Halloumi, Vegan, Pizza, Pide, Lahmacun, Seele, Ayran).
 
 - Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit drei Bewertungen in Höhe des Stadtschnitts (`weightedRating` in `packages/doener_models`). So schlägt eine einzelne 5 nicht viele 4,5er
-- Angezeigt werden echter Schnitt und Anzahl, dazu die Freunde, die den Laden bewertet haben, mit ihrer Note
+- Angezeigt werden echter Schnitt und Anzahl, dazu die Freunde, die den Laden bewertet haben, mit ihrer Note, und der Median der Preisangaben
+- Preisfilter „bis 6/7/8 €“: nur Läden, deren Median-Preis darunter liegt, in der Reihenfolge des ganzen Rankings. Läden ohne Preisangabe fallen dann heraus
 
 ### Andere Stadt ansehen
 
@@ -204,7 +205,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/places/top?lat&lon[&by]` | Beste im Umkreis von 10 km (gewichtet) nach `overall`, `vegetarian` oder `vegan`, mit unbewerteten aufgefüllt |
 | GET | `/places/new?lat&lon` | Im Umkreis neu eröffnete (30 Tage) und von Google angekündigte Läden |
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
-| GET | `/ranking?lat&lon&by[&city]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden und den Top 3 der neuesten Bestenliste; `city` statt der Stadt am Standort |
+| GET | `/ranking?lat&lon&by[&city][&maxPrice]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden, Median-Preis und den Top 3 der neuesten Bestenliste; `city` statt der Stadt am Standort, `maxPrice` in Cent |
 | GET | `/cities` | Städte mit bewerteten Läden samt Mittelpunkt, die meisten zuerst |
 | GET | `/places/:placeId` | Laden (Google Place ID); fehlt er im Cache, lädt der Server ihn für Angemeldete bei Google nach |
 | GET | `/places/:placeId/reviews` | Bewertungen des Ladens, angemeldet ohne die von Blockierten |

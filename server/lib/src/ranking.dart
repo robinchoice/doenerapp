@@ -32,15 +32,19 @@ String _ratings(RankBy by) {
 }
 
 void mountRanking(Router router, Deps deps) {
-  // GET /ranking?lat&lon&by[&city] — the rated places of the city around
-  // lat/lon or of [city] (by their address), best first, with the friends
-  // who rated them.
+  // GET /ranking?lat&lon&by[&city][&maxPrice] — the rated places of the city
+  // around lat/lon or of [city] (by their address), best first, with the
+  // friends who rated them. With maxPrice (cents) only places whose Döner
+  // mostly costs that much at most; they keep their order from the full list.
   router.get('/ranking', (Request request) async {
     final me = await requireUser(deps, request);
     final lat = queryDouble(request, 'lat');
     final lon = queryDouble(request, 'lon');
     final by = RankBy.parse(request.url.queryParameters['by'] ?? RankBy.overall.key);
     if (by == null) throw const ApiException.badRequest('Parameter "by" ist ungültig');
+    final maxPriceParam = request.url.queryParameters['maxPrice'];
+    final maxPrice = maxPriceParam == null ? null : int.tryParse(maxPriceParam);
+    if (maxPriceParam != null && maxPrice == null) throw const ApiException.badRequest('Parameter "maxPrice" ist ungültig');
     final ratings = _ratings(by);
     final itemParam = {if (by.item case final item? when !RatingItem.classicItems.contains(item)) 'item': item.name};
 
@@ -54,11 +58,14 @@ void mountRanking(Router router, Deps deps) {
 
     final rows = rankByWeight(await query(
       deps.db,
-      'SELECT pv.*, s.avg, s.n FROM place_view pv JOIN ('
+      'SELECT pv.*, s.avg, s.n, pr.price FROM place_view pv JOIN ('
       '  SELECT place_id, avg(value)::float8 AS avg, count(*)::int AS n FROM ($ratings) x GROUP BY place_id'
-      ') s ON s.place_id = pv.id WHERE pv.city = @city',
+      ') s ON s.place_id = pv.id LEFT JOIN ('
+      '  SELECT place_id, round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::int AS price FROM reviews '
+      '  WHERE price IS NOT NULL GROUP BY place_id'
+      ') pr ON pr.place_id = pv.id WHERE pv.city = @city',
       {'city': city, ...itemParam},
-    )).take(_maxEntries).toList();
+    )).where((r) => maxPrice == null || (r['price'] is int && r['price'] as int <= maxPrice)).take(_maxEntries).toList();
 
     final friends = <String, List<FriendRatingDto>>{};
     if (rows.isNotEmpty) {
@@ -85,6 +92,7 @@ void mountRanking(Router router, Deps deps) {
           average: r['avg'] as double,
           count: r['n'] as int,
           friends: friends[r['id']] ?? const [],
+          price: r['price'] as int?,
         ),
     ]).toJson());
   });

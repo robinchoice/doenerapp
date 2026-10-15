@@ -716,13 +716,17 @@ class RankingEntryDto {
   final int count;
   final List<FriendRatingDto> friends;
 
-  const RankingEntryDto({required this.place, required this.average, required this.count, this.friends = const []});
+  /// Median of what reviewers paid for a Döner here, in cents.
+  final int? price;
+
+  const RankingEntryDto({required this.place, required this.average, required this.count, this.friends = const [], this.price});
 
   factory RankingEntryDto.fromJson(Json j) => RankingEntryDto(
         place: PlaceDto.fromJson(j['place'] as Json),
         average: (j['average'] as num).toDouble(),
         count: j['count'] as int,
         friends: (j['friends'] as List).map((e) => FriendRatingDto.fromJson(e as Json)).toList(),
+        price: j['price'] as int?,
       );
 
   Json toJson() => {
@@ -730,6 +734,7 @@ class RankingEntryDto {
         'average': average,
         'count': count,
         'friends': friends.map((e) => e.toJson()).toList(),
+        'price': price,
       };
 }
 

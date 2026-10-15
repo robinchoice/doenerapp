@@ -144,8 +144,14 @@ class AppData extends ChangeNotifier {
     return news;
   }
 
-  Future<RankingDto> ranking(double lat, double lon, RankBy by, {String? city}) async {
-    final json = await _api.get('/ranking', query: {'lat': '$lat', 'lon': '$lon', 'by': by.key, 'city': ?city});
+  Future<RankingDto> ranking(double lat, double lon, RankBy by, {String? city, int? maxPrice}) async {
+    final json = await _api.get('/ranking', query: {
+      'lat': '$lat',
+      'lon': '$lon',
+      'by': by.key,
+      'city': ?city,
+      if (maxPrice != null) 'maxPrice': '$maxPrice',
+    });
     final ranking = RankingDto.fromJson(json as Map<String, dynamic>);
     await _storePlaces([for (final e in ranking.entries) e.place]);
     return ranking;

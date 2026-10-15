@@ -14,6 +14,9 @@ import 'best_of.dart';
 import 'city_picker.dart';
 import 'rating_info.dart';
 
+/// Price filters in cents, null for any price.
+const _maxPrices = [null, 600, 700, 800];
+
 /// Moving further than this can mean another city.
 const _reloadDistance = 1000.0;
 
@@ -32,15 +35,16 @@ class _RankingScreenState extends State<RankingScreen> {
   Future<RankingDto>? _ranking;
   LatLng? _center;
   String? _visiting;
+  int? _maxPrice;
 
   void _load() {
     final location = context.read<LocationService>();
     final center = _center = location.center;
     _visiting = location.visiting?.name;
-    _ranking = context.read<AppData>().ranking(center.latitude, center.longitude, _by!, city: location.visiting?.name);
+    _ranking = context
+        .read<AppData>()
+        .ranking(center.latitude, center.longitude, _by!, city: location.visiting?.name, maxPrice: _maxPrice);
   }
-
-
 
   static String _hint(RankBy by) => switch (by) {
         RankBy(diet: Diet.all) => 'Durchschnitt aus Soße, Fleisch, Salat und Brot',
@@ -118,10 +122,37 @@ class _RankingScreenState extends State<RankingScreen> {
                     ],
                   ),
                 ),
-                if (_hint(by).isNotEmpty)
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final price in _maxPrices)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            avatar: price == null ? const Text('💶') : null,
+                            label: Text(price == null ? 'Jeder Preis' : 'bis ${formatPrice(price).replaceAll(',00', '')}'),
+                            selected: price == _maxPrice,
+                            onSelected: (_) => setState(() {
+                              _maxPrice = price;
+                              _load();
+                            }),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_hint(by).isNotEmpty || _maxPrice != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(_hint(by), style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12)),
+                    child: Text(
+                      [
+                        if (_hint(by).isNotEmpty) _hint(by),
+                        if (_maxPrice != null) 'Nur Läden, deren Döner laut Bewertungen meist höchstens ${formatPrice(_maxPrice!)} kostet',
+                      ].join(' · '),
+                      style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12),
+                    ),
                   ),
                 const SizedBox(height: 16),
                 if (snapshot.connectionState != ConnectionState.done)
@@ -143,6 +174,19 @@ class _RankingScreenState extends State<RankingScreen> {
                       icon: const Icon(Icons.travel_explore),
                       label: const Text('Andere Stadt ansehen'),
                       onPressed: () => showCityPicker(context),
+                    ),
+                  )
+                else if (entries.isEmpty && _maxPrice != null)
+                  EmptyState(
+                    icon: Icons.euro,
+                    title: 'Nichts bis ${formatPrice(_maxPrice!)} gefunden',
+                    message: 'Preise kommen aus den Bewertungen. Trag beim nächsten Döner ein, was du bezahlt hast.',
+                    action: OutlinedButton(
+                      onPressed: () => setState(() {
+                        _maxPrice = null;
+                        _load();
+                      }),
+                      child: const Text('Jeder Preis'),
                     ),
                   )
                 else if (entries.isEmpty)
@@ -202,6 +246,8 @@ class _RankingRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(entry.place.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (entry.price case final price?)
+                  Text('💶 meist ${formatPrice(price)}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
                 if (entry.friends.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Row(children: [

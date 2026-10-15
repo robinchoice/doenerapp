@@ -133,6 +133,9 @@ class AppData extends ChangeNotifier {
   Future<List<PlaceDto>> trending(double lat, double lon) async =>
       _cachePlaces(await _api.get('/places/trending', query: {'lat': '$lat', 'lon': '$lon'}) as List);
 
+  Future<List<CityDto>> cities() async =>
+      [for (final c in await _api.get('/cities') as List) CityDto.fromJson(c as Map<String, dynamic>)];
+
   /// Opened lately around, and openings Google announced. Only the opened
   /// ones are real places for the map.
   Future<NewPlacesDto> newPlaces(double lat, double lon) async {
@@ -141,8 +144,8 @@ class AppData extends ChangeNotifier {
     return news;
   }
 
-  Future<RankingDto> ranking(double lat, double lon, RankBy by) async {
-    final json = await _api.get('/ranking', query: {'lat': '$lat', 'lon': '$lon', 'by': by.key});
+  Future<RankingDto> ranking(double lat, double lon, RankBy by, {String? city}) async {
+    final json = await _api.get('/ranking', query: {'lat': '$lat', 'lon': '$lon', 'by': by.key, 'city': ?city});
     final ranking = RankingDto.fromJson(json as Map<String, dynamic>);
     await _storePlaces([for (final e in ranking.entries) e.place]);
     return ranking;

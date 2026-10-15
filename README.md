@@ -126,6 +126,10 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 - Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit drei Bewertungen in Höhe des Stadtschnitts (`weightedRating` in `packages/doener_models`). So schlägt eine einzelne 5 nicht viele 4,5er
 - Angezeigt werden echter Schnitt und Anzahl, dazu die Freunde, die den Laden bewertet haben, mit ihrer Note
 
+### Andere Stadt ansehen
+
+Wer in seiner Gegend noch niemanden hat, schaut woanders rein: Der Knopf neben „Top 3“ auf Start und die Weltkugel im Ranking öffnen „Döner-Tourismus“ mit allen Städten, in denen Läden bewertet sind (`/cities`, die meisten zuerst). Start (Top 3, Trends, neue Läden, Bewertungen der Gegend) und Ranking zeigen dann diese Stadt, ein Hinweis auf Start führt zurück. Die Wahl gilt bis zum Neustart der App, Check-in und Erinnerungen bleiben am echten Standort.
+
 ### Freunde
 
 - Persönlicher Einladungslink samt QR-Code (Profil, Freunde-Liste, letzter Onboarding-Schritt): Wer ihn öffnet und sich anmeldet, ist sofort befreundet, eine offene Anfrage gilt damit als angenommen. Der Link lässt sich zurücksetzen.
@@ -190,7 +194,8 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/places/top?lat&lon[&by]` | Beste im Umkreis von 10 km (gewichtet) nach `overall`, `vegetarian` oder `vegan`, mit unbewerteten aufgefüllt |
 | GET | `/places/new?lat&lon` | Im Umkreis neu eröffnete (30 Tage) und von Google angekündigte Läden |
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
-| GET | `/ranking?lat&lon&by` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden |
+| GET | `/ranking?lat&lon&by[&city]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden; `city` statt der Stadt am Standort |
+| GET | `/cities` | Städte mit bewerteten Läden samt Mittelpunkt, die meisten zuerst |
 | GET | `/places/:placeId` | Laden (Google Place ID); fehlt er im Cache, lädt der Server ihn für Angemeldete bei Google nach |
 | GET | `/places/:placeId/reviews` | Bewertungen des Ladens, angemeldet ohne die von Blockierten |
 | GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran und was „mit allem“ heißt |

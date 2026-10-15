@@ -13,6 +13,7 @@ import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
 import '../place/review_sheet.dart';
+import '../ranking/city_picker.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
 import '../social/moderation.dart';
@@ -46,12 +47,13 @@ class _StartScreenState extends State<StartScreen> {
   /// Bumped on every reload, so a page still on its way for the old filter is dropped.
   int _feedGeneration = 0;
 
-  /// Where the shown data was loaded for — the user's position or Freiburg.
+  /// Where the shown data was loaded for — the user's position, a city they
+  /// look around in, or Freiburg.
   LatLng? _center;
   String? _loadedFor;
 
   Future<void> _refresh() async {
-    _center = context.read<LocationService>().position ?? fallbackLocation;
+    _center = context.read<LocationService>().center;
     await Future.wait([_loadArea(), _loadLive(), _reloadFeed()]);
   }
 
@@ -147,24 +149,32 @@ class _StartScreenState extends State<StartScreen> {
     final session = context.watch<Session>();
     final user = session.user!;
     final diet = session.diet;
-    final position = context.watch<LocationService>().position;
+    final location = context.watch<LocationService>();
+    final visiting = location.visiting;
     final data = context.watch<AppData>();
     final friends = context.watch<Friends>();
 
     final center = _center;
-    final moved = position != null &&
-        (center == null ||
-            Geolocator.distanceBetween(center.latitude, center.longitude, position.latitude, position.longitude) >
-                _reloadDistance);
+    final moved = center == null ||
+        Geolocator.distanceBetween(center.latitude, center.longitude, location.center.latitude, location.center.longitude) >
+            _reloadDistance;
     // Top places depend on the diet, so a new one loads them again.
-    if (_loadedFor != '${user.id}/${diet.name}' || moved) {
-      _loadedFor = '${user.id}/${diet.name}';
-      _center = position ?? fallbackLocation;
+    if (_loadedFor != '${user.id}/${diet.name}/${visiting?.name}' || moved) {
+      _loadedFor = '${user.id}/${diet.name}/${visiting?.name}';
+      _center = location.center;
       WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
     }
 
     // Check-ins without a review since, from every device of the account.
     final tasks = [
+      if (visiting != null)
+        _Task(
+          icon: Icons.travel_explore,
+          title: 'Du schaust dich in ${visiting.name} um 👀',
+          message: 'Tipp für eine andere Stadt, ✕ bringt dich zurück in deine Gegend.',
+          onTap: () => showCityPicker(context),
+          onClose: () => location.visit(null),
+        ),
       for (final visit in data.toReview(DateTime.now()).take(3)) _toReviewTask(data, visit, diet),
       if (data.reviews.isEmpty)
         _Task(
@@ -220,16 +230,24 @@ class _StartScreenState extends State<StartScreen> {
               if (tasks.isNotEmpty) const SizedBox(height: 10),
               SectionTitle(
                 title: switch (diet) { Diet.all => 'Top 3 hier', Diet.vegetarian => 'Top 3 ohne Fleisch', Diet.vegan => 'Top 3 vegan' },
-                trailing: position == null
-                    ? Text('Freiburg', style: TextStyle(color: Theme.of(context).colorScheme.outline))
-                    : null,
+                trailing: CityButton(label: visiting?.name ?? (location.position == null ? 'Freiburg' : 'Andere Stadt')),
               ),
               if (!_areaLoaded)
                 const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
               else if (_top.isEmpty)
                 GlassCard(
                   onTap: widget.onOpenMap,
-                  child: const Text('Hier kennt die App noch keine Döner-Läden. Schau auf der Karte, was es in der Nähe gibt.'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Hier kennt die App noch keine Döner-Läden. Schau auf der Karte, was es in der Nähe gibt.'),
+                      TextButton.icon(
+                        icon: const Icon(Icons.travel_explore),
+                        label: const Text('Oder schau, wo man anderswo am besten isst'),
+                        onPressed: () => showCityPicker(context),
+                      ),
+                    ],
+                  ),
                 )
               else ...[
                 const Divider(),
@@ -251,7 +269,7 @@ class _StartScreenState extends State<StartScreen> {
               ],
               const SizedBox(height: 24),
               SectionTitle(
-                title: _friendsOnly ? 'Deine Freunde' : 'In deiner Gegend',
+                title: _friendsOnly ? 'Deine Freunde' : visiting == null ? 'In deiner Gegend' : 'In ${visiting.name}',
                 trailing: FilterChip(
                   label: const Text('Nur Freunde'),
                   selected: _friendsOnly,

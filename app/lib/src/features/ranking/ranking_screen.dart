@@ -10,6 +10,7 @@ import '../../core/maps.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
+import 'city_picker.dart';
 import 'rating_info.dart';
 
 /// Moving further than this can mean another city.
@@ -29,11 +30,16 @@ class _RankingScreenState extends State<RankingScreen> {
   Diet? _diet;
   Future<RankingDto>? _ranking;
   LatLng? _center;
+  String? _visiting;
 
   void _load() {
-    final center = _center = context.read<LocationService>().position ?? fallbackLocation;
-    _ranking = context.read<AppData>().ranking(center.latitude, center.longitude, _by!);
+    final location = context.read<LocationService>();
+    final center = _center = location.center;
+    _visiting = location.visiting?.name;
+    _ranking = context.read<AppData>().ranking(center.latitude, center.longitude, _by!, city: location.visiting?.name);
   }
+
+
 
   static String _hint(RankBy by) => switch (by) {
         RankBy(diet: Diet.all) => 'Durchschnitt aus Soße, Fleisch und Brot',
@@ -45,7 +51,7 @@ class _RankingScreenState extends State<RankingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final position = context.watch<LocationService>().position;
+    final location = context.watch<LocationService>();
     final diet = context.watch<Session>().diet;
     final center = _center;
     // A new diet starts at its own main score.
@@ -56,9 +62,9 @@ class _RankingScreenState extends State<RankingScreen> {
     }
     final by = _by!;
     if (_ranking == null ||
-        (position != null &&
-            center != null &&
-            Geolocator.distanceBetween(center.latitude, center.longitude, position.latitude, position.longitude) >
+        location.visiting?.name != _visiting ||
+        (center != null &&
+            Geolocator.distanceBetween(center.latitude, center.longitude, location.center.latitude, location.center.longitude) >
                 _reloadDistance)) {
       _load();
     }
@@ -78,6 +84,7 @@ class _RankingScreenState extends State<RankingScreen> {
           appBar: AppBar(
             title: Text(city == null ? title : '$title $city'),
             actions: [
+              IconButton(icon: const Icon(Icons.travel_explore), tooltip: 'Andere Stadt ansehen', onPressed: () => showCityPicker(context)),
               IconButton(icon: const Icon(Icons.info_outline), tooltip: 'So funktionieren Bewertungen', onPressed: () => showRatingInfo(context)),
             ],
           ),
@@ -126,10 +133,16 @@ class _RankingScreenState extends State<RankingScreen> {
                     action: OutlinedButton(onPressed: () => setState(_load), child: const Text('Erneut versuchen')),
                   )
                 else if (city == null)
-                  const EmptyState(
+                  EmptyState(
                     icon: Icons.emoji_events_outlined,
                     title: 'Hier gibt es noch kein Ranking',
-                    message: 'Die App kennt in deiner Gegend noch keine Döner-Läden. Schau auf der Karte, was es gibt.',
+                    message: 'Die App kennt in deiner Gegend noch keine Döner-Läden. Schau auf der Karte, was es gibt, '
+                        'oder wo man anderswo am besten isst.',
+                    action: OutlinedButton.icon(
+                      icon: const Icon(Icons.travel_explore),
+                      label: const Text('Andere Stadt ansehen'),
+                      onPressed: () => showCityPicker(context),
+                    ),
                   )
                 else if (entries.isEmpty)
                   EmptyState(
@@ -138,6 +151,11 @@ class _RankingScreenState extends State<RankingScreen> {
                     message: by == RankBy.overall
                         ? 'Bewerte deinen Stammladen – dann steht er hier ganz oben.'
                         : 'Für ${by.label} hat hier noch niemand eine Note vergeben.',
+                    action: OutlinedButton.icon(
+                      icon: const Icon(Icons.travel_explore),
+                      label: const Text('Andere Stadt ansehen'),
+                      onPressed: () => showCityPicker(context),
+                    ),
                   )
                 else ...[
                   const Divider(),

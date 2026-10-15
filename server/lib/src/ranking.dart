@@ -31,8 +31,9 @@ String _ratings(RankBy by) {
 }
 
 void mountRanking(Router router, Deps deps) {
-  // GET /ranking?lat&lon&by — the rated places of the city around lat/lon
-  // (by their address), best first, with the friends who rated them.
+  // GET /ranking?lat&lon&by[&city] — the rated places of the city around
+  // lat/lon or of [city] (by their address), best first, with the friends
+  // who rated them.
   router.get('/ranking', (Request request) async {
     final me = await requireUser(deps, request);
     final lat = queryDouble(request, 'lat');
@@ -42,12 +43,12 @@ void mountRanking(Router router, Deps deps) {
     final ratings = _ratings(by);
     final itemParam = {if (by.item case final item? when !item.isDoener) 'item': item.name};
 
-    final nearest = await queryOne(
-      deps.db,
-      'SELECT city FROM places p WHERE city IS NOT NULL AND ${withinRadius('p')} ORDER BY ${distanceSql('p')} LIMIT 1',
-      radiusParams(lat, lon, _cityRadius),
-    );
-    final city = nearest?['city'] as String?;
+    final city = request.url.queryParameters['city'] ??
+        (await queryOne(
+          deps.db,
+          'SELECT city FROM places p WHERE city IS NOT NULL AND ${withinRadius('p')} ORDER BY ${distanceSql('p')} LIMIT 1',
+          radiusParams(lat, lon, _cityRadius),
+        ))?['city'] as String?;
     if (city == null) return json(RankingDto(by: by, entries: const []).toJson());
 
     final rows = rankByWeight(await query(
@@ -84,5 +85,21 @@ void mountRanking(Router router, Deps deps) {
           friends: friends[r['id']] ?? const [],
         ),
     ]).toJson());
+  });
+
+  // GET /cities — cities with rated places, most first, each with the middle
+  // of its rated places, so anyone can look around there.
+  router.get('/cities', (Request request) async {
+    await requireUser(deps, request);
+    final rows = await query(
+      deps.db,
+      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM places '
+      'WHERE city IS NOT NULL AND id IN (SELECT place_id FROM reviews) GROUP BY city ORDER BY n DESC, city LIMIT 50',
+    );
+    return json([
+      for (final r in rows)
+        CityDto(name: r['city'] as String, latitude: r['lat'] as double, longitude: r['lon'] as double, ratedPlaces: r['n'] as int)
+            .toJson(),
+    ]);
   });
 }

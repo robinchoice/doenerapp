@@ -661,6 +661,16 @@ void main() {
       expect(bySauce.entries.map((e) => e.place.placeId), ['t-solo', 't-steady']);
       expect(bySauce.entries[1].friends.single.rating, 3);
 
+      final (_, chosen) = await call('GET', '/ranking?lat=10&lon=10&city=Testheim', token: ute);
+      expect(RankingDto.fromJson(chosen as Map<String, dynamic>).entries.length, 3, reason: 'a chosen city wins over the position');
+
+      final (_, cities) = await call('GET', '/cities', token: ute);
+      expect([for (final c in cities as List) c['name']], containsAllInOrder(['Testheim', 'Fernstadt']), reason: 'most rated places first');
+      final testheim = CityDto.fromJson(cities.first as Map<String, dynamic>);
+      expect((testheim.name, testheim.ratedPlaces), ('Testheim', 3));
+      expect(testheim.latitude, closeTo(50, 0.2));
+      expect((await call('GET', '/cities')).$1, 401);
+
       final (_, nowhere) = await call('GET', '/ranking?lat=10&lon=10', token: ute);
       expect(nowhere['city'], isNull);
       expect(nowhere['entries'], isEmpty);

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:doener_models/doener_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -11,6 +12,19 @@ class LocationService extends ChangeNotifier {
   LatLng? position;
   bool denied = false;
   StreamSubscription<Position>? _updates;
+
+  /// A city the user looks around in instead of their own area, until the
+  /// app restarts. Check-ins always go by [position].
+  CityDto? visiting;
+
+  /// Where Start and Ranking show places for.
+  LatLng get center =>
+      visiting == null ? position ?? fallbackLocation : LatLng(visiting!.latitude, visiting!.longitude);
+
+  void visit(CityDto? city) {
+    visiting = city;
+    notifyListeners();
+  }
 
   /// With [ask] false (e.g. when the app comes back to the foreground) only
   /// an already granted location is used. Once it is followed, the position

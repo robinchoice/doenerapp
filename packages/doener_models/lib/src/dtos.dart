@@ -860,3 +860,24 @@ class ReportRequest {
       ReportRequest(reason: ReportReason.values.byName(j['reason'] as String), note: j['note'] as String?);
   Json toJson() => {'reason': reason.name, 'note': note};
 }
+
+// MARK: - Cities
+
+/// A city with rated places, to look around in from anywhere.
+class CityDto {
+  final String name;
+  final double latitude;
+  final double longitude;
+  final int ratedPlaces;
+
+  const CityDto({required this.name, required this.latitude, required this.longitude, required this.ratedPlaces});
+
+  factory CityDto.fromJson(Json j) => CityDto(
+        name: j['name'] as String,
+        latitude: (j['latitude'] as num).toDouble(),
+        longitude: (j['longitude'] as num).toDouble(),
+        ratedPlaces: j['ratedPlaces'] as int,
+      );
+
+  Json toJson() => {'name': name, 'latitude': latitude, 'longitude': longitude, 'ratedPlaces': ratedPlaces};
+}

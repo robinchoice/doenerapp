@@ -125,6 +125,10 @@ class _PlaceDetailState extends State<PlaceDetail> {
     final visits = data.visitsAt(place.placeId);
     final isFavorite = data.favorites.contains(place.placeId);
     final addressLine = [place.postalCode, place.city].whereType<String>().join(' ');
+    // Others' reviews, the friends' first — the ones that tell the user most.
+    final friendIds = {for (final f in context.watch<Friends>().accepted) f.user.id};
+    final others = _reviews.where((r) => r.userId != session.user?.id).toList()
+      ..sort((a, b) => (friendIds.contains(a.userId) ? 0 : 1).compareTo(friendIds.contains(b.userId) ? 0 : 1));
 
     return ListView(
       controller: widget.controller,
@@ -240,14 +244,19 @@ class _PlaceDetailState extends State<PlaceDetail> {
           ),
           _IngredientsCard(summary: summary, diet: diet),
         ],
-        if (_othersFriendsFirst(session) case final others when others.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          SectionTitle(
-            title: 'Bewertungen (${others.length})',
-            trailing: IconButton(icon: const Icon(Icons.info_outline), tooltip: 'So funktionieren Bewertungen', onPressed: () => showRatingInfo(context)),
-          ),
-          for (final r in others) Padding(padding: const EdgeInsets.only(bottom: 8), child: ReviewCard(review: r, showAuthor: true)),
-        ],
+        const SizedBox(height: 20),
+        SectionTitle(
+          title: others.isEmpty ? 'Bewertungen' : 'Bewertungen (${others.length})',
+          trailing: IconButton(icon: const Icon(Icons.info_outline), tooltip: 'So funktionieren Bewertungen', onPressed: () => showRatingInfo(context)),
+        ),
+        if (others.isEmpty)
+          Text('Von anderen gibt es hier noch keine Bewertung.', style: TextStyle(color: theme.colorScheme.outline))
+        else
+          for (final r in others)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ReviewCard(review: r, showAuthor: true, friend: friendIds.contains(r.userId)),
+            ),
         if (visits.isNotEmpty) ...[
           const SizedBox(height: 20),
           SectionTitle(title: 'Deine Besuche (${visits.length})'),
@@ -307,18 +316,11 @@ class _PlaceDetailState extends State<PlaceDetail> {
           child: TextButton.icon(
             onPressed: () => _openPoster(place),
             icon: const Icon(Icons.qr_code_2),
-            label: const Text('Aushang zum Bewerten für den Laden'),
+            label: const Text('Aushang mit QR-Code drucken'),
           ),
         ),
       ],
     );
-  }
-
-  /// Others' reviews, the friends' first — the ones that tell the user most.
-  List<ReviewDto> _othersFriendsFirst(Session session) {
-    final friendIds = {for (final f in context.watch<Friends>().accepted) f.user.id};
-    final others = _reviews.where((r) => r.userId != session.user?.id).toList();
-    return [...others.where((r) => friendIds.contains(r.userId)), ...others.where((r) => !friendIds.contains(r.userId))];
   }
 
   /// A poster with a QR code to the shop's review, to print and hang up there.
@@ -449,8 +451,11 @@ class ReviewCard extends StatelessWidget {
   /// The own photo while it waits for upload.
   final Uint8List? photo;
   final bool showAuthor;
+
+  /// The author is a friend of the user.
+  final bool friend;
   final VoidCallback? onEdit;
-  const ReviewCard({super.key, required this.review, this.photo, this.showAuthor = false, this.onEdit});
+  const ReviewCard({super.key, required this.review, this.photo, this.showAuthor = false, this.friend = false, this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -463,11 +468,14 @@ class ReviewCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              if (showAuthor) ...[Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(width: 8)],
+              if (showAuthor) ...[
+                Flexible(child: Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                if (friend) ...[const SizedBox(width: 4), Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund')],
+                const SizedBox(width: 8),
+              ],
               if (review.headline(diet) case final score?) DoenerRating(value: score, size: 14),
               if (review.onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: review.regular)],
-              const Spacer(),
-              if (onEdit != null) Icon(Icons.edit, size: 16, color: theme.colorScheme.outline),
+              if (onEdit != null) ...[const Spacer(), Icon(Icons.edit, size: 16, color: theme.colorScheme.outline)],
             ],
           ),
           if (review.ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: review.ratings, diet: diet)],

@@ -54,9 +54,10 @@ Map<RatingItem, double> ratingsFromRow(Map<String, dynamic> row) => {
 const reviewItemsJson = '(SELECT jsonb_object_agg(item, rating) FROM review_items WHERE review_id = r.id) AS items';
 
 /// Select expressions for the photo of review `r` and on how many days its author checked in at the
-/// place — several check-ins in one evening don't make a regular.
+/// place — several check-ins in one evening don't make a regular. Days go by when the server got the
+/// check-in, so backdated ones don't count extra.
 const reviewPhotoId = '(SELECT id FROM review_photos WHERE review_id = r.id) AS photo_id';
-const reviewVisitCount = '(SELECT count(DISTINCT (v.visited_at AT TIME ZONE \'UTC\')::date) FROM visits v '
+const reviewVisitCount = '(SELECT count(DISTINCT (v.created_at AT TIME ZONE \'Europe/Berlin\')::date) FROM visits v '
     'WHERE v.user_id = r.user_id AND v.place_id = r.place_id)::int AS visit_count';
 
 ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
@@ -202,8 +203,16 @@ void mountPlaces(Router router, Deps deps) {
     return json(rows.map((r) => placeFromRow(r).toJson()).toList());
   });
 
+  // A shop dropped from the cache after 30 days comes back for a signed-in
+  // user, e.g. via the review link on a poster in the shop (/b/<placeId>).
   router.get('/places/<placeId>', (Request request, String placeId) async {
-    return json(placeFromRow(await _requirePlace(deps, placeId)).toJson());
+    var row = await queryOne(deps.db, 'SELECT * FROM place_view WHERE google_place_id = @id', {'id': placeId});
+    if (row == null && request.headers.containsKey('authorization')) {
+      await requireUser(deps, request);
+      if (await _fetchShop(deps, placeId)) row = await _requirePlace(deps, placeId);
+    }
+    if (row == null) throw const ApiException.notFound('Laden unbekannt');
+    return json(placeFromRow(row).toJson());
   });
 
   router.get('/places/<placeId>/reviews', (Request request, String placeId) async {
@@ -431,6 +440,21 @@ Future<void> _syncTile(Deps deps, String apiKey, Tile tile, String userId) async
   } catch (e) {
     print('Tile ${tile.key} sync failed: $e');
     await deps.db.execute(Sql.named('DELETE FROM search_tiles WHERE tile_key = @key'), parameters: {'key': tile.key});
+  }
+}
+
+/// Loads one shop from Google into the cache; false if it is unknown, closed or no Döner shop.
+Future<bool> _fetchShop(Deps deps, String placeId) async {
+  final apiKey = deps.config.googlePlacesApiKey;
+  if (apiKey == null || !RegExp(r'^[A-Za-z0-9_-]{1,300}$').hasMatch(placeId)) return false;
+  try {
+    final place = await fetchPlace(deps.httpClient, apiKey, placeId);
+    if (place == null || !place.isOpenBusiness || !place.looksLikeDoener) return false;
+    await _upsertPlace(deps, place);
+    return true;
+  } catch (e) {
+    print('Fetching place $placeId failed: $e');
+    return false;
   }
 }
 

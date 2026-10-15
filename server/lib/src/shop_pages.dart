@@ -18,22 +18,24 @@ Future<Map<String, dynamic>?> _place(Deps deps, String placeId) async => _placeI
 
 /// `/b/<placeId>` — where the QR code of a shop's poster leads: straight to
 /// its review in the app, or in the web app for those without it. Google's
-/// terms allow the name only with the source named.
+/// terms allow the name only with the source named. A shop that dropped out
+/// of the cache gets a page without its name; the app loads it again.
 Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) async {
+  if (!_placeIdPattern.hasMatch(placeId)) {
+    return _html(404, '<title>Laden nicht gefunden</title></head><body><main><h1>Laden nicht gefunden</h1></main></body>');
+  }
   final place = await _place(deps, placeId);
   final appUrl = deps.config.appDownloadUrl;
   final name = place == null ? null : _escape.convert(place['name'] as String);
   final city = place?['city'] as String?;
-  final title = name == null ? 'Laden nicht gefunden' : 'Wie war dein Döner bei $name?';
-  final content = name == null
-      ? '<p>Den Laden kennt die Döner App gerade nicht.</p><a class="button" href="/">Zur Döner App</a>'
-      : '<p>Gib Soße, Fleisch und Brot eine Note. Aus allen Bewertungen entsteht das Ranking'
-          '${city == null ? '' : ' von ${_escape.convert(city)}'}.</p>'
-          '<a class="button" href="/app?review=$placeId">Jetzt bewerten</a>'
-          '${appUrl == null ? '' : '<a class="button secondary" href="${_escape.convert(appUrl)}">App holen</a>'}'
-          '<p class="source">Ortsdaten: Google Maps</p>';
+  final title = name == null ? 'Wie war dein Döner?' : 'Wie war dein Döner bei $name?';
+  final content = '<p>Gib Soße, Fleisch und Brot eine Note. Aus allen Bewertungen entsteht das Ranking'
+      '${city == null ? ' deiner Stadt' : ' von ${_escape.convert(city)}'}.</p>'
+      '<a class="button" href="/app?review=$placeId">Jetzt bewerten</a>'
+      '${appUrl == null ? '' : '<a class="button secondary" href="${_escape.convert(appUrl)}">App holen</a>'}'
+      '${name == null ? '' : '<p class="source">Ortsdaten: Google Maps</p>'}';
   return _html(
-    place == null ? 404 : 200,
+    200,
     '''<title>$title</title>
 <meta property="og:title" content="$title">
 <meta property="og:description" content="Bewerte den Laden in der Döner App.">
@@ -69,7 +71,7 @@ Future<Response> posterPage(Deps deps, Request request, String placeId) async {
   main { max-width: 170mm; margin: 0 auto; padding: 24px; text-align: center; }
   h1 { font-size: 2.6rem; margin: 16px 0 8px; }
   .shop { font-size: 1.5rem; font-weight: 600; margin: 0 0 24px; }
-  svg { width: 110mm; height: 110mm; }
+  svg { width: min(110mm, 100%); height: auto; }
   .link { font-size: 0.9rem; color: #666; word-break: break-all; }
   .steps { font-size: 1.15rem; margin: 20px 0; }
   .source { font-size: 0.75rem; color: #888; margin-top: 32px; }

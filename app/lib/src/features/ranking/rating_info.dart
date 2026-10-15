@@ -37,9 +37,10 @@ class _RatingInfo extends StatelessWidget {
         ),
         section(
           'vor Ort und Stammgast',
-          '„vor Ort“ heißt: Die Person hat in der App bei diesem Laden eingecheckt. Das geht nur, wenn das Handy höchstens '
-              '${checkInRadius.round()} m entfernt ist. „Stammgast“ heißt: eingecheckt an mindestens $regularVisits verschiedenen Tagen. '
-              'Mehr prüfen wir nicht. Ob jemand dort wirklich gegessen hat, wissen wir nicht, auch Bewertungen ohne Häkchen zählen.',
+          '„vor Ort“ heißt: Die Person hat in der App bei diesem Laden eingecheckt. Die App lässt das nur zu, wenn das Gerät '
+              'meldet, höchstens ${checkInRadius.round()} m entfernt zu sein. „Stammgast“ heißt: eingecheckt an mindestens '
+              '$regularVisits verschiedenen Tagen. Mehr prüfen wir nicht: Den Standort kontrolliert der Server nicht nach, und ob '
+              'jemand dort wirklich gegessen hat, wissen wir nicht. Bewertungen ohne Häkchen zählen genauso.',
         ),
         section(
           'Noten',

@@ -57,10 +57,10 @@ Ein Bogen, alle Punkte 1–5 in halben Schritten und optional. Ein Tipp auf die 
 - Expertenmodus (Einstellungen): fragt ab, was in „mit allem“ steckt (Salat, Besonderheiten wie Granatapfelkerne oder Mais, Soßen), dazu Fleisch, Spieß (selbst gesteckt oder Fertigspieß) und Brot. Vorausgefüllt mit dem, was andere angegeben haben
 - Eine Bewertung pro Nutzer und Laden, eine neue ersetzt die alte. Die Angaben (vegan, Ayran, Zutaten) hängen an der Bewertung, pro Laden zählt die Mehrheit
 - Optional ein Foto (Kamera oder Galerie, JPEG, PNG oder WebP bis 3 MB). Es bleibt beim Bearbeiten, bis es ersetzt oder entfernt wird, und wartet wie die Bewertung offline in der Queue. Der Server speichert es in Postgres, jedes neue Foto bekommt eine neue ID und ist darüber dauerhaft cachebar
-- Wer im Laden schon einmal eingecheckt hat, bekommt das Häkchen „vor Ort“, wer an mindestens drei verschiedenen Tagen eingecheckt hat, das Abzeichen „Stammgast“ (`regularVisits` in `packages/doener_models`). Der Server leitet beides beim Lesen aus den Check-ins ab
+- Wer im Laden schon einmal eingecheckt hat, bekommt das Häkchen „vor Ort“, wer an mindestens drei verschiedenen Tagen eingecheckt hat, das Abzeichen „Stammgast“ (`regularVisits` in `packages/doener_models`). Der Server leitet beides beim Lesen aus den Check-ins ab und zählt die Tage nach dem Eingang beim Server (deutsche Zeit), zurückdatierte Check-ins zählen also nicht extra
 - Durchschnitt und Anzahl berechnet der Server beim Lesen. Die Noten einer Bewertung (Döner, ohne Fleisch, vegan) leitet er beim Speichern aus den Punkten ab (`Diet.score` in `packages/doener_models`)
 - In der Laden-Ansicht: Chips für vegane Optionen, Ayran und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Expertenmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen, die von Freunden zuerst. Ein Info-Knopf dort und im Ranking erklärt, wer bewertet, was „vor Ort“ und „Stammgast“ prüfen und wie das Ranking sortiert (Pflichtangabe nach § 5b UWG)
-- Aushang für den Laden: Unten in der Laden-Ansicht öffnet „Aushang zum Bewerten“ eine Druckseite (`/aushang/<placeId>`) mit QR-Code. Er führt auf `/b/<placeId>`: Mit installierter App öffnet sich direkt deren Bewertungsbogen, sonst eine Seite, die in die Web-App führt (`/app?review=<placeId>`). Auch ohne Konto bleibt der Wunsch über Onboarding und Login erhalten
+- Aushang für den Laden: Unten in der Laden-Ansicht öffnet „Aushang zum Bewerten“ eine Druckseite (`/aushang/<placeId>`) mit QR-Code. Er führt auf `/b/<placeId>`: Mit installierter App öffnet sich direkt deren Bewertungsbogen, sonst eine Seite, die in die Web-App führt (`/app?review=<placeId>`). Auch ohne Konto bleibt der Wunsch über Onboarding und Login erhalten. Ist der Laden inzwischen aus dem 30-Tage-Cache gefallen, zeigt `/b/` ihn ohne Namen, und `/places/:placeId` lädt ihn für angemeldete Nutzer einzeln bei Google nach (nur offene Döner-Läden)
 
 ### Ernährung
 
@@ -182,7 +182,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/places/new?lat&lon` | Im Umkreis neu eröffnete (30 Tage) und von Google angekündigte Läden |
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
 | GET | `/ranking?lat&lon&by` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden |
-| GET | `/places/:placeId` | Laden (Google Place ID) |
+| GET | `/places/:placeId` | Laden (Google Place ID); fehlt er im Cache, lädt der Server ihn für Angemeldete bei Google nach |
 | GET | `/places/:placeId/reviews` | Bewertungen des Ladens |
 | GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran und was „mit allem“ heißt |
 | PUT | `/places/:placeId/review` | Eigene Bewertung speichern, optional mit Foto (`photoBase64`) oder ohne das bisherige (`removePhoto`) |

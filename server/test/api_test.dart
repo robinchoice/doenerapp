@@ -482,19 +482,22 @@ void main() {
       expect((item.photoId, item.onSite), (withCheckIn.photoId, true));
       expect((withCheckIn.regular, item.regular), (false, false));
 
-      // A second check-in the same day doesn't count, two on earlier days do.
-      for (final (id, daysAgo) in [('33333333-2222-4333-8444-555555555556', 0), ('33333333-2222-4333-8444-555555555557', 1)]) {
+      // Days count by when the server got the check-in: a backdated one or a second on the same day
+      // doesn't make a regular, check-ins received on three days do.
+      Future<bool> bobIsRegular() async {
+        final (_, reviews) = await call('GET', '/places/place-kebap/reviews');
+        return (reviews as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob').regular;
+      }
+
+      for (final (id, daysAgo) in [('33333333-2222-4333-8444-555555555556', 0), ('33333333-2222-4333-8444-555555555557', 5)]) {
         await call('POST', '/places/place-kebap/visits',
             body: {'id': id, 'visitedAt': DateTime.now().toUtc().subtract(Duration(days: daysAgo)).toIso8601String()}, token: bob);
       }
-      final (_, sameDay) = await call('GET', '/places/place-kebap/reviews');
-      expect((sameDay as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob').regular, isFalse);
-      await call('POST', '/places/place-kebap/visits',
-          body: {'id': '33333333-2222-4333-8444-555555555558', 'visitedAt': DateTime.now().toUtc().subtract(const Duration(days: 2)).toIso8601String()},
-          token: bob);
-      final (_, again) = await call('GET', '/places/place-kebap/reviews');
-      expect((again as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob').regular, isTrue,
-          reason: '$regularVisits check-ins make a regular');
+      expect(await bobIsRegular(), isFalse);
+      await db.execute("UPDATE visits SET created_at = now() - interval '1 day' WHERE id = '33333333-2222-4333-8444-555555555556'");
+      expect(await bobIsRegular(), isFalse, reason: 'two days');
+      await db.execute("UPDATE visits SET created_at = now() - interval '2 days' WHERE id = '33333333-2222-4333-8444-555555555557'");
+      expect(await bobIsRegular(), isTrue, reason: 'check-ins on $regularVisits days make a regular');
       final (_, feedAgain) = await call('GET', '/feed', token: anna);
       expect(FeedPage.fromJson(feedAgain as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review).regular, isTrue);
     });
@@ -800,8 +803,16 @@ void main() {
       expect(poster, contains('<svg'));
       expect(poster, contains('https://doener.test/b/place-kebap'));
 
-      expect((await page('/b/place-unknown')).$1, 404);
+      final (unknownStatus, unknown) = await page('/b/place-unknown');
+      expect(unknownStatus, 200, reason: 'a poster outlives the 30-day cache; the app loads the shop again');
+      expect(unknown, allOf(contains('href="/app?review=place-unknown"'), isNot(contains('Ortsdaten'))));
+      expect((await page('/b/%3Cscript%3E')).$1, 404);
       expect((await page('/aushang/%3Cscript%3E')).$1, 404);
+
+      expect((await call('GET', '/places/place-gone')).$1, 404, reason: 'Google only for signed-in users');
+      final (plakat, _) = await signUp('poster@example.org', 'Plakat');
+      final (status2, gone) = await call('GET', '/places/place-gone', token: plakat);
+      expect((status2, gone['name']), (200, 'Kebap Haus'));
     });
   });
 

@@ -21,6 +21,7 @@
 - TestFlight-Release (iOS) nur auf Anstoß, weil macOS-Minuten 10-fach zählen: Tag pushen (`git tag v1.2.3 && git push origin v1.2.3`) oder `gh workflow run Mobile`, beides baut iOS und Android. Nur Android: `gh workflow run Mobile -f platform=android`.
 - Android liefert zwei Artefakte: `doener-android-aab` für Play und `doener-android-apk` (signiert mit dem Upload-Key) zum direkten Verschicken an Tester. Der Upload in den internen Play-Test läuft erst, wenn die Repo-Variable `PLAY_UPLOAD=true` gesetzt ist, also nach dem ersten Upload von Hand in der Play Console.
 - Prüfen: `gh run watch`. Der Deploy-Job ist erst grün, wenn `https://doener-api.pleasance.org/api/v1/health` den Commit als `revision` meldet.
+- Nach grünem Deploy fotografiert `tool/screenshots.mjs` die Landingpage (`/`, `/en`, Desktop und Handy) nach `docs/screenshots/` als WebP, der Bot committet geänderte Bilder mit `[skip ci]` auf `main`. Danach meldet der Job `notify` den Deploy per `repository_dispatch` `prototype-deployed` an `robinchoice/pleasance` (Secret `PLEASANCE_DISPATCH_TOKEN`). `/app` bleibt draußen, es braucht ein Login. Wegen des Bot-Commits vor dem nächsten Push holen. Lokal: `npm install --no-save --prefix tool playwright && node tool/screenshots.mjs [url]`.
 
 ## Fallen
 

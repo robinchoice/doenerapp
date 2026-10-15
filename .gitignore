@@ -17,3 +17,6 @@ app/ios/Flutter/Secrets.xcconfig
 
 # Library package — consumers resolve their own versions
 packages/doener_models/pubspec.lock
+
+# Screenshot tool (tool/screenshots.mjs)
+tool/node_modules/

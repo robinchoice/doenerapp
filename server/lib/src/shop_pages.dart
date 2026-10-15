@@ -108,7 +108,9 @@ Future<Response> sealPage(Deps deps, Request request, String placeId) async {
   final place = await _place(deps, placeId);
   final awards = place == null ? const <AwardDto>[] : await latestAwards(deps.db, placeId);
   if (awards.isEmpty) {
-    return _html(404, '<title>Kein Siegel</title></head><body><main><h1>Dieser Laden hat kein Siegel</h1></main></body>');
+    return request.url.queryParameters['lang'] == 'en'
+        ? _html(404, '<title>No seal</title></head><body><main><h1>This shop has no seal</h1></main></body>', lang: 'en')
+        : _html(404, '<title>Kein Siegel</title></head><body><main><h1>Dieser Laden hat kein Siegel</h1></main></body>');
   }
   final english = request.url.queryParameters['lang'] == 'en';
   final link = '${_base(deps, request)}/b/$placeId';
@@ -124,7 +126,7 @@ Future<Response> sealPage(Deps deps, Request request, String placeId) async {
   .seal { display: block; width: 150mm; max-width: 100%; height: auto; margin: 0 0 10mm; }
   p { color: #5E5E66; font-size: 0.9rem; }
   a { color: inherit; }
-  button { margin: 8px 12px 0 0; padding: 12px 24px; border: 0; border-radius: 12px; background: #17171A; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  button { margin: 8px 12px 0 0; padding: 12px 24px; border: 0; border-radius: 12px; background: #17171A; color: #fff; font: 600 1rem system-ui, sans-serif; cursor: pointer; }
   @media print { p, button { display: none; } main { padding: 0; } }
 </style>
 </head>
@@ -143,17 +145,19 @@ ${[for (final a in awards) _sealSvg(a, link, english: english)].join('\n')}
 String _sealSvg(AwardDto award, String link, {required bool english}) {
   final vegan = award.category == BestOfCategory.vegan;
   final id = award.category.name;
-  final (glow, deep) = vegan
-      ? (['#BCC768', '#94CB7B', '#6CCF8E'], ['#5D6420', '#3D6732', '#1D6A44'])
-      : (['#F6A94A', '#F3BA4D', '#D7C45B'], ['#965410', '#8B5D0A', '#726214']);
+  // The year takes the middle deep tone: a gradient on a tspan spoils Chrome's print.
+  final (glow, year) = vegan ? (['#BCC768', '#94CB7B', '#6CCF8E'], '#3D6732') : (['#F6A94A', '#F3BA4D', '#D7C45B'], '#8B5D0A');
   String gradient(String name, List<String> stops) => '<linearGradient id="$name-$id" x1="0" y1="1" x2="1" y2="0">'
       '<stop offset="0" stop-color="${stops[0]}"/><stop offset=".5" stop-color="${stops[1]}"/><stop offset="1" stop-color="${stops[2]}"/></linearGradient>';
   final city = award.city.toUpperCase();
   final head = vegan
       ? (english ? 'VEGAN RANKING $city' : 'VEGAN-RANKING $city')
       : (english ? 'DÖNER RANKING $city' : 'DÖNER-RANKING $city');
-  // Long city names are squeezed so the line doesn't run into the QR code.
+  // Long city names are squeezed so the lines don't run into the QR code; rank and
+  // year always are, in case the display font is missing.
   final fit = head.length > 28 ? ' textLength="250" lengthAdjust="spacingAndGlyphs"' : '';
+  final origin = english ? 'Rated by people in ${award.city}' : 'Bewertet von Leuten aus ${award.city}';
+  final fitOrigin = origin.length > 36 ? ' textLength="232" lengthAdjust="spacingAndGlyphs"' : '';
   final score = formatScore(award.average, english: english);
   final stats = english
       ? 'Avg. $score from ${award.count} reviews in ${award.year}'
@@ -162,14 +166,14 @@ String _sealSvg(AwardDto award, String link, {required bool english}) {
   const display = 'font-family="Bricolage, Arial Narrow, sans-serif" font-weight="800" font-stretch="78%"';
   final label = english ? 'No. ${award.rank} in ${award.city} ${award.year}' : _awardText(award);
   return '''<svg class="seal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 160" role="img" aria-label="${_escape.convert(label)}">
-<defs>${gradient('glow', glow)}${gradient('deep', deep)}${gradient('tile', const ['#F6A94A', '#F3BA4D', '#D7C45B'])}<clipPath id="clip-$id"><rect width="480" height="160" rx="14"/></clipPath></defs>
+<defs>${gradient('glow', glow)}${gradient('tile', const ['#F6A94A', '#F3BA4D', '#D7C45B'])}<clipPath id="clip-$id"><rect width="480" height="160" rx="14"/></clipPath></defs>
 <g clip-path="url(#clip-$id)"><rect width="480" height="160" fill="#F4F4F1"/><rect y="154" width="480" height="6" fill="url(#glow-$id)"/></g>
 <rect x="18" y="18" width="58" height="58" rx="14" fill="#121117"/>
 <g transform="translate(18,18) scale(.58)"><path d="M41 26H59M32 33H68Q66 54 59 67H41Q34 54 32 33ZM50 67V74" fill="none" stroke="url(#tile-$id)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></g>
 <text x="94" y="36" $display font-size="15" letter-spacing="1.5" fill="#5E5E66"$fit>${_escape.convert(head)}</text>
-<text x="92" y="94" $display font-size="60" fill="#17171A">${english ? 'No.' : 'Platz'} ${award.rank}<tspan dx="12" fill="url(#deep-$id)">${award.year}</tspan></text>
+<text x="92" y="94" $display font-size="57" fill="#17171A" textLength="244" lengthAdjust="spacingAndGlyphs">${english ? 'No.' : 'Platz'} ${award.rank}<tspan dx="12" fill="$year">${award.year}</tspan></text>
 <text x="94" y="120" font-family="system-ui, sans-serif" font-size="13" fill="#17171A">${_escape.convert(stats)}</text>
-<text x="94" y="139" font-family="system-ui, sans-serif" font-size="11.5" fill="#5E5E66">${_escape.convert(english ? 'Rated by people in ${award.city}' : 'Bewertet von Leuten aus ${award.city}')}</text>
+<text x="94" y="139" font-family="system-ui, sans-serif" font-size="11.5" fill="#5E5E66"$fitOrigin>${_escape.convert(origin)}</text>
 <svg x="358" y="12" width="106" height="106" viewBox="0 0 ${qr.size} ${qr.size}" shape-rendering="crispEdges"><rect width="${qr.size}" height="${qr.size}" fill="#fff"/><path d="${qr.path}" fill="#17171A"/></svg>
 <text x="411" y="138" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#17171A">${english ? 'Scan &amp; rate it' : 'Scannen &amp; mitbewerten'}</text>
 </svg>''';

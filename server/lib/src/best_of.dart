@@ -116,6 +116,9 @@ Future<BestOfDto?> latestBestOf(Session db, String city, BestOfCategory category
   );
 }
 
+String _thousands(int n, {required bool english}) =>
+    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => english ? ',' : '.');
+
 String formatScore(double value, {required bool english}) {
   final text = value.toStringAsFixed(1);
   return english ? text : text.replaceAll('.', ',');
@@ -177,11 +180,11 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
       sections.write('<div class="win"><span class="n num ${vegan ? 'v' : ''}">${r['rank']}</span><div>'
           '<h3 class="display">${_escape.convert(r['name'] as String)}</h3>'
           '<p class="muted">${r['address'] == null ? '' : '${_escape.convert(r['address'] as String)} · '}'
-          'Ø ${formatScore(r['average'] as double, english: english)} · ${r['count']} ${t('Bewertungen', 'reviews')}</p>'
+          '${t('Ø', 'Avg.')} ${formatScore(r['average'] as double, english: english)} · ${r['count']} ${t('Bewertungen', 'reviews')}</p>'
           '${q == null ? '' : '<q>${_escape.convert(q)}</q>'}</div></div>');
     }
     if (entries.length > bestOfAwardedRanks) {
-      sections.write('<details><summary>${t('Plätze', 'Places')} ${bestOfAwardedRanks + 1}–${entries.length}</summary>');
+      sections.write('<details><summary>${t('Plätze', 'Ranks')} ${bestOfAwardedRanks + 1}–${entries.length}</summary>');
       for (final r in entries.skip(bestOfAwardedRanks)) {
         sections.write('<div class="row"><span class="num muted">${r['rank']}</span><span>${_escape.convert(r['name'] as String)}</span>'
             '<span class="num">${formatScore(r['average'] as double, english: english)}</span></div>');
@@ -190,7 +193,9 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
     }
   }
 
-  final reviewCount = overall.fold<int>(0, (sum, r) => sum + (r['count'] as int));
+  final reviewCount = _thousands(overall.fold<int>(0, (sum, r) => sum + (r['count'] as int)), english: english);
+  final otherYears = await query(deps.db, 'SELECT DISTINCT year FROM best_of WHERE city = @city AND year <> @year:int4 ORDER BY year DESC',
+      {'city': city, 'year': year});
   final title = t('Die besten Döner in $city $year', 'The best döner in $city $year');
   final top = [for (final r in overall.take(bestOfAwardedRanks)) '${r['rank']}. ${r['name']}'].join(' · ');
   final base = deps.config.publicUrl ?? request.requestedUri.origin;
@@ -210,10 +215,11 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
 <link rel="alternate" hreflang="en" href="${_escape.convert(url)}?lang=en">''';
   final body = '''<h1 class="display">${_escape.convert(title)}</h1>
 <div class="rule"></div>
-<p class="lead muted">${overall.isEmpty ? '' : t('Aus $reviewCount Bewertungen. In der Wertung: ${overall.length} Läden mit mindestens $bestOfMinReviews Bewertungen aus $year.', 'From $reviewCount reviews. Ranked: ${overall.length} shops with at least $bestOfMinReviews reviews from $year.')}</p>
+<p class="lead muted">${overall.isEmpty ? '' : t('In der Wertung: ${overall.length} Läden mit mindestens $bestOfMinReviews Bewertungen aus $year, zusammen $reviewCount.', 'Ranked: ${overall.length} shops with at least $bestOfMinReviews reviews from $year, $reviewCount in all.')}</p>
 $sections
 <div class="method"><b>${t('So entsteht die Liste.', 'How the list is made.')}</b> ${t('Jede:r bewertet einmal pro Laden, eine neue Bewertung ersetzt die alte. Gezählt werden die Bewertungen aus $year, ein Laden braucht mindestens $bestOfMinReviews davon. Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit $rankingPriorWeight gedachten Bewertungen in Höhe des Stadtschnitts, so schlägt eine einzelne 5 nicht viele 4,5er. Angezeigt werden der echte Schnitt und die Anzahl. Ob jemand wirklich dort gegessen hat, prüfen wir nicht. Läden können sich keinen Platz kaufen. Zitate stammen aus Bewertungen, ohne Namen.', 'One review per person and shop; a new one replaces the old. Reviews from $year count, a shop needs at least $bestOfMinReviews of them. Sorted by weighted average: each shop starts with $rankingPriorWeight imagined reviews at the city average, so a single 5 can\'t beat many 4.5s. Shown are the real average and count. We don\'t check whether someone really ate there. Shops can\'t buy a place. Quotes come from reviews, without names.')}</div>
 <div class="ctas"><a class="btn btn-main" href="/app">${t('Selbst bewerten', 'Rate a shop')}</a><button class="btn btn-ghost" id="share" type="button">${t('Teilen', 'Share')}</button></div>
+${otherYears.isEmpty ? '' : '<p class="years">${t('Frühere Jahre', 'Earlier years')}: ${[for (final y in otherYears) '<a href="${bestOfPath(city, y['year'] as int)}${english ? '?lang=en' : ''}">${y['year']}</a>'].join(' · ')}</p>'}
 <p class="source muted">${t('Ortsdaten: Google Maps', 'Place data: Google Maps')}</p>
 <script>
   document.getElementById('share').addEventListener('click', async (e) => {
@@ -273,6 +279,7 @@ summary { cursor: pointer; padding: 8px 0; }
 .btn-main { background: var(--grad); color: var(--ink); }
 .btn-ghost { background: transparent; color: inherit; box-shadow: inset 0 0 0 1.5px currentColor; }
 .source { font-size: 12px; margin-top: 20px; }
+.years { margin-top: 24px; }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0 40px; margin-top: 40px; flex-wrap: wrap; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
 .sender { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .sender span { font-family: Bricolage, "Arial Narrow", sans-serif; font-weight: 650; font-stretch: 80%; }

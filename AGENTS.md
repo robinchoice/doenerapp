@@ -19,6 +19,7 @@
 
 - Ein Push auf `main`, der `server/`, `packages/`, `app/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
 - `mobile.yml` baut die iOS-App für TestFlight und die Android-App für den internen Play-Test bei jedem Push auf `main`, der `app/`, `packages/` oder `mobile.yml` ändert. Das Repo ist öffentlich, die Actions-Minuten kosten nichts.
+- Externe Tester (TestFlight-Gruppe „Erste Tester“, Public Link) bekommen nicht jeden Build: TestFlight mailt allen bei jedem Build, der der Gruppe zugeordnet wird. Zugeordnet und zur Beta-Prüfung eingereicht wird nur der Build eines Release-Tags `v*`, und den setzt ein Agent nur auf Robins Anstoß. Alle anderen Builds landen nur in der internen Gruppe „Doener App Pioniere“.
 - Außerdem bei Tags `v*` und von Hand: `gh workflow run Mobile` baut iOS und Android, `gh workflow run Mobile -f platform=android` nur Android.
 - Android liefert zwei Artefakte: `doener-android-aab` für Play und `doener-android-apk` (signiert mit dem Upload-Key) zum direkten Verschicken an Tester. Der Upload in den internen Play-Test läuft erst, wenn die Repo-Variable `PLAY_UPLOAD=true` gesetzt ist, also nach dem ersten Upload von Hand in der Play Console.
 - Prüfen: `gh run watch`. Der Deploy-Job ist erst grün, wenn `https://doener-api.pleasance.org/api/v1/health` den Commit als `revision` meldet.

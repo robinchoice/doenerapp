@@ -43,14 +43,15 @@ class FakeAppStoreConnect {
           ],
         }),
       ('POST', '/betaGroups/g-ext/relationships/betaTesters') => http.Response('', 204),
+      ('GET', '/builds') when request.url.queryParameters['filter[version]'] != '35' => _json({'data': []}),
       ('GET', '/builds') when request.url.queryParameters.containsKey('filter[betaGroups]') => _json({
           'data': [
-            buildInGroup ? {'id': 'b35'} : {'id': 'b34'},
+            if (buildInGroup) {'id': 'b35'},
           ],
         }),
       ('GET', '/builds') => _json({
           'data': [
-            {'id': 'b35', 'attributes': {'version': '35', 'processingState': processingState, 'expired': false}},
+            {'id': 'b35', 'attributes': {'version': '35', 'processingState': processingState}},
           ],
         }),
       ('POST', '/betaGroups/g-ext/relationships/builds') => () {
@@ -94,16 +95,22 @@ void main() {
     expect(apple.requests.last, 'POST /betaGroups/g-ext/relationships/betaTesters');
   });
 
-  test('hands the newest processed build to the group once', () async {
+  test('hands a release build to the group once processed, and retries a failed review', () async {
+    expect(await testFlight.distributeBuild('36'), isFalse, reason: 'not uploaded yet');
     apple.processingState = 'PROCESSING';
-    expect(await testFlight.distributeNewestBuild(), isNull, reason: 'not processed yet');
+    expect(await testFlight.distributeBuild('35'), isFalse, reason: 'not processed yet');
+    expect(apple.buildInGroup, isFalse);
+
     apple.processingState = 'VALID';
     apple.reviewFails = true;
-    await expectLater(testFlight.distributeNewestBuild(), throwsA(isA<http.ClientException>()));
+    await expectLater(testFlight.distributeBuild('35'), throwsA(isA<http.ClientException>()));
     expect(apple.buildInGroup, isTrue);
     apple.reviewFails = false;
-    expect(await testFlight.distributeNewestBuild(), '35', reason: 'the failed review is submitted on the next run');
+    expect(await testFlight.distributeBuild('35'), isTrue);
     expect(apple.submitted, isTrue);
-    expect(await testFlight.distributeNewestBuild(), isNull, reason: 'in the group and in review already');
+
+    final before = apple.requests.length;
+    expect(await testFlight.distributeBuild('35'), isTrue);
+    expect(apple.requests.skip(before).where((r) => r.startsWith('POST')), isEmpty, reason: 'nothing to do twice');
   });
 }

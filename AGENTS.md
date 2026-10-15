@@ -4,7 +4,7 @@
 
 - Döner-Community für iOS, Android und Web aus einer Flutter-Codebase, Server in Dart. Web und API laufen unter https://doener-api.pleasance.org (Landingpage unter `/` und `/en`, API unter `/api/v1`, Web-App unter `/app`).
 - Coolify auf VPS 1, Projekt `pleasance-doener`, Datenbank `doener-db`.
-- Öffentlicher TestFlight-Link: https://testflight.apple.com/join/nJJ5wARs (externe Gruppe „Erste Tester“). Er steht als `APP_DOWNLOAD_URL` in Coolify und in der Mail einer Einladung ohne Android. `/i/<code>` und `/b/<placeId>` führen statt dorthin zur Bewerbung, weil ohne Konto nichts geht. Neue Builds gibt der Server selbst in die Gruppe (Schedule `testflight`), nach Apples Beta-Prüfung.
+- Öffentlicher TestFlight-Link: https://testflight.apple.com/join/nJJ5wARs (externe Gruppe „Erste Tester“). Er steht als `APP_DOWNLOAD_URL` in Coolify und in der Mail einer Einladung ohne Android. `/i/<code>` und `/b/<placeId>` führen statt dorthin zur Bewerbung, weil ohne Konto nichts geht.
 - Fachliche Regeln und der geplante Umbau: README.md.
 
 ## Checks
@@ -19,7 +19,7 @@
 
 - Ein Push auf `main`, der `server/`, `packages/`, `app/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
 - `mobile.yml` baut die iOS-App für TestFlight und die Android-App für den internen Play-Test bei jedem Push auf `main`, der `app/`, `packages/` oder `mobile.yml` ändert. Das Repo ist öffentlich, die Actions-Minuten kosten nichts.
-- Externe Tester (TestFlight-Gruppe „Erste Tester“, Public Link) bekommen nicht jeden Build: TestFlight mailt allen bei jedem Build, der der Gruppe zugeordnet wird. Zugeordnet und zur Beta-Prüfung eingereicht wird nur der Build eines Release-Tags `v*`, und den setzt ein Agent nur auf Robins Anstoß. Alle anderen Builds landen nur in der internen Gruppe „Doener App Pioniere“.
+- Externe Tester (TestFlight-Gruppe „Erste Tester“, Public Link) bekommen nicht jeden Build: TestFlight mailt allen bei jedem Build, der der Gruppe zugeordnet wird. Zugeordnet und zur Beta-Prüfung eingereicht wird nur der Build eines Release-Tags `v*` (Job `testflight-release` in `mobile.yml`, `server/tool/testflight_release.dart`), und den setzt ein Agent nur auf Robins Anstoß. Alle anderen Builds landen nur in der internen Gruppe „Doener App Pioniere“.
 - Außerdem bei Tags `v*` und von Hand: `gh workflow run Mobile` baut iOS und Android, `gh workflow run Mobile -f platform=android` nur Android.
 - Android liefert zwei Artefakte: `doener-android-aab` für Play und `doener-android-apk` (signiert mit dem Upload-Key) zum direkten Verschicken an Tester. Der Upload in den internen Play-Test läuft erst, wenn die Repo-Variable `PLAY_UPLOAD=true` gesetzt ist, also nach dem ersten Upload von Hand in der Play Console.
 - Prüfen: `gh run watch`. Der Deploy-Job ist erst grün, wenn `https://doener-api.pleasance.org/api/v1/health` den Commit als `revision` meldet.
@@ -37,6 +37,6 @@
 ## Abweichungen vom Standard
 
 - Registrierung: Neue Konten nur über `SIGNUP_ALLOWLIST` und Robins Freischaltung (Profil → Tester statt `/invite`, Bewerbungen von der Landingpage). Freundes-Links verbinden nur bestehende Konten, damit Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026, nimmt die vom Vormittag zurück). Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`.
-- TestFlight läuft über den Server statt die CI (kostet keine macOS-Minuten): Schedule `testflight` verteilt neue Builds, das Freischalten lädt iPhones ein. Der App-Store-Connect-Key liegt dafür auch in Coolify (`ASC_*`).
+- TestFlight: Das Freischalten unter Profil → Tester lädt iPhones über die App Store Connect API in „Erste Tester“ ein, der Key liegt dafür auch in Coolify (`ASC_*`).
 
 - Zeitpläne laufen in der API statt in einem eigenen Worker: Jede Instanz fragt jede Minute `runSchedule` (Tabelle `schedules`), der atomare Claim lässt genau eine den Job ausführen. Ein neuer Job bekommt seine Zeile per Migration. Ein Worker als zweite Coolify-Anwendung bräuchte Kopien von DB-Zugang und Google-Key, die Agenten über die Coolify-API nicht lesen können.

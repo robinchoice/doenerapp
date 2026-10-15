@@ -9,7 +9,7 @@ const _api = 'https://api.appstoreconnect.apple.com/v1';
 const bundleId = 'com.robinchoice.doener';
 
 /// App Store Connect API for the external TestFlight group ([AscConfig.group]):
-/// invites iPhone testers and hands every new build to the group.
+/// invites iPhone testers and hands release builds to the group.
 class TestFlight {
   final AscConfig config;
   final http.Client client;
@@ -73,29 +73,27 @@ class TestFlight {
     if (added.statusCode != 204) throw http.ClientException('TestFlight group: ${added.statusCode} ${added.body}');
   }
 
-  /// Gives the newest processed build to the group and submits it for the beta
-  /// review while it still waits for one. Apple lets further builds of an
-  /// approved version through at once. Both steps are checked on every run, so
-  /// one that failed is tried again. Returns the build number if it did something.
-  Future<String?> distributeNewestBuild() async {
+  /// Gives build [number] (CFBundleVersion) to the group and submits it for the
+  /// beta review while it still waits for one; every assignment mails all
+  /// testers, so only release builds come here (see `tool/testflight_release.dart`).
+  /// Both steps are checked first, so a run that failed halfway can be repeated.
+  /// Returns false while Apple is still processing the build.
+  Future<bool> distributeBuild(String number) async {
     final appId = await _appId();
-    final builds = (await _get('/builds', {'filter[app]': appId, 'sort': '-uploadedDate', 'limit': '1'}))['data'] as List;
-    if (builds.isEmpty) return null;
+    final builds = (await _get('/builds', {'filter[app]': appId, 'filter[version]': number, 'limit': '1'}))['data'] as List;
+    if (builds.isEmpty) return false;
     final build = builds.first as Map<String, dynamic>;
-    final attributes = build['attributes'] as Map<String, dynamic>;
-    if (attributes['processingState'] != 'VALID' || attributes['expired'] == true) return null;
+    if ((build['attributes'] as Map)['processingState'] != 'VALID') return false;
     final group = await _groupId(appId);
-    var acted = false;
 
-    final newestInGroup = (await _get('/builds', {'filter[app]': appId, 'filter[betaGroups]': group, 'sort': '-uploadedDate', 'limit': '1'}))['data'] as List;
-    if (newestInGroup.isEmpty || newestInGroup.first['id'] != build['id']) {
+    final inGroup = (await _get('/builds', {'filter[app]': appId, 'filter[version]': number, 'filter[betaGroups]': group}))['data'] as List;
+    if (inGroup.isEmpty) {
       final added = await _send('POST', '/betaGroups/$group/relationships/builds', body: {
         'data': [
           {'type': 'builds', 'id': build['id']},
         ],
       });
       if (added.statusCode != 204) throw http.ClientException('TestFlight build: ${added.statusCode} ${added.body}');
-      acted = true;
     }
 
     final detail = (await _get('/builds/${build['id']}/buildBetaDetail'))['data']['attributes'] as Map<String, dynamic>;
@@ -111,8 +109,7 @@ class TestFlight {
         },
       });
       if (review.statusCode != 201) throw http.ClientException('TestFlight review: ${review.statusCode} ${review.body}');
-      acted = true;
     }
-    return acted ? attributes['version'] as String? : null;
+    return true;
   }
 }

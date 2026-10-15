@@ -50,17 +50,6 @@ Future<void> startServer() async {
       print('Best-of lists failed: $error');
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
-    final asc = config.asc;
-    if (asc == null) return;
-    try {
-      await runSchedule(db, 'testflight', const Duration(minutes: 30), () async {
-        final build = await TestFlight(asc, deps.httpClient).distributeNewestBuild();
-        if (build != null) print('TestFlight: build $build goes to ${asc.group}');
-      });
-    } catch (error, stackTrace) {
-      print('TestFlight distribution failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
   }
   unawaited(runDueJobs());
   Timer.periodic(const Duration(minutes: 1), (_) => runDueJobs());

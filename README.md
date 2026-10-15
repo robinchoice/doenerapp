@@ -20,7 +20,7 @@ Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der S
 - Login: E-Mail-Code bzw. Magic-Link, kein Passwort; Pflicht, samt eigenem Anzeigenamen statt „Döner-Fan-1234“
 - Registrierung geschlossen wie in starter („Registrierung öffnen“): Bestehende Konten melden sich an, neue nur über `SIGNUP_ALLOWLIST` oder eine Einladung von Robin (Profil → Tester, für `ADMIN_EMAILS`). Der Einladungslink eines Freundes verbindet nur bestehende Konten, so können Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026). Wer kein Konto hat, bewirbt sich auf der Landingpage. Dorthin führen die Einladungsseite, die Bewertungsseite `/b/` und die Meldung beim Login; die Bewerbung merkt sich, über wessen Link sie kam. Wer vor der Schließung (15.10.2026, 16:30) über die Landingpage um einen Test gebeten hat, kommt ebenfalls herein, bis die Anfrage nach 90 Tagen gelöscht ist. Fremde bekommen eine Meldung auf Deutsch und Englisch, es geht keine Mail raus. Geöffnet wird mit `SIGNUP_OPEN=true`, das entscheidet Robin.
 - Freischalten: Unter Profil → Tester sieht Robin die Bewerbungen. „Freischalten“ legt das Konto an, schickt die Login-Mail und bei iPhones die TestFlight-Einladung in die externe Gruppe „Erste Tester“ (App Store Connect API, `ASC_*`). Wer über den Link eines Freundes kam, ist danach mit ihm befreundet. Ablehnen löscht die Anfrage ohne Mail. Android-Tester bekommen die APK bzw. später den Play-Test-Link per Antwort auf die Anfrage-Mail
-- Neue iOS-Builds: Alle 30 Minuten gibt der Server den neuesten verarbeiteten Build an „Erste Tester“ und reicht ihn zur Beta-Prüfung ein (Schedule `testflight`). Weitere Builds einer freigegebenen Version lässt Apple sofort durch, TestFlight aktualisiert bei den Testern von selbst.
+- Neue iOS-Builds: Nur Release-Tags `v*` gehen an die externen Tester, weil jede Zuordnung allen eine Mail schickt. Der Job `testflight-release` in `mobile.yml` wartet, bis Apple den Build verarbeitet hat, gibt ihn an „Erste Tester“ und reicht ihn zur Beta-Prüfung ein (`server/tool/testflight_release.dart`). Weitere Builds einer freigegebenen Version lässt Apple sofort durch, TestFlight aktualisiert bei den Testern von selbst.
 
 ---
 
@@ -304,7 +304,7 @@ cd app && flutter test
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
 | `APP_DOWNLOAD_URL` | – | App-Link in der Mail einer Admin-Einladung |
-| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` | – | App-Store-Connect-Key (`.p8` als Base64) für TestFlight-Einladungen und die Verteilung neuer Builds; ohne bleibt TestFlight Handarbeit |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` | – | App-Store-Connect-Key (`.p8` als Base64) für TestFlight-Einladungen beim Freischalten; ohne bleibt das Handarbeit |
 | `TESTFLIGHT_GROUP` | `Erste Tester` | Externe TestFlight-Gruppe |
 | `FEEDBACK_EMAIL` | – | Empfänger der Tester-Meldungen und Testanfragen; ohne werden sie nur gespeichert |
 | `SIGNUP_OPEN` | – (lokale Compose: `true`) | `true` öffnet die Registrierung für alle, nur nach Robins Go |

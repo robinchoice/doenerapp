@@ -29,6 +29,22 @@ const _appSiteAssociation = {
   },
 };
 
+/// Lets Android open invite and review links in the installed app (App Links).
+/// The fingerprint is the upload key, which signs the APK sent to testers by hand.
+/// Once the app is on Play, add the app signing key from the Play Console.
+const _assetLinks = [
+  {
+    'relation': ['delegate_permission/common.handle_all_urls'],
+    'target': {
+      'namespace': 'android_app',
+      'package_name': 'com.robinchoice.doener',
+      'sha256_cert_fingerprints': [
+        '79:10:D1:31:7D:E1:F6:1A:B8:4A:1D:65:5B:14:A2:8B:29:52:0D:CA:6A:61:76:16:40:A5:B2:F1:86:22:FF:FF',
+      ],
+    },
+  },
+];
+
 /// API under `/api/v1`, the landing page under `/` and `/en`, the Flutter web
 /// build (if present) everywhere else, e.g. `/app`.
 Handler buildHandler(Deps deps) {
@@ -58,7 +74,8 @@ Handler buildHandler(Deps deps) {
     ..get('/b/<placeId>', (Request request, String placeId) => reviewLinkPage(deps, request, placeId))
     ..get('/aushang/<placeId>', (Request request, String placeId) => posterPage(deps, request, placeId))
     ..get('/datenschutz', privacyPage)
-    ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation));
+    ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation))
+    ..get('/.well-known/assetlinks.json', (Request _) => json(_assetLinks));
 
   final webDir = Directory(deps.config.webDir);
   if (webDir.existsSync()) {

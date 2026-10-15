@@ -43,6 +43,19 @@ void main() {
     ]);
   });
 
+  test('Android finds the app for invite and review links', () async {
+    final config = Config(database: Endpoint(host: 'localhost', port: 1, database: 'doener'), webDir: '/nonexistent');
+    final db = openPool(config);
+    addTearDown(db.close);
+    final handler = buildHandler(Deps(db: db, config: config, mailer: LogMailer(), httpClient: http.Client()));
+    final response = await handler(Request('GET', Uri.parse('http://localhost/.well-known/assetlinks.json')));
+    expect(response.statusCode, 200);
+    expect(response.mimeType, 'application/json');
+    final target = (jsonDecode(await response.readAsString()) as List).single['target'];
+    expect(target['package_name'], 'com.robinchoice.doener');
+    expect(target['sha256_cert_fingerprints'], isNotEmpty);
+  });
+
   test('tiles cover the requested box', () {
     final tiles = tilesCovering(minLat: 47.99, minLon: 7.83, maxLat: 48.02, maxLon: 7.86);
     expect(tiles, hasLength(4));

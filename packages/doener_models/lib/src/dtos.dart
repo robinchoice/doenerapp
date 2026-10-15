@@ -288,6 +288,9 @@ class PlaceSummaryDto {
 
 // MARK: - Review
 
+/// Days with a check-in at a place that make the reviewer a regular there.
+const regularVisits = 3;
+
 /// [rating] is the Döner score, derived from sauce, meat and bread — null for
 /// reviews about other food. Facts like [veganOptions] describe the place.
 class ReviewDto {
@@ -309,8 +312,9 @@ class ReviewDto {
   /// Served at `/photos/<photoId>`; a new photo gets a new id.
   final String? photoId;
 
-  /// The reviewer has checked in at the place.
+  /// The reviewer has checked in at the place, as a [regular] on at least [regularVisits] days.
   final bool onSite;
+  final bool regular;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -331,6 +335,7 @@ class ReviewDto {
     this.text,
     this.photoId,
     this.onSite = false,
+    this.regular = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -356,6 +361,7 @@ class ReviewDto {
         text: j['text'] as String?,
         photoId: j['photoId'] as String?,
         onSite: j['onSite'] as bool? ?? false,
+        regular: j['regular'] as bool? ?? false,
         createdAt: _date(j['createdAt']),
         updatedAt: _date(j['updatedAt']),
       );
@@ -378,6 +384,7 @@ class ReviewDto {
         'text': text,
         'photoId': photoId,
         'onSite': onSite,
+        'regular': regular,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
       };
@@ -525,9 +532,10 @@ class FeedItem {
   final String? text;
   final String? foodType;
 
-  /// See [ReviewDto.photoId] and [ReviewDto.onSite].
+  /// See [ReviewDto.photoId], [ReviewDto.onSite] and [ReviewDto.regular].
   final String? photoId;
   final bool onSite;
+  final bool regular;
 
   const FeedItem({
     required this.id,
@@ -542,6 +550,7 @@ class FeedItem {
     this.foodType,
     this.photoId,
     this.onSite = false,
+    this.regular = false,
   });
 
   /// See [ReviewDto.headline].
@@ -560,6 +569,7 @@ class FeedItem {
         foodType: j['foodType'] as String?,
         photoId: j['photoId'] as String?,
         onSite: j['onSite'] as bool? ?? false,
+        regular: j['regular'] as bool? ?? false,
       );
 
   Json toJson() => {
@@ -576,6 +586,7 @@ class FeedItem {
         'foodType': foodType,
         'photoId': photoId,
         'onSite': onSite,
+        'regular': regular,
       };
 }
 

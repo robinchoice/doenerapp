@@ -1,5 +1,4 @@
 import 'package:doener_models/doener_models.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -120,6 +119,28 @@ class _StartScreenState extends State<StartScreen> {
     }
   }
 
+  Future<void> _review(String placeId) async {
+    try {
+      final place = await context.read<AppData>().place(placeId);
+      if (mounted) await showAppSheet(context, (_) => ReviewSheet(place: place));
+    } on OfflineException catch (e) {
+      if (mounted) showMessage(context, e.toString());
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message);
+    }
+  }
+
+  _Task _toReviewTask(AppData data, LocalVisit visit, Diet diet) {
+    final (title, message) = reminderText(visit.dto.placeName, data.reviews[visit.dto.placeId]?.dto.headline(diet));
+    return _Task(
+      icon: Icons.rate_review_outlined,
+      title: title,
+      message: message,
+      onTap: () => _review(visit.dto.placeId),
+      onClose: () => data.dismissToReview(visit),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
@@ -141,19 +162,9 @@ class _StartScreenState extends State<StartScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
     }
 
-    // The apps remind with a notification, the browser can't.
-    final due = kIsWeb ? data.reviewDue(DateTime.now()) : null;
-    final duePlace = due == null ? null : data.places[due.dto.placeId];
-    final dueText = duePlace == null ? null : reminderText(duePlace.name, data.reviews[duePlace.placeId]?.dto.headline(diet));
+    // Check-ins without a review since, from every device of the account.
     final tasks = [
-      if (duePlace != null)
-        _Task(
-          icon: Icons.rate_review_outlined,
-          title: dueText!.$1,
-          message: dueText.$2,
-          onTap: () => showAppSheet(context, (_) => ReviewSheet(place: duePlace)),
-          onClose: () => data.dismissReviewDue(due!),
-        ),
+      for (final visit in data.toReview(DateTime.now()).take(3)) _toReviewTask(data, visit, diet),
       if (data.reviews.isEmpty)
         _Task(
           icon: Icons.restaurant,
@@ -263,6 +274,7 @@ class _StartScreenState extends State<StartScreen> {
                     foodType: item.foodType,
                     photoId: item.photoId,
                     onSite: item.onSite,
+                    regular: item.regular,
                     highlight: item.fromFriend,
                   onTap: () => showPlaceDetail(context, item.place),
                 ),

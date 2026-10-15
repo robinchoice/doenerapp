@@ -11,9 +11,10 @@ import 'landing.dart';
 import 'places.dart';
 import 'privacy.dart';
 import 'ranking.dart';
+import 'shop_pages.dart';
 import 'social.dart';
 
-/// Lets iOS open invite links in the installed app instead of the browser (Universal Links).
+/// Lets iOS open invite and review links in the installed app instead of the browser (Universal Links).
 const _appSiteAssociation = {
   'applinks': {
     'details': [
@@ -21,6 +22,7 @@ const _appSiteAssociation = {
         'appIDs': ['T2F442364K.com.robinchoice.doener'],
         'components': [
           {'/': '/i/*'},
+          {'/': '/b/*'},
         ],
       },
     ],
@@ -53,6 +55,8 @@ Handler buildHandler(Deps deps) {
     ..get('/en', (Request request) => landingPage(request, english: true))
     ..get('/en/', (Request request) => landingPage(request, english: true))
     ..get('/i/<code>', (Request request, String code) => invitePage(deps, request, code))
+    ..get('/b/<placeId>', (Request request, String placeId) => reviewLinkPage(deps, request, placeId))
+    ..get('/aushang/<placeId>', (Request request, String placeId) => posterPage(deps, request, placeId))
     ..get('/datenschutz', privacyPage)
     ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation));
 

@@ -10,6 +10,7 @@ import '../../core/maps.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
+import 'rating_info.dart';
 
 /// Moving further than this can mean another city.
 const _reloadDistance = 1000.0;
@@ -74,7 +75,12 @@ class _RankingScreenState extends State<RankingScreen> {
             if (diet != Diet.vegan || e.place.veganOptions != false) e,
         ];
         return Scaffold(
-          appBar: AppBar(title: Text(city == null ? title : '$title $city')),
+          appBar: AppBar(
+            title: Text(city == null ? title : '$title $city'),
+            actions: [
+              IconButton(icon: const Icon(Icons.info_outline), tooltip: 'So funktionieren Bewertungen', onPressed: () => showRatingInfo(context)),
+            ],
+          ),
           body: RefreshIndicator(
             onRefresh: () async {
               setState(_load);

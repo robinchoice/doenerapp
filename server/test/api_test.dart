@@ -480,6 +480,23 @@ void main() {
       final (_, feed) = await call('GET', '/feed', token: anna);
       final item = FeedPage.fromJson(feed as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review);
       expect((item.photoId, item.onSite), (withCheckIn.photoId, true));
+      expect((withCheckIn.regular, item.regular), (false, false));
+
+      // A second check-in the same day doesn't count, two on earlier days do.
+      for (final (id, daysAgo) in [('33333333-2222-4333-8444-555555555556', 0), ('33333333-2222-4333-8444-555555555557', 1)]) {
+        await call('POST', '/places/place-kebap/visits',
+            body: {'id': id, 'visitedAt': DateTime.now().toUtc().subtract(Duration(days: daysAgo)).toIso8601String()}, token: bob);
+      }
+      final (_, sameDay) = await call('GET', '/places/place-kebap/reviews');
+      expect((sameDay as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob').regular, isFalse);
+      await call('POST', '/places/place-kebap/visits',
+          body: {'id': '33333333-2222-4333-8444-555555555558', 'visitedAt': DateTime.now().toUtc().subtract(const Duration(days: 2)).toIso8601String()},
+          token: bob);
+      final (_, again) = await call('GET', '/places/place-kebap/reviews');
+      expect((again as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.userName == 'Bob').regular, isTrue,
+          reason: '$regularVisits check-ins make a regular');
+      final (_, feedAgain) = await call('GET', '/feed', token: anna);
+      expect(FeedPage.fromJson(feedAgain as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review).regular, isTrue);
     });
 
     test('feedback and shop reports', () async {
@@ -764,6 +781,27 @@ void main() {
       final (missing, notFound) = await page('/i/%3Cscript%3E');
       expect(missing, 404);
       expect(notFound, isNot(contains('<script')));
+    });
+
+    test('review link and poster of a shop', () async {
+      Future<(int, String)> page(String path) async {
+        final response = await handler(Request('GET', Uri.parse('http://localhost$path')));
+        return (response.statusCode, await response.readAsString());
+      }
+
+      final (status, html) = await page('/b/place-kebap');
+      expect(status, 200);
+      expect(html, contains('Kebap Haus'));
+      expect(html, contains('href="/app?review=place-kebap"'));
+      expect(html, contains('Ortsdaten: Google Maps'));
+
+      final (posterStatus, poster) = await page('/aushang/place-kebap');
+      expect(posterStatus, 200);
+      expect(poster, contains('<svg'));
+      expect(poster, contains('https://doener.test/b/place-kebap'));
+
+      expect((await page('/b/place-unknown')).$1, 404);
+      expect((await page('/aushang/%3Cscript%3E')).$1, 404);
     });
   });
 

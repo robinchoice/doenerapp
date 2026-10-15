@@ -11,6 +11,8 @@ import '../../core/app_data.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../../core/maps.dart';
+import '../ranking/rating_info.dart';
+import '../social/friends.dart';
 import 'review_sheet.dart';
 
 Future<void> showPlaceDetail(BuildContext context, PlaceDto place) => showModalBottomSheet(
@@ -238,9 +240,12 @@ class _PlaceDetailState extends State<PlaceDetail> {
           ),
           _IngredientsCard(summary: summary, diet: diet),
         ],
-        if (_reviews.where((r) => r.userId != session.user?.id).toList() case final others when others.isNotEmpty) ...[
+        if (_othersFriendsFirst(session) case final others when others.isNotEmpty) ...[
           const SizedBox(height: 20),
-          SectionTitle(title: 'Bewertungen (${others.length})'),
+          SectionTitle(
+            title: 'Bewertungen (${others.length})',
+            trailing: IconButton(icon: const Icon(Icons.info_outline), tooltip: 'So funktionieren Bewertungen', onPressed: () => showRatingInfo(context)),
+          ),
           for (final r in others) Padding(padding: const EdgeInsets.only(bottom: 8), child: ReviewCard(review: r, showAuthor: true)),
         ],
         if (visits.isNotEmpty) ...[
@@ -297,8 +302,29 @@ class _PlaceDetailState extends State<PlaceDetail> {
           )
         else
           const GoogleAttribution(),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _openPoster(place),
+            icon: const Icon(Icons.qr_code_2),
+            label: const Text('Aushang zum Bewerten für den Laden'),
+          ),
+        ),
       ],
     );
+  }
+
+  /// Others' reviews, the friends' first — the ones that tell the user most.
+  List<ReviewDto> _othersFriendsFirst(Session session) {
+    final friendIds = {for (final f in context.watch<Friends>().accepted) f.user.id};
+    final others = _reviews.where((r) => r.userId != session.user?.id).toList();
+    return [...others.where((r) => friendIds.contains(r.userId)), ...others.where((r) => !friendIds.contains(r.userId))];
+  }
+
+  /// A poster with a QR code to the shop's review, to print and hang up there.
+  Future<void> _openPoster(PlaceDto place) async {
+    final uri = Uri.parse(context.read<Session>().apiBase).resolve('/aushang/${Uri.encodeComponent(place.placeId)}');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   /// The Döner with its sauce, meat and bread first, then everything else the
@@ -439,7 +465,7 @@ class ReviewCard extends StatelessWidget {
             children: [
               if (showAuthor) ...[Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(width: 8)],
               if (review.headline(diet) case final score?) DoenerRating(value: score, size: 14),
-              if (review.onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
+              if (review.onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: review.regular)],
               const Spacer(),
               if (onEdit != null) Icon(Icons.edit, size: 16, color: theme.colorScheme.outline),
             ],

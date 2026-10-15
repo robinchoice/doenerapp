@@ -32,7 +32,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Invite links open the app (App Links). app_links passes them on, not Flutter's router. -->
+            <!-- Invite and review links open the app (App Links). app_links passes them on, not Flutter's router. -->
             <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -42,6 +42,7 @@
                 <data android:host="doener-api.pleasance.org" />
                 <data android:host="doener-api.diespaetzles.lol" />
                 <data android:pathPrefix="/i/" />
+                <data android:pathPrefix="/b/" />
             </intent-filter>
         </activity>
         <!-- Check-in reminder (flutter_local_notifications). -->

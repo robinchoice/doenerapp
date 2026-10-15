@@ -44,7 +44,8 @@ Danach kommt ein Drehrad mit den Essenstypen, die zur Ernährung passen (Döner,
 - Check-ins werden sofort lokal gespeichert und über eine Sync-Queue an den Server geschickt
 - Die ID erzeugt der Client, deshalb entstehen bei Wiederholungen keine doppelten Besuche
 - Ein Check-in setzt für eine Stunde den Live-Status („isst gerade bei …“), aber nur wenn er wirklich gerade passiert
-- Eine halbe Stunde danach fragt eine lokale Benachrichtigung „Wie war's bei X?“, wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“. Ein Tipp öffnet den Bewertungsbogen. Wer vorher bewertet, wird nicht gefragt, ein späterer Check-in ersetzt die Erinnerung, und in den Einstellungen lässt sie sich abschalten. Dafür braucht es weder Server noch APNs. Browser können keine Benachrichtigungen planen, deshalb zeigt die Web-App die Frage bis 12 Stunden nach dem Check-in als Karte auf Start
+- Eine halbe Stunde danach fragt eine lokale Benachrichtigung „Wie war's bei X?“, wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“. Ein Tipp öffnet den Bewertungsbogen. Wer vorher bewertet, wird nicht gefragt, ein späterer Check-in ersetzt die Erinnerung, und in den Einstellungen lässt sie sich abschalten. Dafür braucht es weder Server noch APNs
+- Dieselbe Frage steht als Karte auf Start, auf allen Geräten und im Browser (der keine Benachrichtigungen planen kann): je Laden mit einem Check-in der letzten 14 Tage, der seitdem nicht bewertet wurde, ab einer halben Stunde nach dem Check-in, höchstens drei. Grundlage sind die synchronisierten eigenen Check-ins und Bewertungen, eine geschlossene Karte bleibt auf diesem Gerät zu
 
 ### Bewertungen
 
@@ -56,9 +57,10 @@ Ein Bogen, alle Punkte 1–5 in halben Schritten und optional. Ein Tipp auf die 
 - Expertenmodus (Einstellungen): fragt ab, was in „mit allem“ steckt (Salat, Besonderheiten wie Granatapfelkerne oder Mais, Soßen), dazu Fleisch, Spieß (selbst gesteckt oder Fertigspieß) und Brot. Vorausgefüllt mit dem, was andere angegeben haben
 - Eine Bewertung pro Nutzer und Laden, eine neue ersetzt die alte. Die Angaben (vegan, Ayran, Zutaten) hängen an der Bewertung, pro Laden zählt die Mehrheit
 - Optional ein Foto (Kamera oder Galerie, JPEG, PNG oder WebP bis 3 MB). Es bleibt beim Bearbeiten, bis es ersetzt oder entfernt wird, und wartet wie die Bewertung offline in der Queue. Der Server speichert es in Postgres, jedes neue Foto bekommt eine neue ID und ist darüber dauerhaft cachebar
-- Wer im Laden schon einmal eingecheckt hat, bekommt das Häkchen „vor Ort“. Der Server leitet es beim Lesen aus den Check-ins ab
+- Wer im Laden schon einmal eingecheckt hat, bekommt das Häkchen „vor Ort“, wer an mindestens drei verschiedenen Tagen eingecheckt hat, das Abzeichen „Stammgast“ (`regularVisits` in `packages/doener_models`). Der Server leitet beides beim Lesen aus den Check-ins ab
 - Durchschnitt und Anzahl berechnet der Server beim Lesen. Die Noten einer Bewertung (Döner, ohne Fleisch, vegan) leitet er beim Speichern aus den Punkten ab (`Diet.score` in `packages/doener_models`)
-- In der Laden-Ansicht: Chips für vegane Optionen, Ayran und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Expertenmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen
+- In der Laden-Ansicht: Chips für vegane Optionen, Ayran und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Expertenmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen, die von Freunden zuerst. Ein Info-Knopf dort und im Ranking erklärt, wer bewertet, was „vor Ort“ und „Stammgast“ prüfen und wie das Ranking sortiert (Pflichtangabe nach § 5b UWG)
+- Aushang für den Laden: Unten in der Laden-Ansicht öffnet „Aushang zum Bewerten“ eine Druckseite (`/aushang/<placeId>`) mit QR-Code. Er führt auf `/b/<placeId>`: Mit installierter App öffnet sich direkt deren Bewertungsbogen, sonst eine Seite, die in die Web-App führt (`/app?review=<placeId>`). Auch ohne Konto bleibt der Wunsch über Onboarding und Login erhalten
 
 ### Ernährung
 
@@ -203,7 +205,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/shop-reports` | Fehlenden Laden melden |
 | POST | `/tester-requests` | Testanfrage von der Landingpage, ohne Login |
 
-Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS diese Links in der App öffnet.
+Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/b/:placeId` die Bewertungsseite eines Ladens, unter `/aushang/:placeId` dessen Aushang mit QR-Code und unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS Einladungs- und Bewertungslinks in der App öffnet.
 
 ---
 
@@ -352,5 +354,5 @@ Skript über die Datenbank, Ziele nach 4 Wochen:
 ### Voraussetzungen und Offenes
 
 - APNs-Schlüssel im Apple-Developer-Konto (für Push) und ab 1.0 eine eigene Domain unabhängig von pleasance.org für Landingpage, Web-App und Links (dann auch in `Runner.entitlements` und im Android-Manifest eintragen)
-- Android-App-Links: Der Intent-Filter steht, es fehlt `/.well-known/assetlinks.json` mit dem SHA-256 des Release-Schlüssels. Bis dahin öffnen Einladungslinks auf Android den Browser, weil die CI ohne Keystore-Secrets mit wechselnden Debug-Keys signiert.
+- Android-App-Links: Der Intent-Filter steht, es fehlt `/.well-known/assetlinks.json` mit dem SHA-256 des Release-Schlüssels. Bis dahin öffnen Einladungs- und Bewertungslinks auf Android den Browser, weil die CI ohne Keystore-Secrets mit wechselnden Debug-Keys signiert.
 - Später: Bezirke für Großstädte. Falls Fakes auftauchen, zählen nur noch Bewertungen mit Häkchen voll.

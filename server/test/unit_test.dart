@@ -27,7 +27,7 @@ void main() {
     expect(Config.fromEnvironment({}).smtp, isNull);
   });
 
-  test('iOS finds the app for invite links', () async {
+  test('iOS finds the app for invite and review links', () async {
     final config = Config(database: Endpoint(host: 'localhost', port: 1, database: 'doener'), webDir: '/nonexistent');
     final db = openPool(config);
     addTearDown(db.close);
@@ -39,6 +39,7 @@ void main() {
     expect(details['appIDs'], ['T2F442364K.com.robinchoice.doener']);
     expect(details['components'], [
       {'/': '/i/*'},
+      {'/': '/b/*'},
     ]);
   });
 

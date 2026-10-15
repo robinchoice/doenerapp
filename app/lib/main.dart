@@ -50,6 +50,9 @@ Future<void> startApp() async {
   final linkToken = kIsWeb && Uri.base.path == '/login' ? Uri.base.queryParameters['token'] : null;
   final inviteFromLink = kIsWeb ? Uri.base.queryParameters['invite'] : null;
   if (inviteFromLink != null) await pendingInviteRecord.put(db, inviteFromLink);
+  // A shop's review link (https://…/b/<placeId>) leads here as ?review=<placeId>.
+  final reviewFromLink = kIsWeb ? Uri.base.queryParameters['review'] : null;
+  if (reviewFromLink != null) await data.requestReview(reviewFromLink);
   final inviteCode = await pendingInviteRecord.get(db) as String?;
   final invitePromptDone = await settingsStore.record('invitePromptDone').get(db) == true;
 

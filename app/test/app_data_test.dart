@@ -139,22 +139,40 @@ void main() {
     expect(restarted.reviews['p1']!.dto.photoId, 'ph1');
   });
 
-  test('half an hour after a check-in, the place is due for a review until it gets one', () async {
+  test('half an hour after a check-in, the place is to review until it gets one', () async {
+    server.mode = 'offline'; // the fake server only knows p1
     await data.checkIn(_place);
     final later = DateTime.now().add(const Duration(minutes: 31));
-    expect(data.reviewDue(DateTime.now()), isNull, reason: 'still eating');
-    expect(data.reviewDue(later)?.dto.placeId, 'p1');
-    expect(data.reviewDue(DateTime.now().add(const Duration(hours: 13))), isNull, reason: 'too long ago');
+    expect(data.toReview(DateTime.now()), isEmpty, reason: 'still eating');
+    expect(data.toReview(later).map((v) => v.dto.placeId), ['p1']);
+    expect(data.toReview(DateTime.now().add(const Duration(days: 15))), isEmpty, reason: 'too long ago');
 
-    await data.dismissReviewDue(data.reviewDue(later)!);
+    const other = PlaceDto(placeId: 'p2', name: 'Zweiter', latitude: 48.001, longitude: 7.85);
+    await data.checkIn(other);
+    await data.checkIn(_place);
+    expect(data.toReview(later).map((v) => v.dto.placeId), ['p1', 'p2'], reason: 'one card per place, latest first');
+
+    await data.dismissToReview(data.toReview(later).first);
     final restarted = AppData(db, session);
     await restarted.load();
-    expect(restarted.reviewDue(later), isNull, reason: 'closed stays closed');
+    expect(restarted.toReview(later).map((v) => v.dto.placeId), ['p2'], reason: 'closed stays closed');
 
     await data.checkIn(_place);
-    expect(data.reviewDue(later), isNotNull, reason: 'a new check-in asks again');
+    expect(data.toReview(later).map((v) => v.dto.placeId), ['p1', 'p2'], reason: 'a new check-in asks again');
     await data.saveReview(_place, const UpsertReviewRequest(ratings: {RatingItem.sauce: 4}));
-    expect(data.reviewDue(later), isNull);
+    expect(data.toReview(later).map((v) => v.dto.placeId), ['p2']);
+  });
+
+  test('a review asked for by link waits for the next start until taken', () async {
+    await data.requestReview('p1');
+    final restarted = AppData(db, session);
+    await restarted.load();
+    expect(restarted.reviewRequest.value, 'p1');
+    expect(await restarted.takeReviewRequest(), 'p1');
+    expect(await restarted.takeReviewRequest(), isNull);
+    final again = AppData(db, session);
+    await again.load();
+    expect(again.reviewRequest.value, isNull);
   });
 
   test('places within the check-in radius, nearest first', () async {

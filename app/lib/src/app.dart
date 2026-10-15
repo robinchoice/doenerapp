@@ -200,10 +200,13 @@ class _RootState extends State<_Root> {
   }
 
   /// An invite link opened in the app counts like one opened in the browser:
-  /// kept until the login, accepted once the account has a name.
+  /// kept until the login, accepted once the account has a name. A shop's
+  /// review link (`/b/<placeId>`) opens its review once the app is past that.
   Future<void> _openLink(Uri link) async {
     final segments = link.pathSegments;
-    if (segments.length != 2 || segments.first != 'i') return;
+    if (segments.length != 2) return;
+    if (segments.first == 'b') return context.read<AppData>().requestReview(segments.last);
+    if (segments.first != 'i') return;
     await pendingInviteRecord.put(context.read<Database>(), segments.last);
     if (mounted) setState(() => _inviteCode = segments.last);
   }
@@ -275,6 +278,7 @@ class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
   late final LocationService _location = context.read<LocationService>();
   late final Reminders? _reminders = context.read<Reminders?>();
+  late final AppData _data = context.read<AppData>();
   LatLng? _loadedAround;
 
   @override
@@ -282,16 +286,35 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _location.addListener(_loadAround);
     _loadAround();
-    // A reminder may have started the app.
+    // A reminder or a shop's review link may have started the app.
     _reminders?.opened.addListener(_openReminder);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+    _data.reviewRequest.addListener(_openReviewRequest);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openReminder();
+      _openReviewRequest();
+    });
   }
 
   @override
   void dispose() {
     _location.removeListener(_loadAround);
     _reminders?.opened.removeListener(_openReminder);
+    _data.reviewRequest.removeListener(_openReviewRequest);
     super.dispose();
+  }
+
+  /// A shop's review link opens the review of its place.
+  Future<void> _openReviewRequest() async {
+    final placeId = await _data.takeReviewRequest();
+    if (placeId == null || !mounted) return;
+    try {
+      final place = await _data.place(placeId);
+      if (mounted) await showAppSheet(context, (_) => ReviewSheet(place: place));
+    } on OfflineException catch (e) {
+      if (mounted) showMessage(context, e.toString());
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.status == 404 ? 'Diesen Laden kennt die App gerade nicht.' : e.message);
+    }
   }
 
   /// A tapped reminder opens the review of its place.

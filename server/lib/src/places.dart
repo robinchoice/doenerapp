@@ -53,9 +53,11 @@ Map<RatingItem, double> ratingsFromRow(Map<String, dynamic> row) => {
 /// Select expression for the items of review `r`.
 const reviewItemsJson = '(SELECT jsonb_object_agg(item, rating) FROM review_items WHERE review_id = r.id) AS items';
 
-/// Select expressions for the photo of review `r` and whether its author checked in at the place.
+/// Select expressions for the photo of review `r` and on how many days its author checked in at the
+/// place — several check-ins in one evening don't make a regular.
 const reviewPhotoId = '(SELECT id FROM review_photos WHERE review_id = r.id) AS photo_id';
-const reviewOnSite = 'EXISTS (SELECT 1 FROM visits v WHERE v.user_id = r.user_id AND v.place_id = r.place_id) AS on_site';
+const reviewVisitCount = '(SELECT count(DISTINCT (v.visited_at AT TIME ZONE \'UTC\')::date) FROM visits v '
+    'WHERE v.user_id = r.user_id AND v.place_id = r.place_id)::int AS visit_count';
 
 ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       id: row['id'] as String,
@@ -73,7 +75,8 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       bread: Bread.values.asNameMap()[row['bread']],
       text: row['text'] as String?,
       photoId: row['photo_id'] as String?,
-      onSite: row['on_site'] as bool,
+      onSite: row['visit_count'] as int > 0,
+      regular: row['visit_count'] as int >= regularVisits,
       createdAt: row['created_at'] as DateTime,
       updatedAt: row['updated_at'] as DateTime,
     );
@@ -88,7 +91,7 @@ VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
       foodType: row['food_type'] as String?,
     );
 
-const _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewOnSite, u.display_name, p.google_place_id, p.name AS place_name '
+const _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, u.display_name, p.google_place_id, p.name AS place_name '
     'FROM reviews r JOIN users u ON u.id = r.user_id JOIN places p ON p.id = r.place_id';
 const _visitSelect = 'SELECT v.*, u.display_name, p.google_place_id, p.name AS place_name FROM visits v '
     'JOIN users u ON u.id = v.user_id JOIN places p ON p.id = v.place_id';

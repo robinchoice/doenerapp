@@ -20,6 +20,13 @@ final _queue = intMapStoreFactory.store('queue');
 final _favorites = StoreRef<String, bool>('favorites');
 final _notes = StoreRef<String, String>('notes');
 
+/// A shop whose review a link asked for (`https://…/b/<placeId>`), kept
+/// through onboarding and login until its review sheet opens.
+final pendingReviewRecord = settingsStore.record('pendingReview');
+
+/// How long a check-in without a review stays on Start as "to review".
+const toReviewWindow = Duration(days: 14);
+
 class LocalVisit {
   final VisitDto dto;
   final bool pending;
@@ -55,8 +62,11 @@ class AppData extends ChangeNotifier {
   int pendingCount = 0;
   String? lastSyncError;
 
-  /// The check-in whose "Wie war's?" card was closed.
-  String? _dismissedReviewDue;
+  /// Check-ins whose "Wie war's?" card was closed.
+  Set<String> _dismissedToReview = {};
+
+  /// See [pendingReviewRecord].
+  final reviewRequest = ValueNotifier<String?>(null);
 
   Future<void> load() async {
     // Google allows caching place details for at most 30 days; older entries
@@ -84,7 +94,8 @@ class AppData extends ChangeNotifier {
     visits = [for (final r in await _visits.find(_db)) _visitFromRecord(r.value)];
     _sortVisits();
     pendingCount = await _queue.count(_db);
-    _dismissedReviewDue = await settingsStore.record('reviewDueDismissed').get(_db) as String?;
+    _dismissedToReview = {...?(await settingsStore.record('toReviewDismissed').get(_db) as List?)?.cast<String>()};
+    reviewRequest.value = await pendingReviewRecord.get(_db) as String?;
     notifyListeners();
   }
 
@@ -203,21 +214,51 @@ class AppData extends ChangeNotifier {
     if (reminders case final r?) unawaited(r.schedule(place, request.visitedAt, rating: reviews[place.placeId]?.dto.headline(session.diet)));
   }
 
-  /// The latest check-in, if it was half an hour to half a day ago and the
-  /// place wasn't reviewed since. The web app asks "Wie war's?" on Start.
-  LocalVisit? reviewDue(DateTime now) {
-    final last = visits.firstOrNull;
-    if (last == null || last.dto.id == _dismissedReviewDue) return null;
-    final since = now.difference(last.dto.visitedAt);
-    if (since < reminderDelay || since > const Duration(hours: 12)) return null;
-    final review = reviews[last.dto.placeId]?.dto;
-    return review != null && !review.updatedAt.isBefore(last.dto.visitedAt) ? null : last;
+  /// Places checked in at lately and not reviewed since, latest first — one
+  /// card each on Start. Built from the account's visits and reviews, which
+  /// every device syncs, so a phone and the web app show the same. A check-in
+  /// shows up when the reminder would come.
+  List<LocalVisit> toReview(DateTime now) {
+    final seen = <String>{};
+    return [
+      for (final visit in visits)
+        if (seen.add(visit.dto.placeId) &&
+            !_dismissedToReview.contains(visit.dto.id) &&
+            now.difference(visit.dto.visitedAt) >= reminderDelay &&
+            now.difference(visit.dto.visitedAt) <= toReviewWindow &&
+            (reviews[visit.dto.placeId]?.dto.updatedAt.isBefore(visit.dto.visitedAt) ?? true))
+          visit,
+    ];
   }
 
-  Future<void> dismissReviewDue(LocalVisit visit) async {
-    _dismissedReviewDue = visit.dto.id;
+  Future<void> dismissToReview(LocalVisit visit) async {
+    final cutoff = DateTime.now().subtract(toReviewWindow);
+    final recent = {for (final v in visits) if (v.dto.visitedAt.isAfter(cutoff)) v.dto.id};
+    _dismissedToReview = {..._dismissedToReview.where(recent.contains), visit.dto.id};
     notifyListeners();
-    await settingsStore.record('reviewDueDismissed').put(_db, visit.dto.id);
+    await settingsStore.record('toReviewDismissed').put(_db, _dismissedToReview.toList());
+  }
+
+  /// Opens the review of [placeId] as soon as the app is past login (see [pendingReviewRecord]).
+  Future<void> requestReview(String placeId) async {
+    await pendingReviewRecord.put(_db, placeId);
+    reviewRequest.value = placeId;
+  }
+
+  /// Takes the requested review; null if there is none.
+  Future<String?> takeReviewRequest() async {
+    final placeId = reviewRequest.value;
+    if (placeId == null) return null;
+    reviewRequest.value = null;
+    await pendingReviewRecord.delete(_db);
+    return placeId;
+  }
+
+  /// A place from the cache, otherwise from the server.
+  Future<PlaceDto> place(String placeId) async {
+    if (places[placeId] case final place?) return place;
+    await refreshPlace(placeId);
+    return places[placeId]!;
   }
 
   Future<void> saveReview(PlaceDto place, UpsertReviewRequest request) async {

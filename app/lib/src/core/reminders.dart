@@ -19,8 +19,8 @@ const reminderDelay = Duration(minutes: 30);
     : ('Bleibt’s bei ${formatRating(rating)}?', 'Dein Besuch bei $placeName – passt deine Bewertung noch?');
 
 /// "Wie war's bei X?" half an hour after a check-in, as a local notification
-/// on iOS and Android. Browsers can't schedule notifications; the web app
-/// shows a card on Start instead ([AppData.reviewDue]).
+/// on iOS and Android. Browsers can't schedule notifications; there the card
+/// on Start does the asking ([AppData.toReview]), which the apps show as well.
 class Reminders {
   /// A later check-in replaces the reminder of an earlier one.
   static const _id = 1;

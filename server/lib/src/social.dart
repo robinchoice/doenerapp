@@ -51,12 +51,12 @@ void mountSocial(Router router, Deps deps) {
       '$friendIdsCte SELECT * FROM ('
       '  SELECT \'visit\' AS type, v.id, v.user_id, v.place_id, v.visited_at AS ts, NULL::text AS text,'
       '         NULL::real AS rating, NULL::real AS sauce_rating, NULL::real AS fleisch_rating, NULL::real AS brot_rating,'
-      '         NULL::jsonb AS items, NULL::uuid AS photo_id, false AS on_site,'
+      '         NULL::jsonb AS items, NULL::uuid AS photo_id, 0 AS visit_count,'
       '         v.food_type, true AS from_friend'
       '  FROM visits v WHERE v.user_id IN (SELECT id FROM friends)'
       '  UNION ALL'
       '  SELECT \'review\', r.id, r.user_id, r.place_id, r.updated_at, r.text,'
-      '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewOnSite, NULL,'
+      '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, NULL,'
       '         r.user_id IN (SELECT id FROM friends)'
       '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE r.user_id IN (SELECT id FROM friends)'
       '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}'
@@ -90,7 +90,8 @@ void mountSocial(Router router, Deps deps) {
           text: r['text'] as String?,
           foodType: r['food_type'] as String?,
           photoId: r['photo_id'] as String?,
-          onSite: r['on_site'] as bool,
+          onSite: r['visit_count'] as int > 0,
+          regular: r['visit_count'] as int >= regularVisits,
         ),
     ];
     final last = page.isEmpty ? null : page.last;

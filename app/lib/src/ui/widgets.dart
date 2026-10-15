@@ -248,6 +248,7 @@ class ActivityCard extends StatelessWidget {
   final String? photoId;
   final Uint8List? photo;
   final bool onSite;
+  final bool regular;
   final bool pending;
   final bool highlight;
   final VoidCallback? onTap;
@@ -266,6 +267,7 @@ class ActivityCard extends StatelessWidget {
     this.photoId,
     this.photo,
     this.onSite = false,
+    this.regular = false,
     this.pending = false,
     this.highlight = false,
     this.onTap,
@@ -308,7 +310,7 @@ class ActivityCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund'),
                         ],
-                        if (onSite) ...[const SizedBox(width: 8), const OnSiteBadge()],
+                        if (onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: regular)],
                       ]),
                       Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
                     ],
@@ -332,17 +334,19 @@ class ActivityCard extends StatelessWidget {
   }
 }
 
-/// The reviewer checked in at the place.
+/// The reviewer checked in at the place: "vor Ort", or "Stammgast" on [regularVisits] days or more.
 class OnSiteBadge extends StatelessWidget {
-  const OnSiteBadge({super.key});
+  final bool regular;
+  const OnSiteBadge({super.key, this.regular = false});
 
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: 'Hat hier eingecheckt',
+        message: regular ? 'Hat hier an $regularVisits oder mehr Tagen eingecheckt' : 'Hat hier eingecheckt',
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.verified, size: 14, color: Colors.green.shade600),
+          Icon(regular ? Icons.workspace_premium : Icons.verified, size: 14, color: Colors.green.shade600),
           const SizedBox(width: 3),
-          Text('vor Ort', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.green.shade600, fontWeight: FontWeight.w600)),
+          Text(regular ? 'Stammgast' : 'vor Ort',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.green.shade600, fontWeight: FontWeight.w600)),
         ]),
       );
 }

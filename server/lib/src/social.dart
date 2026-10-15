@@ -12,6 +12,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
+import 'moderation.dart';
 import 'places.dart';
 
 const friendIdsCte = 'WITH friends AS ('
@@ -58,8 +59,8 @@ void mountSocial(Router router, Deps deps) {
       '  SELECT \'review\', r.id, r.user_id, r.place_id, r.updated_at, r.text,'
       '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, NULL,'
       '         r.user_id IN (SELECT id FROM friends)'
-      '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE r.user_id IN (SELECT id FROM friends)'
-      '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}'
+      '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE (r.user_id IN (SELECT id FROM friends)'
+      '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}) AND ${notBlocked('r.user_id')}'
       ') f ${cursor == null ? '' : 'WHERE (f.ts, f.id) < (@ts:timestamptz, @id:uuid)'}'
       ' ORDER BY f.ts DESC, f.id DESC LIMIT @limit:int4',
       {
@@ -139,7 +140,7 @@ void mountSocial(Router router, Deps deps) {
     final pattern = '${q.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
     final rows = await query(
       deps.db,
-      'SELECT id, display_name FROM users WHERE display_name ILIKE @pattern AND id <> @me:uuid '
+      'SELECT id, display_name FROM users WHERE display_name ILIKE @pattern AND id <> @me:uuid AND ${notBlocked('id')} '
       'ORDER BY lower(display_name) LIMIT 20',
       {'pattern': pattern, 'me': me.id},
     );
@@ -160,7 +161,8 @@ void mountSocial(Router router, Deps deps) {
     final body = await readBody(request, FriendRequestBody.fromJson);
     final other = requireUuid(body.userId, 'userId');
     if (other == me.id) throw const ApiException.badRequest('Du kannst dich nicht selbst hinzufügen');
-    if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE id = @id:uuid', {'id': other}) == null) {
+    if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE id = @id:uuid', {'id': other}) == null ||
+        await isBlocked(deps, me.id, other)) {
       throw const ApiException.notFound('Nutzer nicht gefunden');
     }
 
@@ -234,6 +236,7 @@ void mountSocial(Router router, Deps deps) {
     final inviter = await _inviter(deps, code);
     if (inviter == null) throw const ApiException.notFound('Einladung ungültig');
     if (inviter.id == me.id) throw const ApiException.badRequest('Das ist dein eigener Link');
+    if (await isBlocked(deps, me.id, inviter.id)) throw const ApiException.notFound('Einladung ungültig');
 
     // Sharing the link and opening it count as both sides agreeing — an open
     // request between the two is settled as well.

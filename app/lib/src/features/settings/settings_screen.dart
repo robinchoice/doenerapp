@@ -14,6 +14,7 @@ import '../../core/reminders.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../social/friends.dart';
+import '../social/moderation.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -139,6 +140,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 onSubmitted: (_) => _saveName(),
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.block),
+              title: const Text('Blockierte Nutzer'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BlockedUsersScreen())),
             ),
             ListTile(leading: const Icon(Icons.logout), title: const Text('Abmelden'), onTap: _logout),
             ListTile(

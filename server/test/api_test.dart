@@ -542,6 +542,52 @@ void main() {
       expect(rows.first.first, 1);
     });
 
+    test('reporting reviews and blocking users', () async {
+      final (_, before) = await call('GET', '/places/place-kebap/reviews', token: bob);
+      final review = (before as List).singleWhere((r) => r['userName'] == 'Anna')['id'] as String;
+
+      final sent = mailer.sent.length;
+      final report = {'reason': 'spam', 'note': 'Werbung für einen anderen Laden'};
+      expect((await call('POST', '/reviews/$review/report', body: report, token: anna)).$1, 400, reason: 'own review');
+      expect((await call('POST', '/reviews/$review/report', body: {'reason': 'boring'}, token: bob)).$1, 400);
+      expect((await call('POST', '/reviews/$review/report', body: report, token: bob)).$1, 204);
+      expect((await call('POST', '/reviews/$review/report', body: report, token: bob)).$1, 204);
+      expect(mailer.sent.length, sent + 1, reason: 'one mail per reporter and review');
+      final mail = mailer.sent.last;
+      expect(mail.to, 'robin@doener.test');
+      expect(mail.subject, 'Gemeldet: Bewertung von Anna bei Kebap Haus');
+      expect(mail.replyTo, 'bob@example.org');
+      expect(mail.text, allOf(contains('Grund: Spam oder Werbung'), contains('Werbung für einen anderen Laden'), contains(review)));
+
+      expect((await call('PUT', '/me/blocks/${annaUser.id}', token: bob)).$1, 204);
+      expect((await call('PUT', '/me/blocks/${annaUser.id}', token: bob)).$1, 204, reason: 'idempotent');
+      final (_, blocks) = await call('GET', '/me/blocks', token: bob);
+      expect((blocks as List).map((u) => u['displayName']), ['Anna']);
+      expect((await call('GET', '/friends', token: bob)).$2, isEmpty, reason: 'blocking ends the friendship');
+      final (_, hidden) = await call('GET', '/places/place-kebap/reviews', token: bob);
+      expect((hidden as List).map((r) => r['userName']), isNot(contains('Anna')));
+      final (_, public) = await call('GET', '/places/place-kebap/reviews');
+      expect((public as List).map((r) => r['userName']), contains('Anna'));
+      expect((await call('GET', '/places/place-kebap')).$2['reviewCount'], 1, reason: 'the rating still counts');
+      final (_, feed) = await call('GET', '/feed?lat=48&lon=7.85', token: bob);
+      expect((feed['items'] as List).map((i) => i['user']['displayName']), isNot(contains('Anna')));
+      expect((await call('GET', '/users/search?q=an', token: bob)).$2, isEmpty);
+      expect((await call('GET', '/users/search?q=bo', token: anna)).$2, isEmpty, reason: 'both ways');
+      expect((await call('POST', '/friends/requests', body: {'userId': bobUser.id}, token: anna)).$1, 404);
+      final (_, invite) = await call('GET', '/me/invite', token: bob);
+      expect((await call('POST', '/invites/${invite['code']}/accept', token: anna)).$1, 404);
+
+      expect((await call('DELETE', '/me/blocks/${annaUser.id}', token: bob)).$1, 204);
+      expect(((await call('GET', '/users/search?q=an', token: bob)).$2 as List).single['displayName'], 'Anna');
+
+      expect((await call('DELETE', '/reviews/$review', token: bob)).$1, 403, reason: 'admins only');
+      final (robin, _) = await signUp('robin@doener.test', 'Robin');
+      expect((await call('DELETE', '/reviews/$review', token: robin)).$1, 204);
+      expect((await call('GET', '/places/place-kebap')).$2['reviewCount'], 0);
+      final reports = await db.execute('SELECT count(*)::int FROM review_reports');
+      expect(reports.first.first, 0, reason: 'reports go with the review');
+    });
+
     test('deleting the account removes the user data', () async {
       expect((await call('DELETE', '/users/me', token: anna)).$1, 204);
       expect((await call('GET', '/auth/me', token: anna)).$1, 401);

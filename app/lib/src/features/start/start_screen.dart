@@ -15,6 +15,7 @@ import '../place/place_detail.dart';
 import '../place/review_sheet.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
+import '../social/moderation.dart';
 
 /// Moving further than this loads the area around the new position.
 const _reloadDistance = 1000.0;
@@ -277,6 +278,12 @@ class _StartScreenState extends State<StartScreen> {
                     regular: item.regular,
                     highlight: item.fromFriend,
                   onTap: () => showPlaceDetail(context, item.place),
+                  menu: ContentMenu(
+                    user: item.user,
+                    reviewId: item.type == FeedItemType.review ? item.id : null,
+                    onBlocked: () => setState(() => _items.removeWhere((i) => i.user.id == item.user.id)),
+                    onRemoved: () => setState(() => _items.remove(item)),
+                  ),
                 ),
               if (_loading)
                 const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))

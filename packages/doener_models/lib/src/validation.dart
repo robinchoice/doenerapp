@@ -7,6 +7,7 @@ abstract final class Validation {
   static const feedbackMin = 5;
   static const feedbackMax = 5000;
   static const shopNameMin = 2;
+  static const reportNoteMax = 1000;
 
   /// New accounts get a placeholder name with this prefix until the user picks one.
   static const generatedNamePrefix = 'Döner-Fan-';

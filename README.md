@@ -132,6 +132,13 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 - Ist die iOS-App installiert, öffnet der Link sie direkt (Universal Links, Domains in `app/ios/Runner/Runner.entitlements`). Ohne App führt er auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau, von dort in die Web-App. Neue Accounts merken sich, über wessen Link sie kamen.
 - Freunde per Namenssuche finden (ab 2 Zeichen); wer eine offene Anfrage zurückschickt, nimmt sie damit an
 
+### Melden und Blockieren
+
+Pflicht für die Stores, weil Bewertungen mit Text, Foto und Namen für alle im Umkreis sichtbar sind. Das ⋮ an fremden Bewertungen (Laden, Start) und an Check-ins von Freunden bietet:
+- **Bewertung melden** mit Grund und optionalem Hinweis. Der Server speichert die Meldung (eine pro Person und Bewertung) und mailt sie an `FEEDBACK_EMAIL`, Antworten gehen an die meldende Person
+- **Blockieren**: Beide sehen die Bewertungen des anderen nicht mehr, finden sich nicht in der Suche und können sich nicht befreunden, eine Freundschaft endet. Ins Ranking zählen die Bewertungen weiter. Freigeben unter Einstellungen → Blockierte Nutzer
+- **Bewertung entfernen** nur für Admins (`ADMIN_EMAILS`), so wird eine gemeldete Bewertung gelöscht
+
 ### Fehler melden
 
 Für die Testphase liegt ein Käfer-Knopf über allen Screens, auch über Sheets. Er lässt sich verschieben. Ein Tipp fotografiert den Screen darunter (ohne die Google-Karte, native Ansichten erfasst Flutter nicht) und öffnet das Feedback-Formular mit diesem Screenshot. Das Formular gibt es auch unter Einstellungen → Feedback geben. Der Server speichert jede Meldung und mailt sie an `FEEDBACK_EMAIL`, mit dem Screenshot im Anhang. Eine Antwort auf die Mail geht direkt an den Tester.
@@ -185,7 +192,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
 | GET | `/ranking?lat&lon&by` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden |
 | GET | `/places/:placeId` | Laden (Google Place ID); fehlt er im Cache, lädt der Server ihn für Angemeldete bei Google nach |
-| GET | `/places/:placeId/reviews` | Bewertungen des Ladens |
+| GET | `/places/:placeId/reviews` | Bewertungen des Ladens, angemeldet ohne die von Blockierten |
 | GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran und was „mit allem“ heißt |
 | PUT | `/places/:placeId/review` | Eigene Bewertung speichern, optional mit Foto (`photoBase64`) oder ohne das bisherige (`removePhoto`) |
 | GET | `/photos/:id` | Foto einer Bewertung (ohne Login) |
@@ -205,6 +212,10 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/invites/:code/accept` | Einladung annehmen → sofort befreundet |
 | POST | `/feedback` | Feedback mit optionalem Screenshot |
 | POST | `/shop-reports` | Fehlenden Laden melden |
+| POST | `/reviews/:id/report` | Bewertung melden |
+| DELETE | `/reviews/:id` | Bewertung entfernen (Admins) |
+| GET | `/me/blocks` | Blockierte Nutzer |
+| PUT, DELETE | `/me/blocks/:userId` | Blockieren, freigeben |
 | POST | `/tester-requests` | Testanfrage von der Landingpage, ohne Login |
 
 Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/b/:placeId` die Bewertungsseite eines Ladens, unter `/aushang/:placeId` dessen Aushang mit QR-Code und unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS Einladungs- und Bewertungslinks in der App öffnet.
@@ -339,7 +350,6 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 - Push für Check-ins von Freunden und neue Läden, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
 - Öffentliches Profil mit Stufe, Wegfallendes entfernen
 - Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
-- Melden und Blockieren (Pflicht für die Stores, spätestens mit den Fotos)
 
 ### Phase 2 – Community
 

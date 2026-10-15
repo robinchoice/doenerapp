@@ -837,3 +837,26 @@ class ShopReportRequest {
 
   Json toJson() => {'name': name, 'hint': hint, 'latitude': latitude, 'longitude': longitude, 'note': note};
 }
+
+// MARK: - Moderation
+
+/// Why a review is reported.
+enum ReportReason {
+  offensive('Beleidigend oder unangemessen'),
+  spam('Spam oder Werbung'),
+  fake('Fake, nicht echt'),
+  other('Etwas anderes');
+
+  final String label;
+  const ReportReason(this.label);
+}
+
+class ReportRequest {
+  final ReportReason reason;
+  final String? note;
+  const ReportRequest({required this.reason, this.note});
+
+  factory ReportRequest.fromJson(Json j) =>
+      ReportRequest(reason: ReportReason.values.byName(j['reason'] as String), note: j['note'] as String?);
+  Json toJson() => {'reason': reason.name, 'note': note};
+}

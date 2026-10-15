@@ -256,6 +256,27 @@ final migrations = <List<String>>[
     // magic link carries only the token, so the login request remembers it.
     'ALTER TABLE login_requests ADD COLUMN invite_code text',
   ],
+  [
+    // Blocking works both ways: neither sees the other's reviews or finds them.
+    '''CREATE TABLE blocks (
+      blocker_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      blocked_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (blocker_id, blocked_id),
+      CHECK (blocker_id <> blocked_id)
+    )''',
+    'CREATE INDEX blocks_blocked ON blocks (blocked_id)',
+    // Reports of reviews, mailed to Robin. One per reporter and review.
+    '''CREATE TABLE review_reports (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      review_id uuid NOT NULL REFERENCES reviews (id) ON DELETE CASCADE,
+      reporter_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      reason text NOT NULL,
+      note text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (review_id, reporter_id)
+    )''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

@@ -253,6 +253,9 @@ class ActivityCard extends StatelessWidget {
   final bool highlight;
   final VoidCallback? onTap;
 
+  /// [ContentMenu] on someone else's activity.
+  final Widget? menu;
+
   const ActivityCard({
     super.key,
     required this.type,
@@ -271,6 +274,7 @@ class ActivityCard extends StatelessWidget {
     this.pending = false,
     this.highlight = false,
     this.onTap,
+    this.menu,
   });
 
   @override
@@ -318,6 +322,7 @@ class ActivityCard extends StatelessWidget {
                 ),
                 if (pending) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.cloud_upload_outlined, size: 16)),
                 Text(relativeTime(timestamp), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+                ?menu,
               ],
             ),
             if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!, size: 14)],

@@ -13,6 +13,7 @@ import '../../ui/widgets.dart';
 import '../../core/maps.dart';
 import '../ranking/rating_info.dart';
 import '../social/friends.dart';
+import '../social/moderation.dart';
 import 'review_sheet.dart';
 
 Future<void> showPlaceDetail(BuildContext context, PlaceDto place) => showModalBottomSheet(
@@ -255,7 +256,17 @@ class _PlaceDetailState extends State<PlaceDetail> {
           for (final r in others)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: ReviewCard(review: r, showAuthor: true, friend: friendIds.contains(r.userId)),
+              child: ReviewCard(
+                review: r,
+                showAuthor: true,
+                friend: friendIds.contains(r.userId),
+                menu: ContentMenu(
+                  user: UserDto(id: r.userId, displayName: r.userName),
+                  reviewId: r.id,
+                  onBlocked: () => setState(() => _reviews = _reviews.where((x) => x.userId != r.userId).toList()),
+                  onRemoved: () => setState(() => _reviews = _reviews.where((x) => x.id != r.id).toList()),
+                ),
+              ),
             ),
         if (visits.isNotEmpty) ...[
           const SizedBox(height: 20),
@@ -455,7 +466,10 @@ class ReviewCard extends StatelessWidget {
   /// The author is a friend of the user.
   final bool friend;
   final VoidCallback? onEdit;
-  const ReviewCard({super.key, required this.review, this.photo, this.showAuthor = false, this.friend = false, this.onEdit});
+
+  /// [ContentMenu] on someone else's review.
+  final Widget? menu;
+  const ReviewCard({super.key, required this.review, this.photo, this.showAuthor = false, this.friend = false, this.onEdit, this.menu});
 
   @override
   Widget build(BuildContext context) {
@@ -476,6 +490,7 @@ class ReviewCard extends StatelessWidget {
               if (review.headline(diet) case final score?) DoenerRating(value: score, size: 14),
               if (review.onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: review.regular)],
               if (onEdit != null) ...[const Spacer(), Icon(Icons.edit, size: 16, color: theme.colorScheme.outline)],
+              if (menu != null) ...[const Spacer(), menu!],
             ],
           ),
           if (review.ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: review.ratings, diet: diet)],

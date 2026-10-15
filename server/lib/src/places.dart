@@ -10,6 +10,7 @@ import 'auth.dart';
 import 'deps.dart';
 import 'google_places.dart';
 import 'http.dart';
+import 'moderation.dart';
 
 const liveStatusDuration = Duration(hours: 1);
 const _maxSyncSpanDeg = 0.5;
@@ -215,11 +216,14 @@ void mountPlaces(Router router, Deps deps) {
     return json(placeFromRow(row).toJson());
   });
 
+  // Signed in, reviews of blocked users are left out.
   router.get('/places/<placeId>/reviews', (Request request, String placeId) async {
+    final me = request.headers.containsKey('authorization') ? await requireUser(deps, request) : null;
     final rows = await query(
       deps.db,
-      '$_reviewSelect WHERE p.google_place_id = @id ORDER BY r.updated_at DESC LIMIT 100',
-      {'id': placeId},
+      '$_reviewSelect WHERE p.google_place_id = @id ${me == null ? '' : 'AND ${notBlocked('r.user_id')} '}'
+      'ORDER BY r.updated_at DESC LIMIT 100',
+      {'id': placeId, 'me': ?me?.id},
     );
     return json(rows.map((r) => reviewFromRow(r).toJson()).toList());
   });

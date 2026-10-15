@@ -241,6 +241,16 @@ final migrations = <List<String>>[
     'CREATE TABLE schedules (name text PRIMARY KEY, next_run_at timestamptz NOT NULL)',
     "INSERT INTO schedules (name, next_run_at) VALUES ('place_cache', now())",
   ],
+  [
+    // Requests from the landing page to join the TestFlight / Play test.
+    '''CREATE TABLE tester_requests (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      email text NOT NULL,
+      platform text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (email, platform)
+    )''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

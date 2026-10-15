@@ -45,7 +45,7 @@ Future<void> startApp() async {
   final onboardingDone = await settingsStore.record('onboardingDone').get(db) == true;
 
   // Links opened in the browser: magic link (https://…/login?token=…) and
-  // invite (https://…/?invite=…). The invite is kept until it is accepted —
+  // invite (https://…/app?invite=…). The invite is kept until it is accepted —
   // the login via magic link continues in a new tab.
   final linkToken = kIsWeb && Uri.base.path == '/login' ? Uri.base.queryParameters['token'] : null;
   final inviteFromLink = kIsWeb ? Uri.base.queryParameters['invite'] : null;

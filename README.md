@@ -133,6 +133,12 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 
 Für die Testphase liegt ein Käfer-Knopf über allen Screens, auch über Sheets. Er lässt sich verschieben. Ein Tipp fotografiert den Screen darunter (ohne die Google-Karte, native Ansichten erfasst Flutter nicht) und öffnet das Feedback-Formular mit diesem Screenshot. Das Formular gibt es auch unter Einstellungen → Feedback geben. Der Server speichert jede Meldung und mailt sie an `FEEDBACK_EMAIL`, mit dem Screenshot im Anhang. Eine Antwort auf die Mail geht direkt an den Tester.
 
+### Landingpage
+
+`/` (Deutsch) und `/en` (Englisch) zeigen eine statische Seite vom Server (`server/lib/src/landing.dart`), die Web-App läuft unter `/app`. Wer im Browser schon angemeldet ist oder mit Parametern kommt (`?invite=…`), wird sofort nach `/app` weitergeleitet. Die Rangliste im Handy auf der Seite ist ein Beispiel, keine echten Daten.
+
+Über das Formular fragt man den Test an: iPhone (TestFlight) oder Android (Play-Test) und eine E-Mail. Der Server speichert die Anfrage 90 Tage, einmal pro Adresse und Plattform, und mailt sie an `FEEDBACK_EMAIL`. Freigeschaltet wird von Hand: iOS in App Store Connect unter TestFlight, Android in der Play Console unter Interner Test, dazu den Link per Antwort auf die Mail schicken.
+
 ---
 
 ## Architektur
@@ -195,6 +201,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/invites/:code/accept` | Einladung annehmen → sofort befreundet |
 | POST | `/feedback` | Feedback mit optionalem Screenshot |
 | POST | `/shop-reports` | Fehlenden Laden melden |
+| POST | `/tester-requests` | Testanfrage von der Landingpage, ohne Login |
 
 Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS diese Links in der App öffnet.
 
@@ -261,7 +268,7 @@ cd app && flutter test
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
 | `APP_DOWNLOAD_URL` | – | Ziel von „App holen“ auf der Einladungsseite (z. B. öffentlicher TestFlight-Link); ohne nur Web-App |
-| `FEEDBACK_EMAIL` | – | Empfänger der Tester-Meldungen; ohne werden sie nur gespeichert |
+| `FEEDBACK_EMAIL` | – | Empfänger der Tester-Meldungen und Testanfragen; ohne werden sie nur gespeichert |
 
 **App (`--dart-define`):**
 
@@ -282,7 +289,7 @@ cd app && flutter test
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
 | `mobile.yml` | Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
 
-Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, alles andere ist die Web-App.
+Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, die Landingpage unter `/` und `/en`, alles andere ist die Web-App (`/app`).
 
 **Secrets:**
 - Coolify: `COOLIFY_UUID`, `COOLIFY_TOKEN`

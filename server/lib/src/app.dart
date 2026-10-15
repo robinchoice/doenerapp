@@ -7,6 +7,7 @@ import 'package:shelf_static/shelf_static.dart';
 import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
+import 'landing.dart';
 import 'places.dart';
 import 'privacy.dart';
 import 'ranking.dart';
@@ -26,7 +27,8 @@ const _appSiteAssociation = {
   },
 };
 
-/// API under `/api/v1`, the Flutter web build (if present) everywhere else.
+/// API under `/api/v1`, the landing page under `/` and `/en`, the Flutter web
+/// build (if present) everywhere else, e.g. `/app`.
 Handler buildHandler(Deps deps) {
   final api = Router(notFoundHandler: (_) => json({'error': 'Nicht gefunden'}, status: 404))
     // The deploy job waits until the public URL reports its commit as revision.
@@ -43,9 +45,13 @@ Handler buildHandler(Deps deps) {
   mountPlaces(api, deps);
   mountRanking(api, deps);
   mountSocial(api, deps);
+  mountTesterRequests(api, deps);
 
   final root = Router()
     ..mount('/api/v1/', api.call)
+    ..get('/', (Request request) => landingPage(request, english: false))
+    ..get('/en', (Request request) => landingPage(request, english: true))
+    ..get('/en/', (Request request) => landingPage(request, english: true))
     ..get('/i/<code>', (Request request, String code) => invitePage(deps, request, code))
     ..get('/datenschutz', privacyPage)
     ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation));
@@ -54,7 +60,7 @@ Handler buildHandler(Deps deps) {
   if (webDir.existsSync()) {
     final static = createStaticHandler(webDir.path, defaultDocument: 'index.html');
     final index = File('${webDir.path}/index.html');
-    // Unknown paths (e.g. /login?token=…) fall back to the single-page app.
+    // Unknown paths (e.g. /app, /login?token=…) fall back to the single-page app.
     Future<Response> spa(Request request) async {
       final response = await static(request);
       if (response.statusCode != 404 || request.method != 'GET') return response;

@@ -675,6 +675,28 @@ void main() {
     });
   });
 
+  test('landing page in both languages', () async {
+    Future<String> page(String path) async => (await handler(Request('GET', Uri.parse('http://localhost$path')))).readAsString();
+    expect(await page('/'), contains('Der beste Döner'));
+    expect(await page('/en'), contains('The best döner'));
+  });
+
+  test('tester requests mail Robin once per address and platform', () async {
+    expect((await call('POST', '/tester-requests', body: {'email': 'no-mail', 'platform': 'ios'})).$1, 400);
+    expect((await call('POST', '/tester-requests', body: {'email': 'tim@example.org', 'platform': 'windows'})).$1, 400);
+
+    final before = mailer.sent.length;
+    expect((await call('POST', '/tester-requests', body: {'email': ' Tim@Example.org', 'platform': 'android'})).$1, 204);
+    final mail = mailer.sent.last;
+    expect(mail.to, 'robin@doener.test');
+    expect(mail.subject, 'Testanfrage Android: tim@example.org');
+    expect(mail.replyTo, 'tim@example.org');
+
+    expect((await call('POST', '/tester-requests', body: {'email': 'tim@example.org', 'platform': 'android'})).$1, 204);
+    expect((await call('POST', '/tester-requests', body: {'email': 'tim@example.org', 'platform': 'ios'})).$1, 204);
+    expect(mailer.sent.length, before + 2, reason: 'the repeated Android request sends no second mail');
+  });
+
   group('invites', () {
     test('opening the link makes friends without a request', () async {
       final (ina, inaUser) = await signUp('ina@example.org', 'Ina');
@@ -737,7 +759,7 @@ void main() {
       expect(html, contains('<meta property="og:title" content="&lt;i&gt;Nora&lt;/i&gt; lädt dich in die Döner App ein">'));
       expect(html, isNot(contains('<i>Nora')));
       expect(html, contains('<meta property="og:image" content="https://doener.test/icons/Icon-512.png">'));
-      expect(html, contains('href="/?invite=$code"'));
+      expect(html, contains('href="/app?invite=$code"'));
 
       final (missing, notFound) = await page('/i/%3Cscript%3E');
       expect(missing, 404);

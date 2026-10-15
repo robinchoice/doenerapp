@@ -387,7 +387,7 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
   final content = inviter == null
       ? '<p>Der Link wurde zurückgesetzt oder ist falsch.</p><a class="button" href="/">Zur Döner App</a>'
       : '<p>Sieh, wo deine Freunde gerade Döner essen – und iss mit.</p>'
-          '<a class="button" href="/?invite=$code">Im Browser loslegen</a>'
+          '<a class="button" href="/app?invite=$code">Im Browser loslegen</a>'
           '${appUrl == null ? '' : '<a class="button secondary" href="${escape.convert(appUrl)}">App holen</a>'}';
 
   return Response(

@@ -185,7 +185,7 @@ class _RootState extends State<_Root> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Keep login token and invite code out of the browser's address bar.
-      if (kIsWeb && Uri.base.hasQuery) SystemNavigator.routeInformationUpdated(uri: Uri.parse('/'));
+      if (kIsWeb && Uri.base.hasQuery) SystemNavigator.routeInformationUpdated(uri: Uri.parse('/app'));
       final token = widget.linkToken;
       if (token != null) await completeLinkLogin(context, token, inviteCode: _inviteCode);
       if (mounted && _onboardingDone) context.read<LocationService>().request();

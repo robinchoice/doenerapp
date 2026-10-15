@@ -1,4 +1,5 @@
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -95,7 +96,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final page = Uri.parse(context.read<Session>().apiBase).resolve('/');
     final code = widget.inviteCode;
     final uri = page.replace(queryParameters: code == null ? null : {'von': code}, fragment: 'test');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    // In the browser the landing page takes this tab, the apps open the browser.
+    await launchUrl(uri, mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication, webOnlyWindowName: '_self');
   }
 
   @override

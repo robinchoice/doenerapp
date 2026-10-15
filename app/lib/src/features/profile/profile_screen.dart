@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -201,20 +203,21 @@ class _TestersScreenState extends State<_TestersScreen> {
   }
 
   static String _done(String email, InviteResult result) => switch (result.testFlight) {
-        null => 'Login-Mail an $email verschickt',
-        true => 'Login-Mail an $email verschickt, TestFlight-Einladung kommt von Apple',
-        false => 'Login-Mail an $email verschickt. TestFlight hat nicht geklappt, bitte in App Store Connect einladen',
+        'invited' => 'Login-Mail an $email verschickt, die TestFlight-Einladung kommt von Apple',
+        'failed' => 'Login-Mail an $email verschickt. TestFlight hat nicht geklappt, bitte in App Store Connect einladen',
+        'off' => 'Login-Mail an $email verschickt. TestFlight ist auf dem Server nicht eingerichtet, bitte in App Store Connect einladen',
+        _ => 'Login-Mail an $email verschickt',
       };
 
   Future<void> _letIn(TesterRequestDto request) => _run(request.id, () async {
         final json = await context.read<Session>().api.post('/tester-requests/${request.id}/invite');
-        setState(() => _requests?.removeWhere((r) => r.email == request.email));
+        if (mounted) setState(() => _requests?.removeWhere((r) => r.email == request.email));
         return _done(request.email, InviteResult.fromJson(json as Map<String, dynamic>));
       });
 
   Future<void> _turnDown(TesterRequestDto request) => _run(request.id, () async {
         await context.read<Session>().api.delete('/tester-requests/${request.id}');
-        setState(() => _requests?.remove(request));
+        if (mounted) setState(() => _requests?.remove(request));
         return 'Anfrage von ${request.email} gelöscht';
       });
 
@@ -223,6 +226,7 @@ class _TestersScreenState extends State<_TestersScreen> {
     return _run('address', () async {
       final json = await context.read<Session>().api.post('/auth/invite', InviteRequest(email: email, platform: _platform).toJson());
       _email.clear();
+      if (mounted) setState(() => _requests?.removeWhere((r) => r.email == email));
       return _done(email, InviteResult.fromJson(json as Map<String, dynamic>));
     });
   }
@@ -236,7 +240,8 @@ class _TestersScreenState extends State<_TestersScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          // A column of readable width on the desktop, like the profile.
+          padding: EdgeInsets.symmetric(vertical: 16, horizontal: max(16, (MediaQuery.sizeOf(context).width - 720) / 2)),
           children: [
             SectionTitle(title: requests == null || requests.isEmpty ? 'Bewerbungen' : 'Bewerbungen (${requests.length})'),
             if (_error != null)
@@ -246,30 +251,36 @@ class _TestersScreenState extends State<_TestersScreen> {
             else if (requests.isEmpty)
               Text('Gerade bewirbt sich niemand. Die Bewerbung steht auf der Landingpage.', style: TextStyle(color: theme.colorScheme.outline))
             else
+              // The address gets the full width: Robin has to see whom he lets in.
               for (final r in requests)
                 HairlineRow(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(r.platform == 'ios' ? Icons.phone_iphone : Icons.android, color: context.accent),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(r.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            Text(
-                              [formatDate(r.createdAt), if (r.invitedBy != null) 'über ${r.invitedBy}'].join(' · '),
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-                            ),
-                          ],
-                        ),
+                      Row(children: [
+                        Icon(r.platform == 'ios' ? Icons.phone_iphone : Icons.android, color: context.accent, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(r.email, style: const TextStyle(fontWeight: FontWeight.w600))),
+                      ]),
+                      const SizedBox(height: 2),
+                      Text(
+                        [r.platform == 'ios' ? 'iPhone' : 'Android', formatDate(r.createdAt), if (r.invitedBy != null) 'über ${r.invitedBy}']
+                            .join(' · '),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
                       ),
-                      if (_busy.contains(r.id))
-                        const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      else ...[
-                        IconButton(icon: const Icon(Icons.close), tooltip: 'Ablehnen', onPressed: () => _turnDown(r)),
-                        FilledButton(onPressed: () => _letIn(r), child: const Text('Freischalten')),
-                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (_busy.contains(r.id))
+                            const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          else ...[
+                            TextButton(onPressed: () => _turnDown(r), child: const Text('Ablehnen')),
+                            const SizedBox(width: 8),
+                            FilledButton(onPressed: () => _letIn(r), child: const Text('Freischalten')),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -278,15 +289,10 @@ class _TestersScreenState extends State<_TestersScreen> {
             Text('Legt das Konto an und schickt einen Login-Code, bei iPhone auch die TestFlight-Einladung.',
                 style: TextStyle(color: theme.colorScheme.outline)),
             const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'ios', label: Text('iPhone'), icon: Icon(Icons.phone_iphone)),
-                ButtonSegment(value: 'android', label: Text('Android'), icon: Icon(Icons.android)),
-                ButtonSegment(value: 'web', label: Text('Nur Web'), icon: Icon(Icons.language)),
-              ],
-              selected: {_platform},
-              onSelectionChanged: (s) => setState(() => _platform = s.first),
-            ),
+            Wrap(spacing: 8, children: [
+              for (final (value, label) in const [('ios', 'iPhone'), ('android', 'Android'), ('web', 'Nur Web')])
+                ChoiceChip(label: Text(label), selected: _platform == value, onSelected: (_) => setState(() => _platform = value)),
+            ]),
             const SizedBox(height: 12),
             TextField(
               controller: _email,

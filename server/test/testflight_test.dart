@@ -12,6 +12,8 @@ class FakeAppStoreConnect {
   final testers = <String>{};
   String processingState = 'VALID';
   bool buildInGroup = false;
+  bool submitted = false;
+  bool reviewFails = false;
 
   http.Response _json(Object body, [int status = 200]) => http.Response(jsonEncode(body), status);
 
@@ -55,7 +57,16 @@ class FakeAppStoreConnect {
           buildInGroup = true;
           return http.Response('', 204);
         }(),
-      ('POST', '/betaAppReviewSubmissions') => _json({}, 201),
+      ('GET', '/builds/b35/buildBetaDetail') => _json({
+          'data': {
+            'attributes': {'externalBuildState': submitted ? 'IN_BETA_TESTING' : 'READY_FOR_BETA_SUBMISSION'},
+          },
+        }),
+      ('POST', '/betaAppReviewSubmissions') => () {
+          if (reviewFails) return _json({}, 500);
+          submitted = true;
+          return _json({}, 201);
+        }(),
       _ => http.Response('unexpected ${request.method} $path', 500),
     };
   }
@@ -87,8 +98,12 @@ void main() {
     apple.processingState = 'PROCESSING';
     expect(await testFlight.distributeNewestBuild(), isNull, reason: 'not processed yet');
     apple.processingState = 'VALID';
-    expect(await testFlight.distributeNewestBuild(), '35');
-    expect(apple.requests, contains('POST /betaAppReviewSubmissions'));
-    expect(await testFlight.distributeNewestBuild(), isNull, reason: 'in the group already');
+    apple.reviewFails = true;
+    await expectLater(testFlight.distributeNewestBuild(), throwsA(isA<http.ClientException>()));
+    expect(apple.buildInGroup, isTrue);
+    apple.reviewFails = false;
+    expect(await testFlight.distributeNewestBuild(), '35', reason: 'the failed review is submitted on the next run');
+    expect(apple.submitted, isTrue);
+    expect(await testFlight.distributeNewestBuild(), isNull, reason: 'in the group and in review already');
   });
 }

@@ -74,8 +74,9 @@ class TestFlight {
   }
 
   /// Gives the newest processed build to the group and submits it for the beta
-  /// review. Apple lets further builds of an approved version through at once.
-  /// Returns the build number, or null if there was nothing to do.
+  /// review while it still waits for one. Apple lets further builds of an
+  /// approved version through at once. Both steps are checked on every run, so
+  /// one that failed is tried again. Returns the build number if it did something.
   Future<String?> distributeNewestBuild() async {
     final appId = await _appId();
     final builds = (await _get('/builds', {'filter[app]': appId, 'sort': '-uploadedDate', 'limit': '1'}))['data'] as List;
@@ -84,29 +85,34 @@ class TestFlight {
     final attributes = build['attributes'] as Map<String, dynamic>;
     if (attributes['processingState'] != 'VALID' || attributes['expired'] == true) return null;
     final group = await _groupId(appId);
-    final newestInGroup = (await _get('/builds', {'filter[app]': appId, 'filter[betaGroups]': group, 'sort': '-uploadedDate', 'limit': '1'}))['data'] as List;
-    if (newestInGroup.isNotEmpty && newestInGroup.first['id'] == build['id']) return null;
+    var acted = false;
 
-    final added = await _send('POST', '/betaGroups/$group/relationships/builds', body: {
-      'data': [
-        {'type': 'builds', 'id': build['id']},
-      ],
-    });
-    if (added.statusCode != 204) throw http.ClientException('TestFlight build: ${added.statusCode} ${added.body}');
-    final review = await _send('POST', '/betaAppReviewSubmissions', body: {
-      'data': {
-        'type': 'betaAppReviewSubmissions',
-        'relationships': {
-          'build': {
-            'data': {'type': 'builds', 'id': build['id']},
+    final newestInGroup = (await _get('/builds', {'filter[app]': appId, 'filter[betaGroups]': group, 'sort': '-uploadedDate', 'limit': '1'}))['data'] as List;
+    if (newestInGroup.isEmpty || newestInGroup.first['id'] != build['id']) {
+      final added = await _send('POST', '/betaGroups/$group/relationships/builds', body: {
+        'data': [
+          {'type': 'builds', 'id': build['id']},
+        ],
+      });
+      if (added.statusCode != 204) throw http.ClientException('TestFlight build: ${added.statusCode} ${added.body}');
+      acted = true;
+    }
+
+    final detail = (await _get('/builds/${build['id']}/buildBetaDetail'))['data']['attributes'] as Map<String, dynamic>;
+    if (detail['externalBuildState'] == 'READY_FOR_BETA_SUBMISSION') {
+      final review = await _send('POST', '/betaAppReviewSubmissions', body: {
+        'data': {
+          'type': 'betaAppReviewSubmissions',
+          'relationships': {
+            'build': {
+              'data': {'type': 'builds', 'id': build['id']},
+            },
           },
         },
-      },
-    });
-    // 409: submitted already, or this version needs no review.
-    if (review.statusCode != 201 && review.statusCode != 409) {
-      throw http.ClientException('TestFlight review: ${review.statusCode} ${review.body}');
+      });
+      if (review.statusCode != 201) throw http.ClientException('TestFlight review: ${review.statusCode} ${review.body}');
+      acted = true;
     }
-    return attributes['version'] as String?;
+    return acted ? attributes['version'] as String? : null;
   }
 }

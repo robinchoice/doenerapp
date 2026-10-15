@@ -69,12 +69,13 @@ class InviteRequest {
   Json toJson() => {'email': email, 'platform': ?platform};
 }
 
-/// What an invite did: [testFlight] is null without an iPhone, false if Apple refused or isn't set up.
+/// What an invite did for TestFlight: null without an iPhone, otherwise
+/// `invited`, `failed` (Apple refused) or `off` (no App Store Connect key).
 class InviteResult {
-  final bool? testFlight;
+  final String? testFlight;
   const InviteResult({this.testFlight});
 
-  factory InviteResult.fromJson(Json j) => InviteResult(testFlight: j['testFlight'] as bool?);
+  factory InviteResult.fromJson(Json j) => InviteResult(testFlight: j['testFlight'] as String?);
   Json toJson() => {'testFlight': testFlight};
 }
 

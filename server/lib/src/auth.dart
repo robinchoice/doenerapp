@@ -178,26 +178,40 @@ Future<AuthUser> requireAdmin(Deps deps, Request request) async {
 
 /// Creates the account if needed and mails the login code. With [platform]
 /// `ios`, Apple also mails the TestFlight invite; a failure there leaves the
-/// account in place and shows in the result.
-Future<InviteResult> inviteTester(Deps deps, String email, AuthUser admin, {String? platform}) async {
-  if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) == null) {
-    await _createUser(deps, email, null);
+/// account in place and shows in the result. [friendId] is whose invite link
+/// brought the tester: the two are friends right away, as the link promised.
+Future<InviteResult> inviteTester(Deps deps, String email, AuthUser admin, {String? platform, String? friendId}) async {
+  var user = await queryOne(deps.db, 'SELECT id FROM users WHERE email = @email', {'email': email});
+  if (user == null) {
+    user = await _createUser(deps, email, null);
+    if (friendId != null) {
+      await deps.db.execute(
+        Sql.named('UPDATE users SET invited_by = @friend:uuid WHERE id = @me:uuid'),
+        parameters: {'friend': friendId, 'me': user['id']},
+      );
+      await deps.db.execute(
+        Sql.named("INSERT INTO friendships (requester_id, addressee_id, status) VALUES (@friend:uuid, @me:uuid, 'accepted') "
+            'ON CONFLICT (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id)) DO NOTHING'),
+        parameters: {'friend': friendId, 'me': user['id']},
+      );
+    }
   }
-  await _mailLoginCode(deps, email, invitedBy: admin.displayName);
-  if (platform != 'ios') return const InviteResult();
+  final ios = platform == 'ios';
+  await _mailLoginCode(deps, email, invitedBy: admin.displayName, testFlight: ios && deps.config.asc != null);
+  if (!ios) return const InviteResult();
   final asc = deps.config.asc;
-  if (asc == null) return const InviteResult(testFlight: false);
+  if (asc == null) return const InviteResult(testFlight: 'off');
   try {
     await TestFlight(asc, deps.httpClient).invite(email);
-    return const InviteResult(testFlight: true);
+    return const InviteResult(testFlight: 'invited');
   } catch (e) {
     print('TestFlight invite for $email failed: $e');
-    return const InviteResult(testFlight: false);
+    return const InviteResult(testFlight: 'failed');
   }
 }
 
 /// Mails a code and a magic link; [invitedBy] turns it into an invitation.
-Future<void> _mailLoginCode(Deps deps, String email, {String? invitedBy, String? inviteCode}) async {
+Future<void> _mailLoginCode(Deps deps, String email, {String? invitedBy, String? inviteCode, bool testFlight = false}) async {
   await deps.db.execute("DELETE FROM login_requests WHERE created_at < now() - interval '1 day'");
   await deps.db.execute('DELETE FROM sessions WHERE expires_at < now()');
 
@@ -232,7 +246,7 @@ Future<void> _mailLoginCode(Deps deps, String email, {String? invitedBy, String?
     text: '${invitedBy == null ? '' : '$invitedBy hat dir ein Konto in der Döner App angelegt.\n\n'}'
         'Dein Code für die Döner App: $code\n\n'
         '${publicUrl == null ? '' : 'Oder direkt im Browser anmelden:\n$publicUrl/login?token=$token\n\n'}'
-        '${invitedBy == null || appUrl == null ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
+        '${testFlight ? 'Die iPhone-App kommt über TestFlight, die Einladung schickt dir Apple in einer eigenen Mail.\n\n' : invitedBy == null || appUrl == null ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
         'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '
         '${invitedBy == null ? 'Falls du das nicht angefordert hast, ignoriere diese Mail einfach.' : 'Danach meldest du dich jederzeit mit dieser Adresse an.'}',
   );

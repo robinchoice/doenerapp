@@ -883,7 +883,7 @@ void main() {
       expect((await call('POST', '/auth/invite', body: {'email': 'tess@example.org'}, token: robin)).$1, 200,
           reason: 'inviting twice mails again');
       final (_, iphone) = await call('POST', '/auth/invite', body: {'email': 'ida@example.org', 'platform': 'ios'}, token: robin);
-      expect(iphone['testFlight'], isFalse, reason: 'without an App Store Connect key nothing goes to TestFlight');
+      expect(iphone['testFlight'], 'off', reason: 'without an App Store Connect key nothing goes to TestFlight');
     });
 
     test('admins see tester requests with the inviter and let them in or turn them down', () async {
@@ -905,6 +905,8 @@ void main() {
       expect((status, result['testFlight']), (200, null));
       expect(mailer.sent.last.to, 'neu@example.org');
       expect((await login('neu@example.org')).$1, 204, reason: 'the account exists now');
+      final (_, friends) = await call('GET', '/friends', token: gast);
+      expect((friends as List).map((f) => f['status']), contains('accepted'), reason: 'friends with whoever brought them');
 
       expect((await call('DELETE', '/tester-requests/${nein.id}', token: robin)).$1, 204);
       final (_, after) = await call('GET', '/tester-requests', token: robin);

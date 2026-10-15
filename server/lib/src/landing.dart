@@ -44,7 +44,12 @@ void mountTesterRequests(Router router, Deps deps) {
       parameters: {'email': normalized, 'platform': platform, 'code': inviteCode},
     );
     final to = deps.config.feedbackEmail;
-    if (inserted.isNotEmpty && to != null) await _mailTesterRequest(deps, to, normalized, platform as String);
+    if (inserted.isNotEmpty && to != null) {
+      final friend = inviteCode == null
+          ? null
+          : await queryOne(deps.db, 'SELECT display_name FROM users WHERE invite_code = @code', {'code': inviteCode});
+      await _mailTesterRequest(deps, to, normalized, platform as String, friend?['display_name'] as String?);
+    }
     return noContent();
   });
 
@@ -73,9 +78,11 @@ void mountTesterRequests(Router router, Deps deps) {
   // with the TestFlight invite for iPhones. The request is done then.
   router.post('/tester-requests/<id>/invite', (Request request, String id) async {
     final admin = await requireAdmin(deps, request);
-    final row = await queryOne(deps.db, 'SELECT email, platform FROM tester_requests WHERE id = @id:uuid', {'id': requireUuid(id)});
+    final row = await queryOne(
+        deps.db, 'SELECT email, platform, invited_by FROM tester_requests WHERE id = @id:uuid', {'id': requireUuid(id)});
     if (row == null) throw const ApiException.notFound('Anfrage nicht gefunden');
-    final result = await inviteTester(deps, row['email'] as String, admin, platform: row['platform'] as String);
+    final result = await inviteTester(deps, row['email'] as String, admin,
+        platform: row['platform'] as String, friendId: row['invited_by'] as String?);
     await deps.db.execute(Sql.named('DELETE FROM tester_requests WHERE email = @email'), parameters: {'email': row['email']});
     return json(result.toJson());
   });
@@ -89,13 +96,13 @@ void mountTesterRequests(Router router, Deps deps) {
 }
 
 /// A failed mail doesn't fail the request: the request is stored already.
-Future<void> _mailTesterRequest(Deps deps, String to, String email, String platform) async {
+Future<void> _mailTesterRequest(Deps deps, String to, String email, String platform, String? friend) async {
   final ios = platform == 'ios';
   try {
     await deps.mailer.send(
       to: to,
       subject: 'Testanfrage ${ios ? 'iOS' : 'Android'}: $email',
-      text: '$email möchte die ${ios ? 'iOS' : 'Android'}-App testen.\n\n'
+      text: '$email möchte die ${ios ? 'iOS' : 'Android'}-App testen${friend == null ? '' : ', gekommen über den Link von $friend'}.\n\n'
           'Freischalten in der App unter Profil → Tester. Das legt das Konto an und schickt die Login-Mail, '
           '${ios ? 'Apple schickt die TestFlight-Einladung.' : 'die APK bzw. den Link zum Play-Test schickst du mit einer Antwort auf diese Mail.'}',
       replyTo: email,
@@ -168,7 +175,6 @@ final _de = _Texts(
   emailPlaceholder: 'du@beispiel.de',
   submit: 'Einladung anfragen',
   doneH3: 'Du bist auf der Liste!',
-  doneBrowser: 'Bis dahin im Browser loslegen',
   error: 'Das hat nicht geklappt. Versuch es bitte noch einmal.',
   invalidEmail: 'Diese E-Mail-Adresse stimmt nicht. Schau bitte noch einmal drauf.',
   tooMany: 'Gerade kommen zu viele Anfragen. Versuch es in einer Stunde noch einmal.',
@@ -231,7 +237,6 @@ final _en = _Texts(
   emailPlaceholder: 'you@example.com',
   submit: 'Request invite',
   doneH3: 'You’re on the list!',
-  doneBrowser: 'Meanwhile, try it in your browser',
   error: 'That didn’t work. Please try again.',
   invalidEmail: 'That email address doesn’t look right. Please check it.',
   tooMany: 'Too many requests right now. Please try again in an hour.',
@@ -258,7 +263,6 @@ class _Texts {
       emailPlaceholder,
       submit,
       doneH3,
-      doneBrowser,
       error;
   final String invalidEmail, tooMany;
   final _PlatformTexts ios, android;
@@ -295,7 +299,6 @@ class _Texts {
     required this.emailPlaceholder,
     required this.submit,
     required this.doneH3,
-    required this.doneBrowser,
     required this.error,
     required this.invalidEmail,
     required this.tooMany,
@@ -500,8 +503,7 @@ $features
         <p class="error" role="alert" hidden></p>
         <button class="btn btn-main">${t.submit}</button>
       </form>
-      <div class="done" hidden><div class="big">🥙</div><h3 class="display" tabindex="-1">${t.doneH3}</h3><p></p>
-        <a class="btn btn-ghost" href="/app">${t.doneBrowser}</a></div>
+      <div class="done" hidden><div class="big">🥙</div><h3 class="display" tabindex="-1">${t.doneH3}</h3><p></p></div>
     </div>
   </section>
 

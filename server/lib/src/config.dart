@@ -114,13 +114,9 @@ class Config {
       signupOpen: get('SIGNUP_OPEN') == 'true',
       signupAllowlist: list('SIGNUP_ALLOWLIST'),
       adminEmails: list('ADMIN_EMAILS'),
-      asc: switch ((get('ASC_KEY_ID'), get('ASC_ISSUER_ID'), get('ASC_KEY_P8'))) {
-        (final keyId?, final issuerId?, final key?) => AscConfig(
-            keyId: keyId,
-            issuerId: issuerId,
-            privateKey: utf8.decode(base64.decode(key)),
-            group: get('TESTFLIGHT_GROUP') ?? 'Erste Tester',
-          ),
+      asc: switch ((get('ASC_KEY_ID'), get('ASC_ISSUER_ID'), _pem(get('ASC_KEY_P8')))) {
+        (final keyId?, final issuerId?, final key?) =>
+          AscConfig(keyId: keyId, issuerId: issuerId, privateKey: key, group: get('TESTFLIGHT_GROUP') ?? 'Erste Tester'),
         _ => null,
       },
       revision: get('APP_VERSION') ?? 'dev',
@@ -139,4 +135,16 @@ class AscConfig {
   final String group;
 
   const AscConfig({required this.keyId, required this.issuerId, required this.privateKey, this.group = 'Erste Tester'});
+}
+
+/// The .p8 key comes base64 encoded; a PEM pasted as is works too. Anything
+/// else turns TestFlight off instead of stopping the server.
+String? _pem(String? value) {
+  if (value == null || value.contains('BEGIN PRIVATE KEY')) return value;
+  try {
+    return utf8.decode(base64.decode(value.replaceAll(RegExp(r'\s'), '')));
+  } on FormatException {
+    print('WARNING: ASC_KEY_P8 is neither base64 nor PEM — TestFlight stays off.');
+    return null;
+  }
 }

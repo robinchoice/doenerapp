@@ -29,7 +29,7 @@ Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) asyn
   final name = place == null ? null : _escape.convert(place['name'] as String);
   final city = place?['city'] as String?;
   final title = name == null ? 'Wie war dein Döner?' : 'Wie war dein Döner bei $name?';
-  final content = '<p>Gib Soße, Fleisch und Brot eine Note. Aus allen Bewertungen entsteht das Ranking'
+  final content = '<p>Gib Soße, Fleisch, Salat und Brot eine Note. Aus allen Bewertungen entsteht das Ranking'
       '${city == null ? ' deiner Stadt' : ' von ${_escape.convert(city)}'}.</p>'
       '<a class="button" href="/app?review=$placeId">Jetzt bewerten</a>'
       '${appUrl == null ? '' : '<a class="button secondary" href="${_escape.convert(appUrl)}">App holen</a>'}'
@@ -85,7 +85,7 @@ Future<Response> posterPage(Deps deps, Request request, String placeId) async {
 <p class="shop">$name</p>
 ${_qrSvg(link)}
 <p class="link">${_escape.convert(link)}</p>
-<p class="steps">QR-Code scannen, Soße, Fleisch und Brot benoten –<br>daraus entsteht das Döner-Ranking${city == null ? '' : ' von ${_escape.convert(city)}'}.</p>
+<p class="steps">QR-Code scannen, Soße, Fleisch, Salat und Brot benoten –<br>daraus entsteht das Döner-Ranking${city == null ? '' : ' von ${_escape.convert(city)}'}.</p>
 <p class="source">Döner App · Ortsdaten: Google Maps</p>
 <button onclick="window.print()">Drucken</button>
 </main></body>''',

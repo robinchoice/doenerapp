@@ -41,7 +41,7 @@ PlaceDto placeFromRow(Map<String, dynamic> row) => PlaceDto(
       opensOn: row['opening_date'] as String?,
     );
 
-/// Sauce, meat and bread come from their columns, everything else from
+/// Sauce, meat and bread come from their columns, everything else (the salad too) from
 /// `items` (the review's review_items as JSON, see [reviewItemsJson]).
 Map<RatingItem, double> ratingsFromRow(Map<String, dynamic> row) => {
       RatingItem.sauce: ?row['sauce_rating'] as double?,
@@ -71,6 +71,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       ratings: ratingsFromRow(row),
       veganOptions: row['vegan_options'] as bool?,
       ayranHomemade: row['ayran_homemade'] as bool?,
+      price: row['price'] as int?,
       ingredients: (row['ingredients'] as List?)?.map((i) => Ingredient.values.byName(i as String)).toList(),
       meat: Meat.values.asNameMap()[row['meat']],
       skewer: Skewer.values.asNameMap()[row['skewer']],
@@ -242,6 +243,9 @@ void mountPlaces(Router router, Deps deps) {
     final body = await readBody(request, UpsertReviewRequest.fromJson);
     final ratings = body.ratings;
     if (!ratings.values.every(Validation.isValidRating)) throw const ApiException.badRequest('Bewertungen müssen 1–5 in halben Schritten sein');
+    if (body.price case final price? when price < Validation.priceMin || price > Validation.priceMax) {
+      throw const ApiException.badRequest('Der Preis muss zwischen 1 und 30 € liegen');
+    }
     final text = Validation.clean(body.text);
     if ((text?.length ?? 0) > Validation.reviewTextMax) throw const ApiException.badRequest('Text zu lang');
 
@@ -260,6 +264,7 @@ void mountPlaces(Router router, Deps deps) {
     if (ratings.isEmpty &&
         veganOptions == null &&
         ayranHomemade == null &&
+        body.price == null &&
         body.ingredients == null &&
         body.meat == null &&
         body.skewer == null &&
@@ -270,14 +275,14 @@ void mountPlaces(Router router, Deps deps) {
     }
     final place = await _requirePlace(deps, placeId);
 
-    final items = {for (final e in ratings.entries) if (!e.key.isDoener) e.key.name: e.value};
+    final items = {for (final e in ratings.entries) if (!RatingItem.classicItems.contains(e.key)) e.key.name: e.value};
     final saved = await deps.db.runTx((tx) async {
       final row = await queryOne(
         tx,
         'INSERT INTO reviews (user_id, place_id, rating, vegetarian_rating, vegan_rating, sauce_rating, fleisch_rating, '
-        'brot_rating, vegan_options, ayran_homemade, ingredients, meat, skewer, bread, text) '
+        'brot_rating, vegan_options, ayran_homemade, price, ingredients, meat, skewer, bread, text) '
         'VALUES (@user:uuid, @place:uuid, @rating:float4, @vegetarian:float4, @vegan:float4, @sauce:float4, @fleisch:float4, '
-        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @ingredients:_text, @meat:text, @skewer:text, @bread:text, @text) '
+        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @price:int4, @ingredients:_text, @meat:text, @skewer:text, @bread:text, @text) '
         // Older reviews may only have an overall rating, without sauce, meat or
         // bread. It stays until the review rates the Döner itself.
         'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = CASE WHEN num_nonnulls(EXCLUDED.sauce_rating, '
@@ -285,7 +290,7 @@ void mountPlaces(Router router, Deps deps) {
         'THEN reviews.rating ELSE EXCLUDED.rating END, '
         'vegetarian_rating = EXCLUDED.vegetarian_rating, vegan_rating = EXCLUDED.vegan_rating, '
         'sauce_rating = EXCLUDED.sauce_rating, fleisch_rating = EXCLUDED.fleisch_rating, brot_rating = EXCLUDED.brot_rating, '
-        'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, '
+        'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, price = EXCLUDED.price, '
         'ingredients = EXCLUDED.ingredients, meat = EXCLUDED.meat, skewer = EXCLUDED.skewer, bread = EXCLUDED.bread, '
         'text = EXCLUDED.text, updated_at = now() RETURNING *',
         {
@@ -300,6 +305,7 @@ void mountPlaces(Router router, Deps deps) {
           'brot': ratings[RatingItem.brot],
           'veganOptions': veganOptions,
           'ayran': ayranHomemade,
+          'price': body.price,
           'ingredients': body.ingredients?.map((i) => i.name).toList(),
           'meat': body.meat?.name,
           'skewer': body.skewer?.name,
@@ -605,6 +611,7 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews) {
         if (values[item] case final v?) item: ItemAverage(v.reduce((a, b) => a + b) / v.length, v.length),
     },
     ayranHomemade: plurality([for (final r in reviews) r['ayran_homemade'] as bool?]),
+    price: median([for (final r in reviews) ?r['price'] as int?]),
     // What at least half of the experts got.
     ingredients: [
       for (final i in Ingredient.values)
@@ -615,6 +622,14 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews) {
     bread: Bread.values.asNameMap()[plurality([for (final r in reviews) r['bread'] as String?])],
     experts: experts.length,
   );
+}
+
+/// The middle value, between the two middle ones for an even count — null without values.
+int? median(List<int> values) {
+  if (values.isEmpty) return null;
+  final sorted = [...values]..sort();
+  final mid = sorted.length ~/ 2;
+  return sorted.length.isOdd ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) ~/ 2;
 }
 
 /// The most common answer — null if nobody answered or it's a tie.

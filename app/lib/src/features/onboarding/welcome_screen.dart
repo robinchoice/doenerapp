@@ -103,7 +103,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           const SizedBox(height: 24),
                           step(Icons.map, 'Entdecken', 'Die Karte zeigt Döner-Läden rund um dich.'),
                           step(Icons.check_circle, 'Einchecken', 'Sammle Stempel für jeden Besuch und steig im Rang auf.'),
-                          step(Icons.restaurant, 'Bewerten', 'Soße, Fleisch, Brot – bewerte, was wirklich zählt.'),
+                          step(Icons.restaurant, 'Bewerten', 'Soße, Fleisch, Salat, Brot – bewerte, was wirklich zählt.'),
                           step(Icons.group, 'Mit Freunden', 'Sieh, wo deine Freunde gerade essen.'),
                         ],
                       ),

@@ -714,6 +714,30 @@ void main() {
       expect((friendsOnly['items'] as List).map((i) => i['user']['displayName']).toSet(), {'Vic'});
     });
 
+    test('salad counts for the Döner, the price is the median', () async {
+      await place('t-salad', 'Salat Kebap', 52.0, 'Salatdorf');
+      await review(ute, 't-salad', {'sauceRating': 5, 'fleischRating': 4, 'brotRating': 3, 'newRatings': {'salat': 2}, 'price': 650});
+      await review(vic, 't-salad', {'newRatings': {'salat': 5}, 'price': 800});
+      await review(wim, 't-salad', {'price': 700});
+
+      final (_, reviews) = await call('GET', '/places/t-salad/reviews');
+      final utes = (reviews as List).firstWhere((r) => r['userName'] == 'Ute') as Map<String, dynamic>;
+      expect(utes['score'], 3.5, reason: '(5 + 4 + 2 + 3) / 4');
+      expect((utes['ratings'] as Map).containsKey('salat'), isFalse, reason: 'shipped apps fail on unknown items');
+      expect(ReviewDto.fromJson(utes).ratings[RatingItem.salat], 2);
+      expect(ReviewDto.fromJson(utes).price, 650);
+
+      final (_, body) = await call('GET', '/places/t-salad/summary');
+      expect((body['items'] as Map).containsKey('salat'), isFalse);
+      final summary = PlaceSummaryDto.fromJson(body as Map<String, dynamic>);
+      expect(summary.items[RatingItem.salat]!.average, 3.5);
+      expect(summary.price, 700, reason: 'median of 6,50, 7 and 8 €');
+
+      final (_, ranking) = await call('GET', '/ranking?lat=52&lon=8&by=salat', token: ute);
+      expect([for (final e in ranking['entries'] as List) (e['place']['placeId'], e['average'])], [('t-salad', 3.5)]);
+      expect((await call('PUT', '/places/t-salad/review', body: {'price': 50}, token: ute)).$1, 400);
+    });
+
     test('rankings for vegans and single dishes', () async {
       final (xen, _) = await signUp('xen@example.org', 'Xen');
       await review(xen, 't-meh', {'brotRating': 4, 'items': {'falafel': 5, 'veganSauce': 5}});

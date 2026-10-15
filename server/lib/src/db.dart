@@ -277,6 +277,10 @@ final migrations = <List<String>>[
       UNIQUE (review_id, reporter_id)
     )''',
   ],
+  [
+    // What the Döner cost, in cents. The salad is a review item like falafel.
+    'ALTER TABLE reviews ADD COLUMN price int CHECK (price BETWEEN 100 AND 3000)',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

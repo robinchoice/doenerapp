@@ -275,12 +275,13 @@ class AppData extends ChangeNotifier {
       placeId: place.placeId,
       placeName: place.name,
       // As on the server: an older overall rating stays until sauce, meat or bread are rated.
-      rating: RatingItem.doenerItems.any((i) => request.ratings.containsKey(i) || (previous?.ratings.containsKey(i) ?? false))
+      rating: RatingItem.classicItems.any((i) => request.ratings.containsKey(i) || (previous?.ratings.containsKey(i) ?? false))
           ? Diet.all.score(request.ratings)?.halfStep
           : previous?.rating,
       ratings: request.ratings,
       veganOptions: request.veganOptions,
       ayranHomemade: request.ayranHomemade,
+      price: request.price,
       ingredients: request.ingredients,
       meat: request.meat,
       skewer: request.skewer,

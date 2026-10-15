@@ -512,6 +512,9 @@ class Pill extends StatelessWidget {
 
 String formatRating(double value) => value.toStringAsFixed(1).replaceAll('.', ',');
 
+/// Cents as "7,50 €".
+String formatPrice(int cents) => '${(cents / 100).toStringAsFixed(2).replaceAll('.', ',')} €';
+
 String formatDate(DateTime date) => DateFormat('d. MMM y', 'de').format(date.toLocal());
 
 String formatDateTime(DateTime date) => DateFormat('d. MMM y, HH:mm', 'de').format(date.toLocal());

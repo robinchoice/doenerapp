@@ -181,7 +181,7 @@ class _StartScreenState extends State<StartScreen> {
           icon: Icons.restaurant,
           title: 'Bewerte deinen Stammladen',
           message: switch (diet) {
-            Diet.all => 'Such ihn auf der Karte und gib Soße, Fleisch und Brot eine Note.',
+            Diet.all => 'Such ihn auf der Karte und gib Soße, Fleisch, Salat und Brot eine Note.',
             Diet.vegetarian => 'Such ihn auf der Karte und bewerte Falafel, Halloumi, Soße und Brot.',
             Diet.vegan => 'Such ihn auf der Karte und bewerte, was es dort Veganes gibt.',
           },

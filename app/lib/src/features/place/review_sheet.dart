@@ -15,8 +15,15 @@ enum _Answer { yes, no, unknown }
 /// What the card at the top rates: the Döner, or the food without meat.
 List<RatingItem> _mainItems(Diet diet) => switch (diet) {
       Diet.all => RatingItem.doenerItems,
-      Diet.vegetarian => const [RatingItem.falafel, RatingItem.halloumi, RatingItem.sauce, RatingItem.brot],
-      Diet.vegan => const [RatingItem.veganDoener, RatingItem.falafel, RatingItem.veganSauce, RatingItem.hummus, RatingItem.brot],
+      Diet.vegetarian => const [RatingItem.falafel, RatingItem.halloumi, RatingItem.sauce, RatingItem.salat, RatingItem.brot],
+      Diet.vegan => const [
+          RatingItem.veganDoener,
+          RatingItem.falafel,
+          RatingItem.veganSauce,
+          RatingItem.hummus,
+          RatingItem.salat,
+          RatingItem.brot,
+        ],
     };
 
 String _mainTitle(Diet diet) => switch (diet) { Diet.all => '🥙 Döner', Diet.vegetarian => '🧆 Ohne Fleisch', Diet.vegan => '🌱 Vegan' };
@@ -39,6 +46,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
   late final Diet _diet = context.read<Session>().diet;
   late final bool _expert = context.read<Session>().expertMode;
   late final _text = TextEditingController(text: _existing?.text);
+  late final _price = TextEditingController(text: _existing?.price == null ? '' : formatPrice(_existing!.price!).replaceAll(' €', ''));
   late final _ratings = {...?_existing?.ratings};
   late final _extras = {for (final item in RatingItem.extraItems) if (_ratings.containsKey(item)) item};
   late _Answer? _vegan = _answer(_existing?.veganOptions);
@@ -61,17 +69,32 @@ class _ReviewSheetState extends State<ReviewSheet> {
   static _Answer? _answer(bool? value) => value == null ? null : (value ? _Answer.yes : _Answer.no);
   static bool? _bool(_Answer? answer) => switch (answer) { _Answer.yes => true, _Answer.no => false, _ => null };
 
+  /// The entered price in cents, null if empty or not a number.
+  int? get _cents => switch (double.tryParse(_price.text.trim().replaceAll(',', '.'))) {
+        final euros? => (euros * 100).round(),
+        null => null,
+      };
+
+  String? get _priceError {
+    if (_price.text.trim().isEmpty) return null;
+    final cents = _cents;
+    return cents == null || cents < Validation.priceMin || cents > Validation.priceMax ? 'Zwischen 1 und 30 €' : null;
+  }
+
   bool get _canSave =>
-      _ratings.isNotEmpty ||
+      _priceError == null &&
+      (_ratings.isNotEmpty ||
+          _cents != null ||
       _bool(_vegan) != null ||
       _bool(_ayran) != null ||
       _expertTouched ||
-      _hasPhoto ||
-      Validation.clean(_text.text) != null;
+          _hasPhoto ||
+          Validation.clean(_text.text) != null);
 
   @override
   void dispose() {
     _text.dispose();
+    _price.dispose();
     super.dispose();
   }
 
@@ -137,6 +160,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
             ratings: Map.of(_ratings),
             veganOptions: _bool(_vegan),
             ayranHomemade: _bool(_ayran),
+            price: _cents,
             // Without expert mode, earlier answers stay as they were.
             ingredients: _expertTouched ? (_ingredients.toList()..sort((a, b) => a.index.compareTo(b.index))) : _existing?.ingredients,
             meat: _expertTouched ? _meat : _existing?.meat,
@@ -265,7 +289,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
     final extras = [for (final item in RatingItem.extraItems) if (_diet.allows(item.diet) && !main.contains(item)) item];
     // An older review may only have an overall rating; it shows until sauce, meat or bread get one.
     final keepsOld = _diet == Diet.all &&
-        !RatingItem.doenerItems.any((i) => _ratings.containsKey(i) || (_existing?.ratings.containsKey(i) ?? false));
+        !RatingItem.classicItems.any((i) => _ratings.containsKey(i) || (_existing?.ratings.containsKey(i) ?? false));
     final score = _diet.score(_ratings)?.halfStep ?? (keepsOld ? _existing?.rating : null) ?? 0;
     return ListView(
       shrinkWrap: true,
@@ -295,6 +319,22 @@ class _ReviewSheetState extends State<ReviewSheet> {
                         style: TextStyle(color: context.accent, fontWeight: FontWeight.w600),
                       ),
                     ),
+                ],
+              ),
+              const Divider(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Text('💶 Was hast du bezahlt?')),
+                  SizedBox(
+                    width: 110,
+                    child: TextField(
+                      controller: _price,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.end,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(hintText: '7,50', suffixText: '€', errorText: _priceError, isDense: true),
+                    ),
+                  ),
                 ],
               ),
             ],

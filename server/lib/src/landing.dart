@@ -71,13 +71,13 @@ Response landingPage(Request _, {required bool english}) =>
 final _de = _Texts(
   lang: 'de',
   title: 'Döner App – Der beste Döner deiner Stadt',
-  description: 'Döner bewertet nach Soße, Fleisch und Brot – von Leuten, die in deiner Gegend essen.',
+  description: 'Döner bewertet nach Soße, Fleisch, Salat und Brot – von Leuten, die in deiner Gegend essen.',
   ogImage: 'og-image-de.png',
   navTest: 'Testen',
   h1: 'Der beste Döner',
   h1Accent: 'deiner Stadt.',
   lead:
-      'Bewertet nach Soße, Fleisch und Brot – von Leuten, die in deiner Gegend essen. '
+      'Bewertet nach Soße, Fleisch, Salat und Brot – von Leuten, die in deiner Gegend essen. '
       'Und du siehst, wo deine Freunde gerade sitzen.',
   ctaTest: 'Für den Test anmelden',
   ctaBrowser: 'Im Browser öffnen',
@@ -93,7 +93,7 @@ final _de = _Texts(
     (
       '🥙',
       'Ehrlich bewertet',
-      'Soße, Fleisch und Brot einzeln, in halben Punkten. Eine einzelne 5 schlägt keine dreißig 4,5er.',
+      'Soße, Fleisch, Salat und Brot einzeln, in halben Punkten. Eine einzelne 5 schlägt keine dreißig 4,5er.',
     ),
     (
       '🏆',
@@ -140,13 +140,13 @@ final _de = _Texts(
 final _en = _Texts(
   lang: 'en',
   title: 'Döner App – The best döner in your city',
-  description: 'Döner rated by sauce, meat and bread – by people who eat in your area.',
+  description: 'Döner rated by sauce, meat, salad and bread – by people who eat in your area.',
   ogImage: 'og-image-en.png',
   navTest: 'Try it',
   h1: 'The best döner',
   h1Accent: 'in&nbsp;your city.',
   lead:
-      'Rated by sauce, meat and bread – by people who eat in your area. And you see where your friends are eating right now.',
+      'Rated by sauce, meat, salad and bread – by people who eat in your area. And you see where your friends are eating right now.',
   ctaTest: 'Join the beta',
   ctaBrowser: 'Open in browser',
   stores: 'iPhone via TestFlight · Android via Google Play testing · free',
@@ -158,7 +158,7 @@ final _en = _Texts(
   tabs: ['Home', 'Map', 'Ranking', 'Profile'],
   decimal: '.',
   features: [
-    ('🥙', 'Honest ratings', 'Sauce, meat and bread separately, in half points. A single 5 doesn’t beat thirty 4.5s.'),
+    ('🥙', 'Honest ratings', 'Sauce, meat, salad and bread separately, in half points. A single 5 doesn’t beat thirty 4.5s.'),
     (
       '🏆',
       'Your city’s ranking',

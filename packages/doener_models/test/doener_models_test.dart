@@ -157,6 +157,9 @@ void main() {
       expect(Diet.all.score(const {RatingItem.brot: 5}), isNull, reason: 'bread alone is no Döner rating');
       expect(Diet.vegan.score(const {RatingItem.falafel: 4.0, RatingItem.hummus: 5.0, RatingItem.brot: 3.0}), 4);
       expect(Diet.vegetarian.score(const {RatingItem.halloumi: 5.0, RatingItem.sauce: 3.0}), 4);
+      expect(Diet.all.score(const {RatingItem.sauce: 5.0, RatingItem.fleisch: 4.0, RatingItem.salat: 2.0, RatingItem.brot: 3.0}), 3.5,
+          reason: 'the salad is part of the Döner');
+      expect(Diet.all.score(const {RatingItem.salat: 5}), isNull, reason: 'salad alone is no Döner rating');
     });
 
     test('headline falls back to what the review is about', () {
@@ -240,6 +243,24 @@ void main() {
     expect(legacy.ratings, {RatingItem.sauce: 5, RatingItem.brot: 3}, reason: 'reviews stored by older builds');
     expect(legacy.rating, 5);
     expect(() => UpsertReviewRequest.fromJson({'items': {'zwiebel': 3}}), throwsArgumentError);
+  });
+
+  test('salad and price stay out of what older apps read', () {
+    const request = UpsertReviewRequest(ratings: {RatingItem.sauce: 4, RatingItem.salat: 3.5, RatingItem.falafel: 5}, price: 750);
+    final json = request.toJson();
+    expect(json['items'], {'falafel': 5}, reason: 'older apps fail on item names they do not know');
+    expect((json['ratings'] as Map).keys, ['sauce', 'falafel']);
+    expect(json['newRatings'], {'salat': 3.5});
+    final back = UpsertReviewRequest.fromJson(json);
+    expect(back.ratings, request.ratings);
+    expect(back.price, 750);
+
+    const summary = PlaceSummaryDto(items: {RatingItem.salat: ItemAverage(4, 2), RatingItem.ayran: ItemAverage(5, 1)}, price: 700);
+    final summaryJson = summary.toJson();
+    expect((summaryJson['items'] as Map).keys, ['ayran']);
+    final summaryBack = PlaceSummaryDto.fromJson(summaryJson);
+    expect(summaryBack.items.keys, {RatingItem.salat, RatingItem.ayran});
+    expect(summaryBack.price, 700);
   });
 
   test('account settings default for profiles cached by older builds', () {

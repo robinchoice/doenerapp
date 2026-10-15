@@ -162,6 +162,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                       if (place.veganOptions == false) _Fact('Nichts Veganes', theme.colorScheme.outline),
                       if (diet != Diet.vegan && summary?.ayranHomemade == true) _Fact('🥛 Ayran selbstgemacht', context.accent),
                       if (diet != Diet.vegan && summary?.ayranHomemade == false) _Fact('Ayran gekauft', theme.colorScheme.outline),
+                      if (summary?.price case final price?) _Fact('💶 Meist ${formatPrice(price)}', theme.colorScheme.outline),
                       for (final special in summary?.specials ?? const <Ingredient>[]) _Fact('✨ ${special.label}', context.accent),
                     ]),
                   ],
@@ -340,7 +341,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  /// The Döner with its sauce, meat and bread first, then everything else the
+  /// The Döner with its sauce, meat, salad and bread first, then everything else the
   /// diet eats — averages of all reviews.
   List<Widget> _menuRows(PlaceDto place, PlaceSummaryDto summary, Diet diet) {
     final doener = place.score(Diet.all);
@@ -494,6 +495,10 @@ class ReviewCard extends StatelessWidget {
             ],
           ),
           if (review.ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: review.ratings, diet: diet)],
+          if (review.price case final price?) ...[
+            const SizedBox(height: 4),
+            Text('💶 ${formatPrice(price)}', style: theme.textTheme.bodySmall),
+          ],
           if (review.text != null) ...[const SizedBox(height: 6), Text(review.text!)],
           if (photo != null || review.photoId != null) ...[const SizedBox(height: 10), ReviewPhoto(photoId: review.photoId, bytes: photo)],
           const SizedBox(height: 6),

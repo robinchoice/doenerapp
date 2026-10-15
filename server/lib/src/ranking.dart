@@ -41,7 +41,7 @@ void mountRanking(Router router, Deps deps) {
     final by = RankBy.parse(request.url.queryParameters['by'] ?? RankBy.overall.key);
     if (by == null) throw const ApiException.badRequest('Parameter "by" ist ungültig');
     final ratings = _ratings(by);
-    final itemParam = {if (by.item case final item? when !item.isDoener) 'item': item.name};
+    final itemParam = {if (by.item case final item? when !RatingItem.classicItems.contains(item)) 'item': item.name};
 
     final city = request.url.queryParameters['city'] ??
         (await queryOne(

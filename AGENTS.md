@@ -26,6 +26,7 @@
 ## Fallen
 
 - Die Adresse `doener-api.pleasance.org` bleibt für ausgelieferte Mobile-Clients erhalten. API-Änderungen müssen mit ihnen kompatibel bleiben.
+- Ausgelieferte Builds bis 1.0.x scheitern an unbekannten Namen von Bewertungspunkten. Neue `RatingItem`s kommen deshalb in `RatingItem.newItems`, das JSON trägt sie getrennt (`newRatings`, `newItems`).
 - Der Maps-JavaScript-Key der Web-Version (`GOOGLE_MAPS_WEB_KEY`) ist per Referrer auf die Domains beschränkt. Neue Domain: Referrer im Google-Projekt ergänzen.
 
 - Die Landingpage lädt Schrift und Wortmarke aus dem Flutter-Build (`/assets/assets/…`). Wer Assets in `app/pubspec.yaml` verschiebt, muss die Pfade in `server/lib/src/landing.dart` nachziehen.

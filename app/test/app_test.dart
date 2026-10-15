@@ -107,7 +107,7 @@ void main() {
     );
 
     final empty = find.byIcon(Icons.restaurant_outlined);
-    expect(empty, findsNWidgets(20)); // Soße, Fleisch, Brot, Gesamt
+    expect(empty, findsNWidgets(25)); // Soße, Fleisch, Salat, Brot, Gesamt
     await tester.tap(empty.at(3)); // Soße: 4
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.restaurant_outlined).at(2)); // Fleisch: 2

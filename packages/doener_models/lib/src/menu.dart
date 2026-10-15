@@ -17,13 +17,27 @@ enum Diet {
 
   /// Items whose average makes up the main score.
   List<RatingItem> get scoreItems => switch (this) {
-        all => const [RatingItem.sauce, RatingItem.fleisch, RatingItem.brot],
-        vegetarian => const [RatingItem.falafel, RatingItem.halloumi, RatingItem.veganDoener, RatingItem.sauce, RatingItem.brot],
-        vegan => const [RatingItem.falafel, RatingItem.veganDoener, RatingItem.veganSauce, RatingItem.hummus, RatingItem.brot],
+        all => const [RatingItem.sauce, RatingItem.fleisch, RatingItem.salat, RatingItem.brot],
+        vegetarian => const [
+            RatingItem.falafel,
+            RatingItem.halloumi,
+            RatingItem.veganDoener,
+            RatingItem.sauce,
+            RatingItem.salat,
+            RatingItem.brot,
+          ],
+        vegan => const [
+            RatingItem.falafel,
+            RatingItem.veganDoener,
+            RatingItem.veganSauce,
+            RatingItem.hummus,
+            RatingItem.salat,
+            RatingItem.brot,
+          ],
       };
 
   /// A review only counts for the main score once it rates one of these — a
-  /// rated bread alone says nothing about the Döner, the falafel or the vegan food.
+  /// rated bread or salad alone says nothing about the Döner, the falafel or the vegan food.
   List<RatingItem> get scoreRequires => switch (this) {
         all => const [RatingItem.sauce, RatingItem.fleisch],
         vegetarian => const [RatingItem.falafel, RatingItem.halloumi, RatingItem.veganDoener],
@@ -53,11 +67,12 @@ enum Diet {
   }
 }
 
-/// Everything a review can rate, 1–5 each in half steps. Sauce, meat and
-/// bread are the Döner itself, everything else is optional.
+/// Everything a review can rate, 1–5 each in half steps. Sauce, meat, salad
+/// and bread are the Döner itself, everything else is optional.
 enum RatingItem {
   sauce('Soße', '🥣', Diet.vegetarian),
   fleisch('Fleisch', '🥩', Diet.all),
+  salat('Salat', '🥗', Diet.vegan),
   brot('Brot', '🍞', Diet.vegan),
   falafel('Falafel', '🧆', Diet.vegan),
   halloumi('Halloumi', '🧀', Diet.vegetarian),
@@ -78,7 +93,15 @@ enum RatingItem {
   final String? hint;
   const RatingItem(this.label, this.emoji, this.diet, {this.hint});
 
-  static const doenerItems = [sauce, fleisch, brot];
+  static const doenerItems = [sauce, fleisch, salat, brot];
+
+  /// Rated from the start: fields of their own in the JSON and columns of
+  /// their own in the database. All other items are review_items.
+  static const classicItems = [sauce, fleisch, brot];
+
+  /// Unknown to clients before 1.1, which fail on item names they don't know.
+  /// The JSON carries these in keys of their own that those clients don't read.
+  static const newItems = [salat];
 
   /// "Was gab's noch?"
   static const extraItems = [falafel, halloumi, pizza, pide, lahmacun, seele];
@@ -187,7 +210,8 @@ class RankBy {
   static List<RankBy> forDiet(Diet diet) => switch (diet) {
         Diet.all => [
             overall,
-            for (final i in [RatingItem.sauce, RatingItem.fleisch, RatingItem.brot, RatingItem.falafel, RatingItem.halloumi]) RankBy.item(i),
+            for (final i in [RatingItem.sauce, RatingItem.fleisch, RatingItem.salat, RatingItem.brot, RatingItem.falafel, RatingItem.halloumi])
+              RankBy.item(i),
             const RankBy.score(Diet.vegan),
             for (final i in [RatingItem.pizza, RatingItem.pide, RatingItem.lahmacun, RatingItem.seele, RatingItem.ayran]) RankBy.item(i),
           ],
@@ -195,12 +219,12 @@ class RankBy {
             const RankBy.score(Diet.vegetarian),
             for (final i in [RatingItem.falafel, RatingItem.halloumi]) RankBy.item(i),
             const RankBy.score(Diet.vegan),
-            for (final i in [RatingItem.sauce, RatingItem.brot, RatingItem.pizza, RatingItem.pide, RatingItem.seele, RatingItem.ayran])
+            for (final i in [RatingItem.sauce, RatingItem.salat, RatingItem.brot, RatingItem.pizza, RatingItem.pide, RatingItem.seele, RatingItem.ayran])
               RankBy.item(i),
           ],
         Diet.vegan => [
             const RankBy.score(Diet.vegan),
-            for (final i in [RatingItem.veganDoener, RatingItem.falafel, RatingItem.hummus, RatingItem.veganSauce, RatingItem.brot])
+            for (final i in [RatingItem.veganDoener, RatingItem.falafel, RatingItem.hummus, RatingItem.veganSauce, RatingItem.salat, RatingItem.brot])
               RankBy.item(i),
           ],
       };

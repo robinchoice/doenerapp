@@ -9,6 +9,10 @@ abstract final class Validation {
   static const shopNameMin = 2;
   static const reportNoteMax = 1000;
 
+  /// What a Döner may cost, in cents.
+  static const priceMin = 100;
+  static const priceMax = 3000;
+
   /// New accounts get a placeholder name with this prefix until the user picks one.
   static const generatedNamePrefix = 'Döner-Fan-';
 

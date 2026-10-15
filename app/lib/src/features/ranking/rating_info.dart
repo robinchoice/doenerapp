@@ -44,7 +44,7 @@ class _RatingInfo extends StatelessWidget {
         ),
         section(
           'Noten',
-          'Bewertet wird von 1 bis 5 in halben Schritten. Die Döner-Note ist der Schnitt aus Soße, Fleisch und Brot. '
+          'Bewertet wird von 1 bis 5 in halben Schritten. Die Döner-Note ist der Schnitt aus Soße, Fleisch, Salat und Brot. '
               'Bei Vegetarisch und Vegan zählen eigene Noten, etwa für Falafel oder veganen Döner.',
         ),
         section(

@@ -2,7 +2,7 @@
 
 **Der beste Döner der Stadt – empfohlen von Leuten in deiner Umgebung.**
 
-Eine lokale Döner-Community für iOS, Android und Web aus einer Codebase. Wer in der Nähe Döner isst, bewertet die Läden nach Soße, Fleisch und Brot. Daraus entstehen das Ranking der Stadt und die Trends im Umkreis. Freunde verbinden sich per QR-Code und sehen, wo der andere gerade isst.
+Eine lokale Döner-Community für iOS, Android und Web aus einer Codebase. Wer in der Nähe Döner isst, bewertet die Läden nach Soße, Fleisch, Salat und Brot. Daraus entstehen das Ranking der Stadt und die Trends im Umkreis. Freunde verbinden sich per QR-Code und sehen, wo der andere gerade isst.
 
 Die App wird gerade auf diese Ausrichtung umgebaut. Was beschlossen, aber noch nicht gebaut ist, steht unter [Umbau](#umbau). Alle anderen Abschnitte beschreiben den Stand im Code.
 
@@ -10,7 +10,7 @@ Die App wird gerade auf diese Ausrichtung umgebaut. Was beschlossen, aber noch n
 
 ## Überblick
 
-Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Dazu kommen eine persönliche Stempelkarte und die eigene Döner-Geschichte.
+Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Dazu kommen eine persönliche Stempelkarte und die eigene Döner-Geschichte.
 
 **Stack:**
 - App: Flutter (iOS, Android, Web), Google Maps (google_maps_flutter), sembast als lokaler Store
@@ -50,7 +50,7 @@ Danach kommt ein Drehrad mit den Essenstypen, die zur Ernährung passen (Döner,
 
 ### Bewertungen
 
-Ein Bogen, alle Punkte 1–5 in halben Schritten und optional. Ein Tipp auf die linke Hälfte eines Bestecks gibt den halben Punkt. Oben der Döner mit Soße, Fleisch und Brot. Die Gesamtnote ist ihr Durchschnitt, auf halbe Punkte gerundet, ohne manuelles Überschreiben. Sie zählt erst, wenn Soße oder Fleisch benotet ist, Brot allein ist keine Döner-Note. Darunter:
+Ein Bogen, alle Punkte 1–5 in halben Schritten und optional. Ein Tipp auf die linke Hälfte eines Bestecks gibt den halben Punkt. Oben der Döner mit Soße, Fleisch, Salat und Brot. Die Gesamtnote ist ihr Durchschnitt, auf halbe Punkte gerundet, ohne manuelles Überschreiben. Sie zählt erst, wenn Soße oder Fleisch benotet ist, Brot oder Salat allein sind keine Döner-Note. Darunter der Preis in € (1–30 €, optional), der Laden zeigt den Median aller Angaben („Meist 7,50 €“). Darunter:
 
 - „Was gab's noch?“: Falafel, Halloumi, Pizza, Pide, Lahmacun, Seele. Ein Tipp öffnet die Zeile, jedes Gericht hat eine eigene Rangliste und zählt nicht in die Gesamtnote
 - „Vegane Optionen?“ (Ja/Nein/Weiß nicht): Bei Ja lassen sich veganer Döner (Seitan oder Soja), vegane Soße und Hummus bewerten. „Nein“ zeigt der Laden als „Nichts Veganes“
@@ -69,9 +69,9 @@ In den Einstellungen: Alles, Vegetarisch oder Vegan. Gespeichert am Account, gil
 
 | Ernährung | Note | Durchschnitt aus | zählt, sobald bewertet ist |
 |---|---|---|---|
-| Alles | Gesamt | Soße, Fleisch, Brot | Soße oder Fleisch |
-| Vegetarisch | Ohne Fleisch | Falafel, Halloumi, veganer Döner, Soße, Brot | Falafel, Halloumi oder veganer Döner |
-| Vegan | Vegan | Falafel, veganer Döner, vegane Soße, Hummus, Brot | eines davon außer Brot |
+| Alles | Gesamt | Soße, Fleisch, Salat, Brot | Soße oder Fleisch |
+| Vegetarisch | Ohne Fleisch | Falafel, Halloumi, veganer Döner, Soße, Salat, Brot | Falafel, Halloumi oder veganer Döner |
+| Vegan | Vegan | Falafel, veganer Döner, vegane Soße, Hummus, Salat, Brot | eines davon außer Brot |
 
 ### Profil & Stempelkarte
 
@@ -121,7 +121,7 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 
 ### Ranking
 
-Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens im Umkreis von 20 km. Gerankt wird der Laden, umschaltbar per Chips: zuerst die Note zur Ernährung, dann einzelne Punkte (bei „Alles“ Soße, Fleisch, Brot, Falafel, Halloumi, Vegan, Pizza, Pide, Lahmacun, Seele, Ayran).
+Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens im Umkreis von 20 km. Gerankt wird der Laden, umschaltbar per Chips: zuerst die Note zur Ernährung, dann einzelne Punkte (bei „Alles“ Soße, Fleisch, Salat, Brot, Falafel, Halloumi, Vegan, Pizza, Pide, Lahmacun, Seele, Ayran).
 
 - Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit drei Bewertungen in Höhe des Stadtschnitts (`weightedRating` in `packages/doener_models`). So schlägt eine einzelne 5 nicht viele 4,5er
 - Angezeigt werden echter Schnitt und Anzahl, dazu die Freunde, die den Laden bewertet haben, mit ihrer Note

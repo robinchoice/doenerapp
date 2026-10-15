@@ -42,9 +42,9 @@ class _RankingScreenState extends State<RankingScreen> {
 
 
   static String _hint(RankBy by) => switch (by) {
-        RankBy(diet: Diet.all) => 'Durchschnitt aus Soße, Fleisch und Brot',
-        RankBy(diet: Diet.vegetarian) => 'Falafel, Halloumi und veganer Döner mit Soße und Brot',
-        RankBy(diet: Diet.vegan) => 'Falafel, veganer Döner, vegane Soße und Hummus mit Brot',
+        RankBy(diet: Diet.all) => 'Durchschnitt aus Soße, Fleisch, Salat und Brot',
+        RankBy(diet: Diet.vegetarian) => 'Falafel, Halloumi und veganer Döner mit Soße, Salat und Brot',
+        RankBy(diet: Diet.vegan) => 'Falafel, veganer Döner, vegane Soße und Hummus mit Salat und Brot',
         RankBy(item: RatingItem.ayran) => 'Nur selbstgemachter Ayran',
         _ => '',
       };

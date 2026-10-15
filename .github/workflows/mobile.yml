@@ -1,11 +1,18 @@
 name: Mobile
 
-# Android → AAB als Artefakt und in den internen Play-Test, iOS → TestFlight.
+# Android → AAB als Artefakt und in den internen Play-Test, dazu eine signierte APK
+# zum direkten Verschicken an Tester; iOS → TestFlight.
 # Beides nur bei Tags `v*` und per workflow_dispatch: Die Minuten gehen vom Kontingent
 # des privaten Repos ab (macOS 10-fach), ein Build pro Push auf main war zu teuer.
+# `gh workflow run Mobile -f platform=android` baut nur Android.
 
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        type: choice
+        options: [all, android]
+        default: all
   push:
     tags: ['v*']
 
@@ -14,6 +21,7 @@ env:
 
 jobs:
   ios:
+    if: inputs.platform != 'android'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +109,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      HAS_PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # Repo variable PLAY_UPLOAD=true once the first bundle was uploaded by hand in the Play Console.
+      HAS_PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' && vars.PLAY_UPLOAD == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -138,6 +147,18 @@ jobs:
         with:
           name: doener-android-aab
           path: app/build/app/outputs/bundle/release/app-release.aab
+
+      # Until Play testing works, testers install this APK by hand.
+      - name: APK bauen
+        working-directory: app
+        env:
+          GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
+        run: flutter build apk --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: doener-android-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
 
       # Play only accepts API uploads once the first bundle was uploaded by hand in the Play Console.
       - name: Upload zu Play (interner Test)

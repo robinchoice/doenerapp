@@ -197,7 +197,9 @@ Future<InviteResult> inviteTester(Deps deps, String email, AuthUser admin, {Stri
     }
   }
   final ios = platform == 'ios';
-  await _mailLoginCode(deps, email, invitedBy: admin.displayName, testFlight: ios && deps.config.asc != null);
+  // The public TestFlight link only helps iPhones that Apple doesn't invite itself.
+  await _mailLoginCode(deps, email,
+      invitedBy: admin.displayName, testFlight: ios && deps.config.asc != null, appLink: platform != 'android');
   if (!ios) return const InviteResult();
   final asc = deps.config.asc;
   if (asc == null) return const InviteResult(testFlight: 'off');
@@ -211,7 +213,8 @@ Future<InviteResult> inviteTester(Deps deps, String email, AuthUser admin, {Stri
 }
 
 /// Mails a code and a magic link; [invitedBy] turns it into an invitation.
-Future<void> _mailLoginCode(Deps deps, String email, {String? invitedBy, String? inviteCode, bool testFlight = false}) async {
+Future<void> _mailLoginCode(Deps deps, String email,
+    {String? invitedBy, String? inviteCode, bool testFlight = false, bool appLink = true}) async {
   await deps.db.execute("DELETE FROM login_requests WHERE created_at < now() - interval '1 day'");
   await deps.db.execute('DELETE FROM sessions WHERE expires_at < now()');
 
@@ -246,7 +249,7 @@ Future<void> _mailLoginCode(Deps deps, String email, {String? invitedBy, String?
     text: '${invitedBy == null ? '' : '$invitedBy hat dir ein Konto in der Döner App angelegt.\n\n'}'
         'Dein Code für die Döner App: $code\n\n'
         '${publicUrl == null ? '' : 'Oder direkt im Browser anmelden:\n$publicUrl/login?token=$token\n\n'}'
-        '${testFlight ? 'Die iPhone-App kommt über TestFlight, die Einladung schickt dir Apple in einer eigenen Mail.\n\n' : invitedBy == null || appUrl == null ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
+        '${testFlight ? 'Die iPhone-App kommt über TestFlight, die Einladung schickt dir Apple in einer eigenen Mail.\n\n' : invitedBy == null || appUrl == null || !appLink ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
         'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '
         '${invitedBy == null ? 'Falls du das nicht angefordert hast, ignoriere diese Mail einfach.' : 'Danach meldest du dich jederzeit mit dieser Adresse an.'}',
   );

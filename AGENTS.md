@@ -4,6 +4,7 @@
 
 - Döner-Community für iOS, Android und Web aus einer Flutter-Codebase, Server in Dart. Web und API laufen unter https://doener-api.pleasance.org (Landingpage unter `/` und `/en`, API unter `/api/v1`, Web-App unter `/app`).
 - Coolify auf VPS 1, Projekt `pleasance-doener`, Datenbank `doener-db`.
+- Öffentlicher TestFlight-Link: https://testflight.apple.com/join/nJJ5wARs (externe Gruppe „Erste Tester“). Er steht als `APP_DOWNLOAD_URL` in Coolify und hinter „App holen“ auf `/i/<code>` und `/b/<placeId>`. Ein neuer Build kommt erst nach Apples Beta-Prüfung in die Gruppe.
 - Fachliche Regeln und der geplante Umbau: README.md.
 
 ## Checks

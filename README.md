@@ -10,7 +10,7 @@ Die App wird gerade auf diese Ausrichtung umgebaut. Was beschlossen, aber noch n
 
 ## Überblick
 
-Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Dazu kommen eine persönliche Stempelkarte und die eigene Döner-Geschichte.
+Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Jedes Profil ist öffentlich: Stufe, Bewertungen und die persönliche Bestenliste.
 
 **Stack:**
 - App: Flutter (iOS, Android, Web), Google Maps (google_maps_flutter), sembast als lokaler Store
@@ -75,40 +75,29 @@ In den Einstellungen: Alles, Vegetarisch oder Vegan. Gespeichert am Account, gil
 | Vegetarisch | Ohne Fleisch | Falafel, Halloumi, veganer Döner, Soße, Salat, Brot | Falafel, Halloumi oder veganer Döner |
 | Vegan | Vegan | Falafel, veganer Döner, vegane Soße, Hummus, Salat, Brot | eines davon außer Brot |
 
-### Profil & Stempelkarte
+### Profil
 
-Das Profil ist der persönliche Döner-Pass: Besuche, Bewertungen, Läden, Döner-Konsum nach Essenstyp und „Seit [Monat Jahr]“ ab dem ersten Check-in. Dort liegen auch „Meine Aktivität“ (eigene Check-ins und Bewertungen, noch nicht übertragene sind markiert) und „Meine Läden“ (alle besuchten oder bewerteten Läden, sortierbar nach Bewertung, Besuchen oder zuletzt besucht).
+Ein Profil für alle, ein Tipp auf einen Namen (Feed, Laden, Freundesliste, Suche) öffnet es. Es zeigt Name, Stufe, „Seit [Monat Jahr]“ ab dem ersten Check-in oder der ersten Bewertung, die Zahl der bewerteten Läden und drei Tabs:
+- **Top 5:** die persönliche Bestenliste, die bestbewerteten Läden der Person, gerechnet mit der Ernährung dessen, der schaut
+- **Bewertungen:** alle Bewertungen der Person
+- **Check-ins:** nur für Freunde und einen selbst, für alle anderen gesperrt
 
-| Stufe | Ab Besuchen | Farbe |
-|---|---|---|
-| Dönerneuling | 0 | Grau |
-| Dönerfreund | 5 | Braun |
-| Dönerfan | 15 | Orange |
-| Dönerprofi | 30 | Rot |
-| Dönermeister | 60 | Lila |
-| Dönerlegende | 100 | Gold |
+Am fremden Profil stehen „Als Freund hinzufügen“ und ⋮ zum Blockieren. Das eigene Profil zeigt zusätzlich, wie viele Läden bis zur nächsten Stufe fehlen, die Zahl der Check-ins und Freunde, noch nicht übertragene Einträge (markiert) und das Menü mit Freunden, „Meine Läden“ (alle besuchten oder bewerteten Läden, sortierbar nach Bewertung, Besuchen oder zuletzt besucht) und Wrapped.
 
-### Erfolge
+Die Stufe steht neben dem Namen und richtet sich nach bewerteten Läden (`Tier` in `packages/doener_models`):
 
-| Erfolg | Bedingung |
+| Stufe | Ab bewerteten Läden |
 |---|---|
-| First Bite | Erster Check-in |
-| Kritiker | Erste Bewertung |
-| Stammgast | 5× derselbe Laden |
-| Entdecker | 10 verschiedene Läden |
-| Kenner | 50 verschiedene Läden |
-| Berlin Döner Tour | 5 Läden in Berlin |
-| Hamburg Döner Tour | 5 Läden in Hamburg |
-| Silber-Sammler | Stufe „Dönerfan“ erreicht |
-| Gold-Sammler | Stufe „Dönermeister“ erreicht |
-| Nachtschwärmer | Check-in nach 22 Uhr |
-| Schmetterling | 5 Freunde |
-
-Die Regeln liegen in `packages/doener_models` und sind dort getestet.
+| Dönerneuling | 0 |
+| Dönerfreund | 3 |
+| Dönerfan | 10 |
+| Dönerprofi | 25 |
+| Dönermeister | 50 |
+| Dönerlegende | 100 |
 
 ### Döner Wrapped
 
-Jahresrückblick auf 5 Seiten auf dunklem Grund: Besuche im Jahr, Lieblingsessen, Stammladen, entdeckte Läden, Zusammenfassung mit aktivstem Monat.
+Nur im Dezember, sonst ausgegraut. Jahresrückblick auf 5 Seiten auf dunklem Grund: Besuche im Jahr, Lieblingsessen, Stammladen, entdeckte Läden, Zusammenfassung mit aktivstem Monat.
 
 ### Start
 
@@ -183,14 +172,14 @@ server/                       Dart-API + Auslieferung der Web-App
 ├── lib/src/google_places.dart
 ├── lib/src/db.dart           SQL-Migrationen (nur anhängen, nie ändern)
 └── tool/seed_dev.dart        Test-Läden in Freiburg für Entwicklung ohne Google-Key
-packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und Ernährung (`menu.dart`), Ranking-Regel, Stempel/Erfolge/Essenstypen
+packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und Ernährung (`menu.dart`), Ranking-Regel, Stufen und Essenstypen
 ```
 
 **Prinzipien:**
 - Offline-First: Die App zeigt alles aus dem lokalen Store. Eigene Besuche und Bewertungen warten in einer Queue, bis der Server sie bestätigt.
 - Bei einem Netzwerkfehler versucht die App es später erneut, auch eine abgelaufene Sitzung verwirft keine Einträge. Nur was der Server endgültig ablehnt (z. B. ungültige Daten), wird verworfen.
 - Der Server ist die Quelle der Wahrheit für den Account. Ein neues Gerät oder die Web-App holt sich Besuche und Bewertungen über `/me/*`.
-- Favoriten und Notizen bleiben lokal auf dem Gerät.
+- Favoriten bleiben lokal auf dem Gerät.
 
 ### API (`/api/v1`)
 
@@ -216,6 +205,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/photos/:id` | Foto einer Bewertung (ohne Login) |
 | POST | `/places/:placeId/visits` | Check-in (idempotent über Client-ID) |
 | GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten |
+| GET | `/users/:id/profile` | Öffentliches Profil: Stufe und Bewertungen, für Freunde auch die Check-ins |
 | DELETE | `/me/live-status` | Live-Status beenden |
 | GET | `/feed?cursor[&lat&lon]` | Check-ins und Bewertungen der Freunde, mit `lat`/`lon` auch alle Bewertungen im Umkreis (Keyset-Pagination) |
 | GET | `/feed/live` | Live-Status der Freunde |
@@ -363,15 +353,12 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 - **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren mit 🤤, 🥙 oder 🙋. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
 - **Bewertung:** optional mit Foto. Bewerten darf jeder, wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
 - **Push nur für Freunde und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar.
-- **Belohnung:** eine Stufe nach bewerteten Läden (bisherige Stufen-Namen) neben dem Namen, ab Phase 2 mit den Upvotes. Wrapped gibt es nur im Dezember.
-- **Fällt weg:** Erfolge, Stempelkarte, Konsum-Statistik und private Notizen.
-- **Profil:** öffentlich mit Name, Stufe und Bewertungen. Freunde sehen zusätzlich die Check-ins.
+- **Belohnung:** Ab Phase 2 zählen die Upvotes zur Stufe.
 - **Texte:** Einladung „Welcher Döner ist der beste in [Stadt]? Die Döner-App weiß es, und du siehst, wo ich gerade esse: [Link]“, App-Store-Untertitel „Der beste Döner deiner Stadt“.
 
 ### Phase 1 – Bester Döner der Stadt
 
 - Push für Check-ins von Freunden und neue Läden, jeweils mit Schalter in den Einstellungen: iOS über APNs, dazu Web Push. Für „neuer Laden“ merkt sich der Server die Stadt des Accounts
-- Öffentliches Profil mit Stufe, Wegfallendes entfernen
 - Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
 
 ### Phase 2 – Community

@@ -1,65 +1,15 @@
 import 'package:doener_models/doener_models.dart';
 import 'package:test/test.dart';
 
-VisitDto _visit(String placeId, DateTime at) => VisitDto(
-      id: '$placeId-${at.microsecondsSinceEpoch}',
-      userId: 'u',
-      userName: 'U',
-      placeId: placeId,
-      placeName: placeId,
-      visitedAt: at,
-    );
-
 void main() {
-  group('StampTier', () {
-    test('picks highest reached tier', () {
-      expect(StampTier.forStamps(0), StampTier.doenerneuling);
-      expect(StampTier.forStamps(4), StampTier.doenerneuling);
-      expect(StampTier.forStamps(5), StampTier.doenerfreund);
-      expect(StampTier.forStamps(99), StampTier.doenermeister);
-      expect(StampTier.forStamps(500), StampTier.doenerlegende);
-      expect(StampTier.doenerlegende.nextTier, isNull);
-    });
-  });
-
-  group('ProfileStats', () {
-    test('counts places, cities and achievements', () {
-      final base = DateTime(2026, 5, 1, 12);
-      final visits = [
-        for (var i = 0; i < 5; i++) _visit('a', base.add(Duration(days: i))),
-        for (var i = 0; i < 4; i++) _visit('berlin$i', base),
-        _visit('berlin4', DateTime(2026, 5, 2, 23)),
-      ];
-      final stats = ProfileStats.compute(
-        visits: visits,
-        reviewCount: 1,
-        cityOf: (id) => id.startsWith('berlin') ? 'Berlin' : 'Freiburg',
-      );
-      expect(stats.totalVisits, 10);
-      expect(stats.uniquePlaces, 6);
-      expect(stats.maxVisitsToSamePlace, 5);
-      expect(stats.uniquePlacesByCity, {'Freiburg': 1, 'Berlin': 5});
-      expect(stats.stampTier, StampTier.doenerfreund);
-      expect(stats.stampsToNextTier, 5);
-      expect(stats.stampProgress, closeTo(0.5, 1e-9));
-      expect(
-        stats.unlockedAchievements(friendsCount: 5),
-        {
-          AchievementType.firstBite,
-          AchievementType.critic,
-          AchievementType.regular,
-          AchievementType.berlinTour,
-          AchievementType.nightOwl,
-          AchievementType.socialButterfly,
-        },
-      );
-    });
-
-    test('empty stats unlock nothing', () {
-      const stats = ProfileStats();
-      expect(stats.unlockedAchievements(friendsCount: 0), isEmpty);
-      expect(stats.stampProgress, 0);
-    });
+  test('tier by reviewed places', () {
+    expect(Tier.forReviewedPlaces(0), Tier.doenerneuling);
+    expect(Tier.forReviewedPlaces(2), Tier.doenerneuling);
+    expect(Tier.forReviewedPlaces(3), Tier.doenerfreund);
+    expect(Tier.forReviewedPlaces(99), Tier.doenermeister);
+    expect(Tier.forReviewedPlaces(500), Tier.doenerlegende);
+    expect(Tier.doenerlegende.next, isNull);
+    expect(const UserDto(id: 'u', displayName: 'U', reviewedPlaces: 10).tier, Tier.doenerfan);
   });
 
   group('Validation', () {

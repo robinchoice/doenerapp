@@ -374,6 +374,29 @@ void main() {
       expect((await call('GET', '/places/trending')).$1, 400, reason: 'trends are local');
     });
 
+    test('public profile: tier and reviews for everyone, check-ins for friends', () async {
+      final (_, own) = await call('GET', '/users/${annaUser.id}/profile', token: anna);
+      expect(own['user'], {'id': annaUser.id, 'displayName': 'Anna', 'reviewedPlaces': 1});
+      expect((own['reviews'] as List).single['userReviewedPlaces'], 1);
+      expect(own['checkIns'], greaterThan(0));
+      expect(own['since'], isNotNull);
+
+      final (_, asFriend) = await call('GET', '/users/${annaUser.id}/profile', token: bob);
+      expect(asFriend['visits'], isNotEmpty);
+      final (carla, _) = await signUp('carla@example.org', 'Carla');
+      final (_, asStranger) = await call('GET', '/users/${annaUser.id}/profile', token: carla);
+      expect(asStranger['reviews'], hasLength(1));
+      expect([asStranger['checkIns'], asStranger['visits']], [null, null]);
+      expect((await call('GET', '/users/00000000-0000-4000-8000-000000000000/profile', token: carla)).$1, 404);
+
+      final (_, friends) = await call('GET', '/friends', token: bob);
+      expect((friends as List).single['user']['reviewedPlaces'], 1, reason: 'the tier shows next to names');
+      final (_, found) = await call('GET', '/users/search?q=ann', token: carla);
+      expect((found as List).single['reviewedPlaces'], 1);
+      final (_, feed) = await call('GET', '/feed', token: bob);
+      expect((feed['items'] as List).firstWhere((i) => i['type'] == 'review')['user']['reviewedPlaces'], 1);
+    });
+
     test('feed pages through many entries without gaps', () async {
       // 30 visits sharing one timestamp — the old feed stopped after 20 and
       // skipped same-second entries.

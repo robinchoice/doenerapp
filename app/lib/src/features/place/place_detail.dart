@@ -15,6 +15,7 @@ import '../ranking/best_of.dart';
 import '../ranking/rating_info.dart';
 import '../social/friends.dart';
 import '../social/moderation.dart';
+import '../profile/profile_view.dart';
 import 'review_sheet.dart';
 
 Future<void> showPlaceDetail(BuildContext context, PlaceDto place) => showModalBottomSheet(
@@ -86,33 +87,6 @@ class _PlaceDetailState extends State<PlaceDetail> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _editNote(PlaceDto place, String? current) async {
-    final controller = TextEditingController(text: current);
-    final result = await showAppSheet<String>(
-      context,
-      (context) => ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        children: [
-          Text('Notiz zu ${place.name}', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          TextField(controller: controller, autofocus: true, minLines: 4, maxLines: 10, decoration: const InputDecoration(hintText: 'Deine Notiz…')),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              if (current != null)
-                TextButton(onPressed: () => Navigator.of(context).pop(''), child: Text('Löschen', style: TextStyle(color: Theme.of(context).colorScheme.error))),
-              const Spacer(),
-              FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Speichern')),
-            ],
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result != null && mounted) await context.read<AppData>().setNote(place.placeId, result);
-  }
-
   @override
   Widget build(BuildContext context) {
     final data = context.watch<AppData>();
@@ -122,7 +96,6 @@ class _PlaceDetailState extends State<PlaceDetail> {
     final summary = _summary;
     final menu = summary == null ? const <Widget>[] : _menuRows(place, summary, diet);
     final theme = Theme.of(context);
-    final note = data.notes[place.placeId];
     final ownReview = data.reviews[place.placeId];
     final visits = data.visitsAt(place.placeId);
     final isFavorite = data.favorites.contains(place.placeId);
@@ -202,29 +175,9 @@ class _PlaceDetailState extends State<PlaceDetail> {
               onTap: () => data.toggleFavorite(place.placeId),
             ),
             const SizedBox(width: 8),
-            _ActionButton(
-              icon: note != null ? Icons.sticky_note_2 : Icons.sticky_note_2_outlined,
-              label: 'Notiz',
-              onTap: () => _editNote(place, note),
-            ),
-            const SizedBox(width: 8),
             _ActionButton(icon: Icons.directions, label: 'Route', onTap: () => _openRoute(place)),
           ],
         ),
-        if (note != null) ...[
-          const SizedBox(height: 12),
-          GlassCard(
-            onTap: () => _editNote(place, note),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Notiz', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.outline)),
-                const SizedBox(height: 4),
-                Text(note),
-              ],
-            ),
-          ),
-        ],
         if (ownReview != null) ...[
           const SizedBox(height: 20),
           SectionTitle(
@@ -493,17 +446,30 @@ class ReviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (showAuthor)
+            Row(
+              children: [
+                Flexible(
+                  child: NameLink(
+                    review.userName,
+                    onTap: () => showUserProfile(
+                      context,
+                      UserDto(id: review.userId, displayName: review.userName, reviewedPlaces: review.userReviewedPlaces),
+                    ),
+                  ),
+                ),
+                if (friend) ...[const SizedBox(width: 4), Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund')],
+                const SizedBox(width: 6),
+                TierLabel(Tier.forReviewedPlaces(review.userReviewedPlaces)),
+                if (menu != null) ...[const Spacer(), menu!],
+              ],
+            ),
           Row(
             children: [
-              if (showAuthor) ...[
-                Flexible(child: Text(review.userName, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-                if (friend) ...[const SizedBox(width: 4), Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund')],
-                const SizedBox(width: 8),
-              ],
               if (review.headline(diet) case final score?) DoenerRating(value: score, size: 14),
               if (review.onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: review.regular)],
               if (onEdit != null) ...[const Spacer(), Icon(Icons.edit, size: 16, color: theme.colorScheme.outline)],
-              if (menu != null) ...[const Spacer(), menu!],
+              if (menu != null && !showAuthor) ...[const Spacer(), menu!],
             ],
           ),
           if (review.ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: review.ratings, diet: diet)],

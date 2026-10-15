@@ -123,8 +123,8 @@ void main() {
     expect(find.text('noch unbewertet'), findsOneWidget);
     expect(find.text('Bewerte deinen Stammladen'), findsOneWidget);
     expect(find.text('Hol deine Freunde per QR-Code'), findsOneWidget);
-    expect(find.text('Eingecheckt bei Kebap Haus'), findsOneWidget);
-    expect(find.text('Bewertet: Kebap Haus'), findsOneWidget);
+    expect(find.text('Dönerneuling · Eingecheckt bei Kebap Haus', findRichText: true), findsOneWidget, reason: 'the tier leads the line');
+    expect(find.text('Dönerneuling · Bewertet: Kebap Haus', findRichText: true), findsOneWidget);
     expect(find.byIcon(Icons.group), findsOneWidget, reason: 'only Tom is a friend');
     expect(find.text('🎉 Neu in Freiburg'), findsOneWidget);
     expect(find.text('Anatolia Grill hat am 2. Oktober aufgemacht'), findsOneWidget);

@@ -1,5 +1,3 @@
-import 'package:doener_models/doener_models.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,64 +6,6 @@ import '../../core/maps.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
-
-/// Own check-ins and reviews; entries the server hasn't confirmed yet are marked.
-class MyActivityScreen extends StatelessWidget {
-  const MyActivityScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final data = context.watch<AppData>();
-    final diet = context.watch<Session>().diet;
-    final entries = [
-      for (final v in data.visits)
-        (type: FeedItemType.visit, placeId: v.dto.placeId, placeName: v.dto.placeName, at: v.dto.visitedAt, text: null as String?, score: null as double?, ratings: const <RatingItem, double>{}, food: v.dto.foodType, photoId: null as String?, photo: null as Uint8List?, onSite: false, pending: v.pending),
-      for (final r in data.reviews.values)
-        (type: FeedItemType.review, placeId: r.dto.placeId, placeName: r.dto.placeName, at: r.dto.updatedAt, text: r.dto.text, score: r.dto.headline(diet), ratings: r.dto.ratings, food: null as String?, photoId: r.dto.photoId, photo: r.photo, onSite: r.dto.onSite, pending: r.pending),
-    ]..sort((a, b) => b.at.compareTo(a.at));
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Meine Aktivität')),
-      body: entries.isEmpty
-          ? const EmptyState(
-              icon: Icons.restaurant,
-              title: 'Noch keine Aktivität',
-              message: 'Checke bei einem Döner-Laden ein oder schreibe eine Bewertung.',
-            )
-          : RefreshIndicator(
-              onRefresh: () async {
-                await data.sync();
-                await data.refreshMine();
-              },
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  for (final e in entries)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: ActivityCard(
-                        type: e.type,
-                        title: e.type == FeedItemType.visit ? 'Eingecheckt' : 'Bewertet',
-                        subtitle: e.placeName,
-                        timestamp: e.at,
-                        score: e.score,
-                        ratings: e.ratings,
-                        diet: diet,
-                        text: e.text,
-                        foodType: e.food,
-                        photoId: e.photoId,
-                        photo: e.photo,
-                        onSite: e.onSite,
-                        pending: e.pending,
-                        onTap: data.places[e.placeId] == null ? null : () => showPlaceDetail(context, data.places[e.placeId]!),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-    );
-  }
-}
 
 enum _Sort { rating, visits, recent }
 

@@ -17,6 +17,7 @@ import '../ranking/city_picker.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
 import '../social/moderation.dart';
+import '../profile/profile_view.dart';
 
 /// Moving further than this loads the area around the new position.
 const _reloadDistance = 1000.0;
@@ -284,6 +285,8 @@ class _StartScreenState extends State<StartScreen> {
                 ActivityCard(
                     type: item.type,
                     title: item.user.displayName,
+                    tier: item.user.tier,
+                    onTitleTap: () => showUserProfile(context, item.user),
                     subtitle: '${item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet:'} ${item.place.name}',
                     timestamp: item.timestamp,
                     score: item.headline(diet),

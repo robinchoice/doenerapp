@@ -62,10 +62,21 @@ const reviewPhotoId = '(SELECT id FROM review_photos WHERE review_id = r.id) AS 
 const reviewVisitCount = '(SELECT count(DISTINCT (v.created_at AT TIME ZONE \'Europe/Berlin\')::date) FROM visits v '
     'WHERE v.user_id = r.user_id AND v.place_id = r.place_id)::int AS visit_count';
 
+/// Select expression: how many places the user [userId] (an SQL expression) reviewed — gives their tier.
+String reviewedPlacesOf(String userId) => '(SELECT count(*) FROM reviews rp WHERE rp.user_id = $userId)::int';
+
+/// A user from a row with `id`, `display_name` and `reviewed_places`.
+UserDto userFromRow(Map<String, dynamic> row) => UserDto(
+      id: row['id'] as String,
+      displayName: row['display_name'] as String,
+      reviewedPlaces: row['reviewed_places'] as int,
+    );
+
 ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       id: row['id'] as String,
       userId: row['user_id'] as String,
       userName: row['display_name'] as String,
+      userReviewedPlaces: row['user_reviewed_places'] as int,
       placeId: row['google_place_id'] as String,
       placeName: row['place_name'] as String,
       rating: row['rating'] as double?,
@@ -95,7 +106,8 @@ VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
       foodType: row['food_type'] as String?,
     );
 
-const _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, u.display_name, p.google_place_id, p.name AS place_name '
+final _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, u.display_name, '
+    '${reviewedPlacesOf('r.user_id')} AS user_reviewed_places, p.google_place_id, p.name AS place_name '
     'FROM reviews r JOIN users u ON u.id = r.user_id JOIN places p ON p.id = r.place_id';
 const _visitSelect = 'SELECT v.*, u.display_name, p.google_place_id, p.name AS place_name FROM visits v '
     'JOIN users u ON u.id = v.user_id JOIN places p ON p.id = v.place_id';
@@ -415,6 +427,42 @@ void mountPlaces(Router router, Deps deps) {
       {'user': user.id},
     );
     return json(rows.map((r) => placeFromRow(r).toJson()).toList());
+  });
+
+  // GET /users/<id>/profile — name, tier and reviews for everyone, check-ins only
+  // for friends and oneself. Blocked either way, there is no profile.
+  router.get('/users/<id>/profile', (Request request, String id) async {
+    final me = await requireUser(deps, request);
+    final params = {'id': requireUuid(id), 'me': me.id};
+    final user = await queryOne(
+      deps.db,
+      'SELECT u.id, u.display_name, ${reviewedPlacesOf('u.id')} AS reviewed_places, '
+      'LEAST((SELECT min(created_at) FROM reviews WHERE user_id = u.id), (SELECT min(visited_at) FROM visits WHERE user_id = u.id)) AS since '
+      'FROM users u WHERE u.id = @id:uuid AND ${notBlocked('u.id')}',
+      params,
+    );
+    if (user == null) throw const ApiException.notFound('Nutzer nicht gefunden');
+    final close = params['id'] == me.id ||
+        await queryOne(
+              deps.db,
+              "SELECT 1 FROM friendships WHERE status = 'accepted' AND ((requester_id = @me:uuid AND addressee_id = @id:uuid) "
+              'OR (requester_id = @id:uuid AND addressee_id = @me:uuid))',
+              params,
+            ) !=
+            null;
+    final byId = {'id': params['id']};
+    final reviews = await query(deps.db, '$_reviewSelect WHERE r.user_id = @id:uuid ORDER BY r.updated_at DESC LIMIT 200', byId);
+    final visits = close
+        ? await query(deps.db, '$_visitSelect WHERE v.user_id = @id:uuid ORDER BY v.visited_at DESC LIMIT 100', byId)
+        : null;
+    final checkIns = close ? await queryOne(deps.db, 'SELECT count(*)::int AS n FROM visits WHERE user_id = @id:uuid', byId) : null;
+    return json(ProfileDto(
+      user: userFromRow(user),
+      since: user['since'] as DateTime?,
+      reviews: reviews.map(reviewFromRow).toList(),
+      checkIns: checkIns?['n'] as int?,
+      visits: visits?.map(visitFromRow).toList(),
+    ).toJson());
   });
 }
 

@@ -1,3 +1,4 @@
+import 'gamification.dart';
 import 'menu.dart';
 
 typedef Json = Map<String, dynamic>;
@@ -159,13 +160,21 @@ class UpdateMeRequest {
 
 // MARK: - User
 
+/// [reviewedPlaces] gives the [tier] shown next to the name.
 class UserDto {
   final String id;
   final String displayName;
-  const UserDto({required this.id, required this.displayName});
+  final int reviewedPlaces;
+  const UserDto({required this.id, required this.displayName, this.reviewedPlaces = 0});
 
-  factory UserDto.fromJson(Json j) => UserDto(id: j['id'] as String, displayName: j['displayName'] as String);
-  Json toJson() => {'id': id, 'displayName': displayName};
+  Tier get tier => Tier.forReviewedPlaces(reviewedPlaces);
+
+  factory UserDto.fromJson(Json j) => UserDto(
+        id: j['id'] as String,
+        displayName: j['displayName'] as String,
+        reviewedPlaces: j['reviewedPlaces'] as int? ?? 0,
+      );
+  Json toJson() => {'id': id, 'displayName': displayName, 'reviewedPlaces': reviewedPlaces};
 
   @override
   bool operator ==(Object other) => other is UserDto && other.id == id && other.displayName == displayName;
@@ -386,6 +395,9 @@ class ReviewDto {
   final String id;
   final String userId;
   final String userName;
+
+  /// Gives the author's [Tier].
+  final int userReviewedPlaces;
   final String placeId;
   final String placeName;
   final double? rating;
@@ -414,6 +426,7 @@ class ReviewDto {
     required this.id,
     required this.userId,
     required this.userName,
+    this.userReviewedPlaces = 0,
     required this.placeId,
     required this.placeName,
     this.rating,
@@ -441,6 +454,7 @@ class ReviewDto {
         id: j['id'] as String,
         userId: j['userId'] as String,
         userName: j['userName'] as String,
+        userReviewedPlaces: j['userReviewedPlaces'] as int? ?? 0,
         placeId: j['placeId'] as String,
         placeName: j['placeName'] as String,
         rating: _scoreFromJson(j),
@@ -464,6 +478,7 @@ class ReviewDto {
         'id': id,
         'userId': userId,
         'userName': userName,
+        'userReviewedPlaces': userReviewedPlaces,
         'placeId': placeId,
         'placeName': placeName,
         'rating': rating?.round(),
@@ -1058,4 +1073,34 @@ class CityDto {
       );
 
   Json toJson() => {'name': name, 'latitude': latitude, 'longitude': longitude, 'ratedPlaces': ratedPlaces};
+}
+
+// MARK: - Profile
+
+/// Someone's public profile. [since] is their first check-in or review.
+/// [checkIns] and [visits] are only there for friends and oneself.
+class ProfileDto {
+  final UserDto user;
+  final DateTime? since;
+  final List<ReviewDto> reviews;
+  final int? checkIns;
+  final List<VisitDto>? visits;
+
+  const ProfileDto({required this.user, this.since, this.reviews = const [], this.checkIns, this.visits});
+
+  factory ProfileDto.fromJson(Json j) => ProfileDto(
+        user: UserDto.fromJson(j['user'] as Json),
+        since: _dateOrNull(j['since']),
+        reviews: [for (final r in j['reviews'] as List) ReviewDto.fromJson(r as Json)],
+        checkIns: j['checkIns'] as int?,
+        visits: (j['visits'] as List?)?.map((v) => VisitDto.fromJson(v as Json)).toList(),
+      );
+
+  Json toJson() => {
+        'user': user.toJson(),
+        'since': since?.toUtc().toIso8601String(),
+        'reviews': [for (final r in reviews) r.toJson()],
+        'checkIns': checkIns,
+        'visits': visits?.map((v) => v.toJson()).toList(),
+      };
 }

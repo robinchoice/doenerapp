@@ -238,7 +238,11 @@ class RatingChips extends StatelessWidget {
 class ActivityCard extends StatelessWidget {
   final FeedItemType type;
   final String title;
-  final String subtitle;
+
+  /// The author's tier, in front of [subtitle]. A tap on [title] opens [onTitleTap].
+  final Tier? tier;
+  final VoidCallback? onTitleTap;
+  final String? subtitle;
   final DateTime timestamp;
   final double? score;
   final Map<RatingItem, double> ratings;
@@ -260,7 +264,9 @@ class ActivityCard extends StatelessWidget {
     super.key,
     required this.type,
     required this.title,
-    required this.subtitle,
+    this.tier,
+    this.onTitleTap,
+    this.subtitle,
     required this.timestamp,
     this.score,
     this.ratings = const {},
@@ -309,18 +315,29 @@ class ActivityCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        Flexible(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                        Flexible(child: NameLink(title, onTap: onTitleTap)),
                         if (highlight) ...[
                           const SizedBox(width: 6),
                           Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund'),
                         ],
                         if (onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: regular)],
                       ]),
-                      Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                      // The tier leads the second line, so a long name can't cut it short.
+                      if (tier != null || subtitle != null)
+                        Text.rich(
+                          TextSpan(children: [
+                            if (tier != null)
+                              TextSpan(text: tier!.displayName, style: TextStyle(color: context.accent, fontWeight: FontWeight.w600)),
+                            if (tier != null && subtitle != null) const TextSpan(text: ' · '),
+                            if (subtitle != null) TextSpan(text: subtitle),
+                          ]),
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                        ),
                     ],
                   ),
                 ),
                 if (pending) const Padding(padding: EdgeInsets.only(right: 6), child: Icon(Icons.cloud_upload_outlined, size: 16)),
+                const SizedBox(width: 8),
                 Text(relativeTime(timestamp), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
                 ?menu,
               ],
@@ -337,6 +354,36 @@ class ActivityCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The tier next to someone's name, see [Tier].
+class TierLabel extends StatelessWidget {
+  final Tier tier;
+  const TierLabel(this.tier, {super.key});
+
+  @override
+  Widget build(BuildContext context) => Text(
+        tier.displayName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.accent, fontWeight: FontWeight.w600),
+      );
+}
+
+/// Someone's name; a tap opens their profile.
+class NameLink extends StatelessWidget {
+  final String name;
+  final VoidCallback? onTap;
+  const NameLink(this.name, {super.key, this.onTap});
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+        ),
+      );
 }
 
 /// The reviewer checked in at the place: "vor Ort", or "Stammgast" on [regularVisits] days or more.
@@ -540,28 +587,6 @@ String relativeTime(DateTime date) {
 }
 
 String foodEmoji(String? foodType) => FoodItem.byId(foodType)?.emoji ?? '✅';
-
-IconData achievementIcon(AchievementType type) => switch (type) {
-      AchievementType.firstBite => Icons.restaurant,
-      AchievementType.critic => Icons.rate_review,
-      AchievementType.regular => Icons.repeat,
-      AchievementType.explorer => Icons.map,
-      AchievementType.connoisseur => Icons.workspace_premium,
-      AchievementType.berlinTour || AchievementType.hamburgTour => Icons.location_city,
-      AchievementType.stampCollectorSilver => Icons.verified_outlined,
-      AchievementType.stampCollectorGold => Icons.verified,
-      AchievementType.nightOwl => Icons.nightlight_round,
-      AchievementType.socialButterfly => Icons.groups,
-    };
-
-Color tierColor(BuildContext context, StampTier tier) => switch (tier) {
-      StampTier.doenerneuling => Colors.grey,
-      StampTier.doenerfreund => Colors.brown,
-      StampTier.doenerfan => context.accent,
-      StampTier.doenerprofi => Colors.red,
-      StampTier.doenermeister => Colors.purple,
-      StampTier.doenerlegende => Colors.amber,
-    };
 
 void showMessage(BuildContext context, String message) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));

@@ -140,12 +140,13 @@ void mountSocial(Router router, Deps deps) {
     final pattern = '${q.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
     final rows = await query(
       deps.db,
-      'SELECT id, display_name FROM users WHERE display_name ILIKE @pattern AND id <> @me:uuid AND ${notBlocked('id')} '
+      'SELECT u.id, u.display_name, ${reviewedPlacesOf('u.id')} AS reviewed_places FROM users u '
+      'WHERE u.display_name ILIKE @pattern AND u.id <> @me:uuid AND ${notBlocked('u.id')} '
       'ORDER BY lower(display_name) LIMIT 20',
       {'pattern': pattern, 'me': me.id},
     );
     return json(
-      rows.map((r) => UserDto(id: r['id'] as String, displayName: r['display_name'] as String).toJson()).toList(),
+      rows.map((r) => userFromRow(r).toJson()).toList(),
     );
   });
 
@@ -331,8 +332,9 @@ Future<void> _mailFeedback(Deps deps, String to, AuthUser me, String message, Fe
   }
 }
 
-const _friendshipSelect = 'SELECT f.id, f.status, f.created_at, f.requester_id, f.addressee_id, '
-    'r.display_name AS requester_name, a.display_name AS addressee_name FROM friendships f '
+final _friendshipSelect = 'SELECT f.id, f.status, f.created_at, f.requester_id, f.addressee_id, '
+    'r.display_name AS requester_name, a.display_name AS addressee_name, '
+    '${reviewedPlacesOf('r.id')} AS requester_places, ${reviewedPlacesOf('a.id')} AS addressee_places FROM friendships f '
     'JOIN users r ON r.id = f.requester_id JOIN users a ON a.id = f.addressee_id';
 
 FriendshipDto _friendshipFromRow(Map<String, dynamic> row, String me) {
@@ -340,8 +342,16 @@ FriendshipDto _friendshipFromRow(Map<String, dynamic> row, String me) {
   return FriendshipDto(
     id: row['id'] as String,
     user: outgoing
-        ? UserDto(id: row['addressee_id'] as String, displayName: row['addressee_name'] as String)
-        : UserDto(id: row['requester_id'] as String, displayName: row['requester_name'] as String),
+        ? UserDto(
+            id: row['addressee_id'] as String,
+            displayName: row['addressee_name'] as String,
+            reviewedPlaces: row['addressee_places'] as int,
+          )
+        : UserDto(
+            id: row['requester_id'] as String,
+            displayName: row['requester_name'] as String,
+            reviewedPlaces: row['requester_places'] as int,
+          ),
     status: FriendshipStatus.values.byName(row['status'] as String),
     direction: outgoing ? FriendshipDirection.outgoing : FriendshipDirection.incoming,
     createdAt: row['created_at'] as DateTime,
@@ -427,8 +437,12 @@ ${inviter == null ? '' : '<meta property="og:url" content="$base/i/$code">'}
 
 Future<Map<String, UserDto>> _usersById(Deps deps, Set<String> ids) async {
   if (ids.isEmpty) return {};
-  final rows = await query(deps.db, 'SELECT id, display_name FROM users WHERE id = ANY(@ids:_uuid)', {'ids': ids.toList()});
-  return {for (final r in rows) r['id'] as String: UserDto(id: r['id'] as String, displayName: r['display_name'] as String)};
+  final rows = await query(
+    deps.db,
+    'SELECT u.id, u.display_name, ${reviewedPlacesOf('u.id')} AS reviewed_places FROM users u WHERE u.id = ANY(@ids:_uuid)',
+    {'ids': ids.toList()},
+  );
+  return {for (final r in rows) r['id'] as String: userFromRow(r)};
 }
 
 Future<Map<String, PlaceDto>> _placesById(Deps deps, Set<String> ids) async {

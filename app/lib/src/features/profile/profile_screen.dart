@@ -12,6 +12,7 @@ import '../settings/settings_screen.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
 import 'mine.dart';
+import 'profile_view.dart';
 
 List<(FoodItem, int)> foodCounts(Iterable<VisitDto> visits) {
   final counts = <String, int>{};
@@ -28,6 +29,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+/// The own profile: what others see, plus progress, friends and settings.
 class _ProfileScreenState extends State<ProfileScreen> {
   String? _friendsLoadedFor;
 
@@ -43,9 +45,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => friends.load());
     }
 
-    final visits = data.visits.map((v) => v.dto).toList();
-    final stats = ProfileStats.compute(visits: visits, reviewCount: data.reviews.length, cityOf: (id) => data.places[id]?.city);
-    final foods = foodCounts(visits);
+    final reviews = data.reviews.values.toList()..sort((a, b) => b.dto.updatedAt.compareTo(a.dto.updatedAt));
+    final since = [for (final v in data.visits) v.dto.visitedAt, for (final r in reviews) r.dto.createdAt]
+        .fold<DateTime?>(null, (first, d) => first == null || d.isBefore(first) ? d : first);
+    final december = DateTime.now().month == DateTime.december;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -59,97 +62,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    const BrandTile(size: 64),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(user?.displayName ?? 'Döner-Fan', style: displayStyle.copyWith(fontSize: 28, color: theme.colorScheme.onSurface)),
-                          Text.rich(
-                            TextSpan(children: [
-                              if (stats.firstVisit != null) TextSpan(text: 'Seit ${DateFormat('MMMM y', 'de').format(stats.firstVisit!.toLocal())} · '),
-                              TextSpan(text: stats.stampTier.displayName, style: TextStyle(color: context.accent, fontWeight: FontWeight.w600)),
-                            ]),
-                            style: TextStyle(color: theme.colorScheme.outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                _MenuRow(
-                  icon: Icons.group,
-                  label: 'Freunde',
-                  trailing: [
-                    if (friends.incoming.isNotEmpty) Badge(backgroundColor: needsGlow, textColor: ink, label: Text('${friends.incoming.length}')),
-                    const SizedBox(width: 8),
-                    Text('${friends.accepted.length}', style: TextStyle(color: theme.colorScheme.outline)),
-                  ],
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
-                ),
-                _MenuRow(icon: Icons.qr_code_2, label: 'Freunde einladen', onTap: () => showAppSheet(context, (_) => const InviteSheet())),
-                if (context.watch<Session>().user?.admin ?? false)
-                  _MenuRow(
-                    icon: Icons.person_add_alt,
-                    label: 'Tester',
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _TestersScreen())),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await data.sync();
+          await data.refreshMine();
+        },
+        child: ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ProfileHeader(
+                    name: user?.displayName ?? 'Döner-Fan',
+                    reviewedPlaces: reviews.length,
+                    since: since,
+                    checkIns: data.visits.length,
+                    friends: friends.accepted.length,
+                    own: true,
                   ),
-                _MenuRow(
-                  icon: Icons.history,
-                  label: 'Meine Aktivität',
-                  trailing: [if (data.pendingCount > 0) Badge(label: Text('${data.pendingCount}'))],
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyActivityScreen())),
-                ),
-                _MenuRow(
-                  icon: Icons.storefront,
-                  label: 'Meine Läden',
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPlacesScreen())),
-                ),
-                _MenuRow(
-                  icon: Icons.auto_awesome,
-                  label: 'Döner Wrapped ${DateTime.now().year}',
-                  trailing: [Text('Dein Jahresrückblick', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline))],
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WrappedScreen())),
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                IntrinsicHeight(
-                  child: Row(children: [
-                    _StatCard(value: stats.totalVisits, label: 'Besuche'),
-                    const VerticalDivider(width: 1),
-                    _StatCard(value: stats.totalReviews, label: 'Bewertungen'),
-                    const VerticalDivider(width: 1),
-                    _StatCard(value: stats.uniquePlaces, label: 'Läden'),
-                  ]),
-                ),
-                const Divider(),
-                const SizedBox(height: 20),
-                _StampCard(stats: stats),
-                const SizedBox(height: 24),
-                FoodStatsCard(foods: foods),
-                const SizedBox(height: 24),
-                _Achievements(unlocked: stats.unlockedAchievements(friendsCount: friends.accepted.length)),
-              ],
+                  const SizedBox(height: 8),
+                  _MenuRow(
+                    icon: Icons.group,
+                    label: 'Freunde',
+                    trailing: [
+                      if (friends.incoming.isNotEmpty) Badge(backgroundColor: needsGlow, textColor: ink, label: Text('${friends.incoming.length}')),
+                      const SizedBox(width: 8),
+                      Text('${friends.accepted.length}', style: TextStyle(color: theme.colorScheme.outline)),
+                    ],
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
+                  ),
+                  _MenuRow(icon: Icons.qr_code_2, label: 'Freunde einladen', onTap: () => showAppSheet(context, (_) => const InviteSheet())),
+                  if (user?.admin ?? false)
+                    _MenuRow(
+                      icon: Icons.person_add_alt,
+                      label: 'Tester',
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _TestersScreen())),
+                    ),
+                  _MenuRow(
+                    icon: Icons.storefront,
+                    label: 'Meine Läden',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPlacesScreen())),
+                  ),
+                  // The year in review only makes sense at its end.
+                  _MenuRow(
+                    icon: Icons.auto_awesome,
+                    label: 'Döner Wrapped ${DateTime.now().year}',
+                    trailing: [
+                      if (!december) Text('ab 1. Dezember', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                    ],
+                    onTap: december
+                        ? () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WrappedScreen()))
+                        : null,
+                  ),
+                  if (user != null)
+                    ProfileTabs(
+                      user: UserDto(id: user.id, displayName: user.displayName, reviewedPlaces: reviews.length),
+                      own: true,
+                      reviews: reviews,
+                      visits: data.visits,
+                    ),
+                ],
+              ),
             ),
-          ),
-          const PleasanceFooter(),
-        ],
+            const PleasanceFooter(),
+          ],
+        ),
       ),
     );
   }
 }
+
+
 
 /// Sign-up is closed: admins let testers in — from the requests on the landing
 /// page or by address. Each gets an account and a login mail, iPhones also the
@@ -313,170 +298,36 @@ class _TestersScreenState extends State<_TestersScreen> {
   }
 }
 
+
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final List<Widget> trailing;
-  final VoidCallback onTap;
+
+  /// Null greys the row out.
+  final VoidCallback? onTap;
   const _MenuRow({required this.icon, required this.label, this.trailing = const [], required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
-          child: Row(children: [
-            Icon(icon, color: context.accent, size: 22),
-            const SizedBox(width: 14),
-            Expanded(child: Text(label)),
-            ...trailing,
-            Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
-          ]),
-        ),
-      );
-}
-
-class _StatCard extends StatelessWidget {
-  final int value;
-  final String label;
-  const _StatCard({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(children: [
-            Text('$value', style: numberStyle.copyWith(fontSize: 44, color: Theme.of(context).colorScheme.onSurface)),
-            const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.outline)),
-          ]),
-        ),
-      );
-}
-
-class FoodStatsCard extends StatelessWidget {
-  final List<(FoodItem, int)> foods;
-  const FoodStatsCard({super.key, required this.foods});
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SectionTitle(title: 'Dein Döner-Konsum'),
-          if (foods.isEmpty) Text('Noch keine Check-ins mit Essenstyp', style: Theme.of(context).textTheme.bodySmall),
-          for (final (food, count) in foods)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                SizedBox(width: 32, child: Text(food.emoji, style: const TextStyle(fontSize: 20))),
-                SizedBox(width: 80, child: Text(food.label)),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, c) => Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        width: c.maxWidth * count / foods.first.$2,
-                        height: 20,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 6),
-                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface, borderRadius: BorderRadius.circular(6)),
-                        child: Text('$count', style: TextStyle(color: Theme.of(context).colorScheme.surface, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ),
-                  ),
-                ),
-              ]),
-            ),
-        ],
-      );
-}
-
-class _StampCard extends StatelessWidget {
-  final ProfileStats stats;
-  const _StampCard({required this.stats});
-
-  @override
   Widget build(BuildContext context) {
-    final tier = stats.stampTier;
-    final color = tierColor(context, tier);
-    final scheme = Theme.of(context).colorScheme;
-    final next = tier.nextTier;
-    final inTier = stats.totalVisits - tier.stampsRequired;
-    final dots = next == null ? 10 : next.stampsRequired - tier.stampsRequired;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionTitle(
-          title: 'Stempelkarte',
-          trailing: Chip(
-            label: Text(tier.displayName, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-            backgroundColor: color.withValues(alpha: 0.15),
-            side: BorderSide.none,
-            visualDensity: VisualDensity.compact,
-          ),
-        ),
-        GradientProgress(value: stats.stampProgress),
-        const SizedBox(height: 6),
-        Text(
-          next == null ? 'Höchste Stufe erreicht!' : 'Noch ${stats.stampsToNextTier} Besuche bis ${next.displayName}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (var i = 0; i < dots; i++)
-              CircleAvatar(
-                radius: 8,
-                backgroundColor: i < inTier || next == null ? scheme.onSurface : scheme.onSurface.withValues(alpha: 0.08),
-                child: i < inTier || next == null ? Icon(Icons.check, size: 10, color: scheme.surface) : null,
-              ),
-          ],
-        ),
-      ],
+    final outline = Theme.of(context).colorScheme.outline;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor))),
+        child: Row(children: [
+          Icon(icon, color: onTap == null ? outline : context.accent, size: 22),
+          const SizedBox(width: 14),
+          Expanded(child: Text(label, style: onTap == null ? TextStyle(color: outline) : null)),
+          ...trailing,
+          if (onTap != null) Icon(Icons.chevron_right, color: outline),
+        ]),
+      ),
     );
   }
 }
 
-class _Achievements extends StatelessWidget {
-  final Set<AchievementType> unlocked;
-  const _Achievements({required this.unlocked});
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionTitle(
-            title: 'Erfolge',
-            trailing: Text('${unlocked.length}/${AchievementType.values.length}'),
-          ),
-          GridView.count(
-            crossAxisCount: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 0.8,
-            children: [
-              for (final type in AchievementType.values)
-                Tooltip(
-                  message: type.description,
-                  triggerMode: TooltipTriggerMode.tap,
-                  child: Column(children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: unlocked.contains(type) ? Theme.of(context).colorScheme.secondaryContainer : Colors.grey.withValues(alpha: 0.08),
-                      child: Icon(achievementIcon(type), color: unlocked.contains(type) ? context.accent : Colors.grey.withValues(alpha: 0.4)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(type.title, textAlign: TextAlign.center, maxLines: 2, style: const TextStyle(fontSize: 10)),
-                  ]),
-                ),
-            ],
-          ),
-        ],
-      );
-}
 
 /// Yearly recap in five swipeable pages.
 class WrappedScreen extends StatefulWidget {

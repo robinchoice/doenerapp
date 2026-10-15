@@ -19,7 +19,10 @@ class ContentMenu extends StatelessWidget {
   /// The user's content should vanish from the list.
   final VoidCallback onBlocked;
   final VoidCallback? onRemoved;
-  const ContentMenu({super.key, required this.user, this.reviewId, required this.onBlocked, this.onRemoved});
+
+  /// Small inside cards, full size in an app bar.
+  final bool small;
+  const ContentMenu({super.key, required this.user, this.reviewId, required this.onBlocked, this.onRemoved, this.small = true});
 
   Future<bool> _confirm(BuildContext context, String title, String message, String action) async =>
       await showDialog<bool>(
@@ -70,14 +73,11 @@ class ContentMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final admin = context.watch<Session>().user?.admin ?? false;
-    return SizedBox(
-      width: 32,
-      height: 24,
-      child: PopupMenuButton<_Action>(
+    final button = PopupMenuButton<_Action>(
         tooltip: 'Mehr',
-        padding: EdgeInsets.zero,
-        iconSize: 18,
-        icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.outline),
+        padding: small ? EdgeInsets.zero : const EdgeInsets.all(8),
+        iconSize: small ? 18 : 24,
+        icon: Icon(Icons.more_vert, color: small ? Theme.of(context).colorScheme.outline : null),
         onSelected: (action) => switch (action) {
           _Action.report => showAppSheet(context, (_) => _ReportSheet(reviewId: reviewId!)),
           _Action.block => _block(context),
@@ -89,8 +89,8 @@ class ContentMenu extends StatelessWidget {
           if (admin && reviewId != null && onRemoved != null)
             const PopupMenuItem(value: _Action.remove, child: Text('Bewertung entfernen (Admin)')),
         ],
-      ),
-    );
+      );
+    return small ? SizedBox(width: 32, height: 24, child: button) : button;
   }
 }
 

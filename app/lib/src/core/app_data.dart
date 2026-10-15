@@ -18,7 +18,6 @@ final _visits = stringMapStoreFactory.store('visits');
 final _reviews = stringMapStoreFactory.store('reviews');
 final _queue = intMapStoreFactory.store('queue');
 final _favorites = StoreRef<String, bool>('favorites');
-final _notes = StoreRef<String, String>('notes');
 
 /// A shop whose review a link asked for (`https://…/b/<placeId>`), kept
 /// through onboarding and login until its review sheet opens.
@@ -56,7 +55,6 @@ class AppData extends ChangeNotifier {
 
   final places = <String, PlaceDto>{};
   final favorites = <String>{};
-  final notes = <String, String>{};
   final reviews = <String, LocalReview>{};
   List<LocalVisit> visits = [];
   int pendingCount = 0;
@@ -84,9 +82,6 @@ class AppData extends ChangeNotifier {
     await _places.records(expired).delete(_db);
     for (final r in await _favorites.find(_db)) {
       favorites.add(r.key);
-    }
-    for (final r in await _notes.find(_db)) {
-      notes[r.key] = r.value;
     }
     for (final r in await _reviews.find(_db)) {
       reviews[r.key] = _reviewFromRecord(r.value);
@@ -185,18 +180,6 @@ class AppData extends ChangeNotifier {
     } else {
       favorites.add(placeId);
       await _favorites.record(placeId).put(_db, true);
-    }
-    notifyListeners();
-  }
-
-  Future<void> setNote(String placeId, String? text) async {
-    final note = Validation.clean(text);
-    if (note == null) {
-      notes.remove(placeId);
-      await _notes.record(placeId).delete(_db);
-    } else {
-      notes[placeId] = note;
-      await _notes.record(placeId).put(_db, note);
     }
     notifyListeners();
   }
@@ -420,7 +403,7 @@ class AppData extends ChangeNotifier {
 
   /// Drops cached places that nothing on this device refers to.
   Future<void> clearMapCache() async {
-    final keep = {...favorites, ...notes.keys, ...reviews.keys, ...visits.map((v) => v.dto.placeId)};
+    final keep = {...favorites, ...reviews.keys, ...visits.map((v) => v.dto.placeId)};
     places.removeWhere((id, _) => !keep.contains(id));
     await _places.delete(_db, finder: Finder(filter: Filter.custom((r) => !keep.contains(r.key))));
     notifyListeners();
@@ -430,11 +413,9 @@ class AppData extends ChangeNotifier {
     await clearAccountData();
     await _db.transaction((tx) async {
       await _favorites.delete(tx);
-      await _notes.delete(tx);
       await _places.delete(tx);
     });
     favorites.clear();
-    notes.clear();
     places.clear();
     notifyListeners();
   }

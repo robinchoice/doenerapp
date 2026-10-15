@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
+import '../profile/profile_view.dart';
 import 'invite.dart';
 
 /// Invite code from a link opened before the user was signed in — accepted
@@ -135,6 +136,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 ListTile(
                   title: Text(f.user.displayName),
                   subtitle: const Text('Möchte dich als Freund hinzufügen'),
+                  onTap: () => showUserProfile(context, f.user),
                   trailing: FilledButton(onPressed: () => friends.accept(f.id), child: const Text('Annehmen')),
                 ),
             ],
@@ -153,6 +155,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
               ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.person)),
                 title: Text(f.user.displayName),
+                subtitle: TierLabel(f.user.tier),
+                onTap: () => showUserProfile(context, f.user),
                 trailing: IconButton(
                   tooltip: 'Entfernen',
                   icon: const Icon(Icons.person_remove_outlined),
@@ -234,6 +238,8 @@ class _FriendSearchState extends State<_FriendSearch> {
         for (final u in _results)
           ListTile(
             title: Text(u.displayName),
+            subtitle: TierLabel(u.tier),
+            onTap: () => showUserProfile(context, u),
             trailing: switch (known[u.id]?.status) {
               FriendshipStatus.accepted => const Text('Befreundet'),
               FriendshipStatus.pending => const Text('Angefragt'),

@@ -3,6 +3,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
 import 'auth.dart';
+import 'best_of.dart';
 import 'deps.dart';
 import 'http.dart';
 import 'places.dart';
@@ -76,7 +77,8 @@ void mountRanking(Router router, Deps deps) {
       }
     }
 
-    return json(RankingDto(city: city, by: by, entries: [
+    final bestOf = await latestBestOf(deps.db, city, by.diet == Diet.vegan ? BestOfCategory.vegan : BestOfCategory.overall);
+    return json(RankingDto(city: city, by: by, bestOf: bestOf, entries: [
       for (final r in rows)
         RankingEntryDto(
           place: placeFromRow(r),

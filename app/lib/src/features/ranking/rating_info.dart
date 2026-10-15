@@ -54,6 +54,13 @@ class _RatingInfo extends StatelessWidget {
               'Schnitt und die Anzahl. Läden können sich keinen Platz kaufen.',
         ),
         section(
+          'Bestenliste und Siegel',
+          'Am 1. Januar entsteht für jede Stadt die Bestenliste des Vorjahres, gesamt und vegan. Gezählt werden nur die '
+              'Bewertungen aus diesem Jahr, ein Laden braucht mindestens $bestOfMinReviews davon. Sortiert wird wie im Ranking. '
+              'Eine Stadt braucht mindestens $bestOfMinPlaces solche Läden. Die ersten $bestOfAwardedRanks bekommen ein Siegel. '
+              'Danach steht die Liste fest. Zitate auf der Liste stammen aus Bewertungen, ohne Namen.',
+        ),
+        section(
           'Gefälschte Bewertung entdeckt?',
           'Schick uns eine Nachricht über „Feedback geben“ in den Einstellungen.',
         ),

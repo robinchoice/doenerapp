@@ -276,4 +276,19 @@ void main() {
     expect(const LoginRequest(email: 'a@b.de').toJson(), {'email': 'a@b.de'});
     expect(const LoginRequest(email: 'a@b.de', inviteCode: 'x').toJson(), {'email': 'a@b.de', 'inviteCode': 'x'});
   });
+
+  test('best-of lists round-trip and stay optional for older payloads', () {
+    const award = AwardDto(year: 2026, city: 'Freiburg', category: BestOfCategory.vegan, rank: 1, average: 4.8, count: 16, path: '/bestenliste/freiburg/2026');
+    final summary = PlaceSummaryDto.fromJson(const PlaceSummaryDto(awards: [award]).toJson());
+    expect(summary.awards.single.category, BestOfCategory.vegan);
+    expect(summary.awards.single.path, '/bestenliste/freiburg/2026');
+    expect(PlaceSummaryDto.fromJson(const PlaceSummaryDto().toJson()..remove('awards')).awards, isEmpty);
+
+    const bestOf = BestOfDto(year: 2026, city: 'Freiburg', category: BestOfCategory.overall, path: '/bestenliste/freiburg/2026', entries: [
+      BestOfEntryDto(rank: 1, placeId: 'p1', name: 'Bosporus Grill'),
+    ]);
+    final ranking = RankingDto.fromJson(const RankingDto(by: RankBy.overall, entries: [], bestOf: bestOf).toJson());
+    expect(ranking.bestOf!.entries.single.name, 'Bosporus Grill');
+    expect(RankingDto.fromJson(const RankingDto(by: RankBy.overall, entries: []).toJson()).bestOf, isNull);
+  });
 }

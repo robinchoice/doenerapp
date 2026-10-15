@@ -152,4 +152,10 @@ void main() {
     expect(summary.meat, Meat.kalb);
     expect(summary.bread, Bread.homemade);
   });
+
+  test('city slugs for best-of URLs', () {
+    expect(citySlug('Freiburg im Breisgau'), 'freiburg-im-breisgau');
+    expect(citySlug('Göttingen'), 'goettingen');
+    expect(citySlug(' Frankfurt (Oder) '), 'frankfurt-oder');
+  });
 }

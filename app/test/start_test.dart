@@ -71,6 +71,13 @@ class FakeServer {
             RankingEntryDto(place: _rated, average: 4.5, count: 4, friends: [FriendRatingDto(user: _tom, rating: 5)]),
             const RankingEntryDto(place: _meatOnly, average: 3.5, count: 2),
           ],
+          bestOf: request.url.queryParameters['by'] == 'vegan'
+              ? null
+              : const BestOfDto(year: 2026, city: 'Freiburg im Breisgau', category: BestOfCategory.overall, path: '/bestenliste/freiburg-im-breisgau/2026', entries: [
+                  BestOfEntryDto(rank: 1, placeId: 'b1', name: 'Bosporus Grill'),
+                  BestOfEntryDto(rank: 2, placeId: 'b2', name: 'Mardin Döner'),
+                  BestOfEntryDto(rank: 3, placeId: 'b3', name: 'Yufka-Ecke'),
+                ]),
         ).toJson()),
       _ => json([]),
     };
@@ -136,6 +143,8 @@ void main() {
     expect(find.text('Tom 5'), findsOneWidget);
     expect(find.text('4,5'), findsOneWidget);
     expect(server.calls('/ranking').single.queryParameters['by'], 'overall');
+    expect(find.text('Die besten Döner in Freiburg im Breisgau 2026'), findsOneWidget);
+    expect(find.text('Mardin Döner'), findsOneWidget);
 
     await tester.tap(find.text('Soße'));
     await tester.pumpAndSettle();
@@ -154,6 +163,7 @@ void main() {
     expect(find.text('Fleisch'), findsNothing);
     expect(find.text('Kebap Haus'), findsOneWidget);
     expect(find.text('Fleischerei Grill'), findsNothing, reason: 'people found nothing vegan there');
+    expect(find.textContaining('Am 1. Januar erscheint die Bestenliste'), findsOneWidget, reason: 'no vegan list yet');
   });
 
   testWidgets('check-in lets the user pick between shops next to each other', (tester) async {

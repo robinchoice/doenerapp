@@ -7,6 +7,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
 import 'auth.dart';
+import 'best_of.dart';
 import 'deps.dart';
 import 'google_places.dart';
 import 'http.dart';
@@ -235,7 +236,7 @@ void mountPlaces(Router router, Deps deps) {
       'SELECT r.*, $reviewItemsJson FROM reviews r JOIN places p ON p.id = r.place_id WHERE p.google_place_id = @id',
       {'id': placeId},
     );
-    return json(summarize(rows).toJson());
+    return json(summarize(rows, awards: await latestAwards(deps.db, placeId)).toJson());
   });
 
   router.put('/places/<placeId>/review', (Request request, String placeId) async {
@@ -597,7 +598,7 @@ const _scoreColumns = {
 };
 
 /// What the community says about a place, from its review rows.
-PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews) {
+PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, {List<AwardDto> awards = const []}) {
   final values = <RatingItem, List<double>>{};
   for (final review in reviews) {
     for (final e in ratingsFromRow(review).entries) {
@@ -621,6 +622,7 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews) {
     skewer: Skewer.values.asNameMap()[plurality([for (final r in reviews) r['skewer'] as String?])],
     bread: Bread.values.asNameMap()[plurality([for (final r in reviews) r['bread'] as String?])],
     experts: experts.length,
+    awards: awards,
   );
 }
 

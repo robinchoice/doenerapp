@@ -30,6 +30,7 @@
 - Ausgelieferte Builds bis 1.0.x scheitern an unbekannten Namen von Bewertungspunkten. Neue `RatingItem`s kommen deshalb in `RatingItem.newItems`, das JSON trägt sie getrennt (`newRatings`, `newItems`).
 - Der Maps-JavaScript-Key der Web-Version (`GOOGLE_MAPS_WEB_KEY`) ist per Referrer auf die Domains beschränkt. Neue Domain: Referrer im Google-Projekt ergänzen.
 
+- Die Bestenliste eines Jahres friert der Zeitplan `best_of` am 1. Januar einmal ein (`best_of_years` merkt sich das Jahr). Wer die Regeln ändert und ein Jahr neu rechnen will, löscht dessen Zeilen in `best_of` und `best_of_years`, dann rechnet der nächste Lauf es neu.
 - Die Landingpage lädt Schrift und Wortmarke aus dem Flutter-Build (`/assets/assets/…`). Wer Assets in `app/pubspec.yaml` verschiebt, muss die Pfade in `server/lib/src/landing.dart` nachziehen.
 
 ## Abweichungen vom Standard

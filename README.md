@@ -130,6 +130,16 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 
 Wer in seiner Gegend noch niemanden hat, schaut woanders rein: Der Knopf neben „Top 3“ auf Start und die Weltkugel im Ranking öffnen „Döner-Tourismus“ mit allen Städten, in denen Läden bewertet sind (`/cities`, die meisten zuerst). Start (Top 3, Trends, neue Läden, Bewertungen der Gegend) und Ranking zeigen dann diese Stadt, ein Hinweis auf Start führt zurück. Die Wahl gilt bis zum Neustart der App, Check-in und Erinnerungen bleiben am echten Standort.
 
+### Bestenliste und Siegel
+
+Am 1. Januar friert der Server für jede Stadt die Bestenliste des Vorjahres ein (Zeitplan `best_of`, Tabelle `best_of`, erstes Jahr 2026), gesamt und vegan.
+
+- Gezählt werden Bewertungen, die im Kalenderjahr (Europe/Berlin) abgegeben oder zuletzt geändert wurden. Ein Laden braucht mindestens 10 davon (vegan: 10 mit veganer Note), eine Stadt mindestens 5 solche Läden. Sortiert wird wie im Ranking, der Stadtschnitt kommt aus allen Bewertungen des Jahres. Die Regeln stehen als Konstanten in `packages/doener_models` (`bestOf…`)
+- Platz 1–3 bekommen ein Siegel: „Platz 1 in Freiburg 2026“. Kein „Testsieger“, denn es gab keinen Test
+- Öffentliche Seite `/bestenliste/<stadt>/<jahr>` (`?lang=en` englisch) mit Top 3 je Kategorie, den weiteren Plätzen und der Methodik. Das Zitat ist die längste Bewertung mit Text aus dem Jahr, ohne Namen, und wird beim Aufruf gelesen: Eine gelöschte Bewertung nimmt ihr Zitat mit
+- Siegel zum Drucken unter `/siegel/<placeId>`, 15 × 5 cm, mit QR-Code auf `/b/<placeId>`. Druck und Versand an die Läden sind noch offen
+- In der App: Zeile über dem Ladennamen, Link zur Liste und „Siegel drucken“ in der Laden-Ansicht, Banner mit den Top 3 über dem Ranking. Gezeigt wird immer das neueste Jahr. Die Karte bleibt unverändert
+
 ### Freunde
 
 - Persönlicher Einladungslink samt QR-Code (Profil, Freunde-Liste, letzter Onboarding-Schritt): Wer ihn öffnet und sich anmeldet, ist sofort befreundet, eine offene Anfrage gilt damit als angenommen. Der Link lässt sich zurücksetzen.
@@ -194,11 +204,11 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | GET | `/places/top?lat&lon[&by]` | Beste im Umkreis von 10 km (gewichtet) nach `overall`, `vegetarian` oder `vegan`, mit unbewerteten aufgefüllt |
 | GET | `/places/new?lat&lon` | Im Umkreis neu eröffnete (30 Tage) und von Google angekündigte Läden |
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
-| GET | `/ranking?lat&lon&by[&city]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden; `city` statt der Stadt am Standort |
+| GET | `/ranking?lat&lon&by[&city]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan` oder einem Punkt (`sauce`, `falafel`, `ayran` …), mit Freunden und den Top 3 der neuesten Bestenliste; `city` statt der Stadt am Standort |
 | GET | `/cities` | Städte mit bewerteten Läden samt Mittelpunkt, die meisten zuerst |
 | GET | `/places/:placeId` | Laden (Google Place ID); fehlt er im Cache, lädt der Server ihn für Angemeldete bei Google nach |
 | GET | `/places/:placeId/reviews` | Bewertungen des Ladens, angemeldet ohne die von Blockierten |
-| GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran und was „mit allem“ heißt |
+| GET | `/places/:placeId/summary` | Durchschnitt je Punkt, Ayran, was „mit allem“ heißt und die Siegel aus der neuesten Bestenliste |
 | PUT | `/places/:placeId/review` | Eigene Bewertung speichern, optional mit Foto (`photoBase64`) oder ohne das bisherige (`removePhoto`) |
 | GET | `/photos/:id` | Foto einer Bewertung (ohne Login) |
 | POST | `/places/:placeId/visits` | Check-in (idempotent über Client-ID) |
@@ -223,7 +233,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | PUT, DELETE | `/me/blocks/:userId` | Blockieren, freigeben |
 | POST | `/tester-requests` | Testanfrage von der Landingpage, ohne Login |
 
-Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/b/:placeId` die Bewertungsseite eines Ladens, unter `/aushang/:placeId` dessen Aushang mit QR-Code und unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS Einladungs- und Bewertungslinks in der App öffnet.
+Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/b/:placeId` die Bewertungsseite eines Ladens, unter `/aushang/:placeId` dessen Aushang mit QR-Code, unter `/siegel/:placeId` seine Siegel zum Drucken, unter `/bestenliste/:stadt/:jahr` die Bestenliste und unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS Einladungs- und Bewertungslinks in der App öffnet.
 
 ---
 

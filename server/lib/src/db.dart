@@ -281,6 +281,23 @@ final migrations = <List<String>>[
     // What the Döner cost, in cents. The salad is a review item like falafel.
     'ALTER TABLE reviews ADD COLUMN price int CHECK (price BETWEEN 100 AND 3000)',
   ],
+  [
+    // Yearly best-of lists, frozen once the year is over (computeBestOf).
+    // A year is claimed first, so it is computed once even with no city in it.
+    'CREATE TABLE best_of_years (year int PRIMARY KEY, computed_at timestamptz NOT NULL DEFAULT now())',
+    '''CREATE TABLE best_of (
+      year int NOT NULL REFERENCES best_of_years (year),
+      city text NOT NULL,
+      category text NOT NULL CHECK (category IN ('overall', 'vegan')),
+      rank int NOT NULL,
+      place_id uuid NOT NULL REFERENCES places (id) ON DELETE CASCADE,
+      average float8 NOT NULL,
+      count int NOT NULL,
+      PRIMARY KEY (year, city, category, rank)
+    )''',
+    'CREATE INDEX best_of_place ON best_of (place_id)',
+    "INSERT INTO schedules (name, next_run_at) VALUES ('best_of', now())",
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

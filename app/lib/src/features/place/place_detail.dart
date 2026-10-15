@@ -11,6 +11,7 @@ import '../../core/app_data.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../../core/maps.dart';
+import '../ranking/best_of.dart';
 import '../ranking/rating_info.dart';
 import '../social/friends.dart';
 import '../social/moderation.dart';
@@ -126,6 +127,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
     final visits = data.visitsAt(place.placeId);
     final isFavorite = data.favorites.contains(place.placeId);
     final addressLine = [place.postalCode, place.city].whereType<String>().join(' ');
+    final awards = summary?.awards ?? const <AwardDto>[];
     // Others' reviews, the friends' first — the ones that tell the user most.
     final friendIds = {for (final f in context.watch<Friends>().accepted) f.user.id};
     final others = _reviews.where((r) => r.userId != session.user?.id).toList()
@@ -144,6 +146,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (awards.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 2), child: AwardLine(awards: awards)),
                     Text(place.name, style: displayStyle.copyWith(fontSize: 30, color: theme.colorScheme.onSurface)),
                     if (place.address != null) ...[
                       const SizedBox(height: 4),
@@ -154,6 +157,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
                       ]),
                     ],
                     if (addressLine.isNotEmpty) Text(addressLine, style: TextStyle(color: theme.colorScheme.outline)),
+                    if (awards.isNotEmpty) AwardStats(award: awards.first),
                     const SizedBox(height: 6),
                     Wrap(spacing: 6, runSpacing: 6, children: [
                       if (place.openedOn case final opened? when DateTime.now().difference(opened).inDays < 30)
@@ -331,6 +335,14 @@ class _PlaceDetailState extends State<PlaceDetail> {
             label: const Text('Aushang mit QR-Code drucken'),
           ),
         ),
+        if (awards.isNotEmpty)
+          Center(
+            child: TextButton.icon(
+              onPressed: () => openBestOfPage(context, '/siegel/${Uri.encodeComponent(place.placeId)}'),
+              icon: const Icon(Icons.workspace_premium_outlined),
+              label: Text('Siegel ${awards.first.year} drucken'),
+            ),
+          ),
       ],
     );
   }

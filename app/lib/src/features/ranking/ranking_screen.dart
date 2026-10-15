@@ -10,6 +10,7 @@ import '../../core/maps.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
+import 'best_of.dart';
 import 'city_picker.dart';
 import 'rating_info.dart';
 
@@ -158,6 +159,17 @@ class _RankingScreenState extends State<RankingScreen> {
                     ),
                   )
                 else ...[
+                  if (ranking!.bestOf case final bestOf?)
+                    BestOfBanner(bestOf: bestOf)
+                  else if (DateTime.now().year >= firstBestOfYear)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Am 1. Januar erscheint die Bestenliste ${DateTime.now().year} für $city: Läden mit mindestens '
+                        '$bestOfMinReviews Bewertungen aus diesem Jahr.',
+                        style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12.5),
+                      ),
+                    ),
                   const Divider(),
                   for (final (i, entry) in entries.indexed) _RankingRow(rank: i + 1, entry: entry),
                 ],

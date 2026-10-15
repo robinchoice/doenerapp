@@ -27,6 +27,9 @@ const deep = [
 /// This app's section of the band.
 const appBand = (from: 2.55, to: 3.20);
 
+/// The vegan seal's section, so it differs from the overall one next to it.
+const veganBand = (from: 3.40, to: 4.00);
+
 const paper = Color(0xFFF4F4F1);
 const ink = Color(0xFF17171A);
 const muted = Color(0xFF5E5E66);
@@ -71,14 +74,14 @@ Color bandColor(double position, List<Color> tones) {
   return Color.lerp(tones[i], tones[i + 1], p - 1 - i)!;
 }
 
-/// Gradient of this app's section, from bottom left to top right.
-LinearGradient bandGradient(List<Color> tones) => LinearGradient(
+/// Gradient of this app's section (or [band]), from bottom left to top right.
+LinearGradient bandGradient(List<Color> tones, {({double from, double to}) band = appBand}) => LinearGradient(
       begin: Alignment.bottomLeft,
       end: Alignment.topRight,
       colors: [
-        bandColor(appBand.from, tones),
-        bandColor((appBand.from + appBand.to) / 2, tones),
-        bandColor(appBand.to, tones),
+        bandColor(band.from, tones),
+        bandColor((band.from + band.to) / 2, tones),
+        bandColor(band.to, tones),
       ],
     );
 

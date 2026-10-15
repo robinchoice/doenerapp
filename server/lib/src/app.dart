@@ -5,6 +5,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
 import 'auth.dart';
+import 'best_of.dart';
 import 'deps.dart';
 import 'http.dart';
 import 'landing.dart';
@@ -75,6 +76,8 @@ Handler buildHandler(Deps deps) {
     ..get('/i/<code>', (Request request, String code) => invitePage(deps, request, code))
     ..get('/b/<placeId>', (Request request, String placeId) => reviewLinkPage(deps, request, placeId))
     ..get('/aushang/<placeId>', (Request request, String placeId) => posterPage(deps, request, placeId))
+    ..get('/siegel/<placeId>', (Request request, String placeId) => sealPage(deps, request, placeId))
+    ..get('/bestenliste/<city>/<year>', (Request request, String city, String year) => bestOfPage(deps, request, city, year))
     ..get('/datenschutz', privacyPage)
     ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation))
     ..get('/.well-known/assetlinks.json', (Request _) => json(_assetLinks));

@@ -286,6 +286,9 @@ class PlaceSummaryDto {
   /// Reviews that told what came with "mit allem".
   final int experts;
 
+  /// The place's seals from the latest best-of lists.
+  final List<AwardDto> awards;
+
   const PlaceSummaryDto({
     this.items = const {},
     this.ayranHomemade,
@@ -295,6 +298,7 @@ class PlaceSummaryDto {
     this.skewer,
     this.bread,
     this.experts = 0,
+    this.awards = const [],
   });
 
   List<Ingredient> get specials => [for (final i in ingredients) if (i.isSpecial) i];
@@ -311,6 +315,7 @@ class PlaceSummaryDto {
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
         experts: j['experts'] as int,
+        awards: [for (final a in (j['awards'] as List?) ?? const []) AwardDto.fromJson(a as Json)],
       );
 
   Json toJson() => {
@@ -324,6 +329,7 @@ class PlaceSummaryDto {
         'skewer': skewer?.name,
         'bread': bread?.name,
         'experts': experts,
+        'awards': [for (final a in awards) a.toJson()],
       };
 }
 
@@ -734,15 +740,108 @@ class RankingDto {
   final RankBy by;
   final List<RankingEntryDto> entries;
 
-  const RankingDto({this.city, required this.by, required this.entries});
+  /// The city's latest best-of list: vegan when ranking by the vegan score, else overall.
+  final BestOfDto? bestOf;
+
+  const RankingDto({this.city, required this.by, required this.entries, this.bestOf});
 
   factory RankingDto.fromJson(Json j) => RankingDto(
         city: j['city'] as String?,
         by: RankBy.parse(j['by'] as String) ?? (throw FormatException('Unknown ranking ${j['by']}')),
         entries: (j['entries'] as List).map((e) => RankingEntryDto.fromJson(e as Json)).toList(),
+        bestOf: j['bestOf'] == null ? null : BestOfDto.fromJson(j['bestOf'] as Json),
       );
 
-  Json toJson() => {'city': city, 'by': by.key, 'entries': entries.map((e) => e.toJson()).toList()};
+  Json toJson() => {
+        'city': city,
+        'by': by.key,
+        'entries': entries.map((e) => e.toJson()).toList(),
+        if (bestOf != null) 'bestOf': bestOf!.toJson(),
+      };
+}
+
+// MARK: - Best of
+
+enum BestOfCategory { overall, vegan }
+
+/// A seal: [rank] in the best-of list of [city] for [year]. [average] and
+/// [count] are the reviews of that year; [path] is the list's public page.
+class AwardDto {
+  final int year;
+  final String city;
+  final BestOfCategory category;
+  final int rank;
+  final double average;
+  final int count;
+  final String path;
+
+  const AwardDto({
+    required this.year,
+    required this.city,
+    required this.category,
+    required this.rank,
+    required this.average,
+    required this.count,
+    required this.path,
+  });
+
+  factory AwardDto.fromJson(Json j) => AwardDto(
+        year: j['year'] as int,
+        city: j['city'] as String,
+        category: BestOfCategory.values.byName(j['category'] as String),
+        rank: j['rank'] as int,
+        average: (j['average'] as num).toDouble(),
+        count: j['count'] as int,
+        path: j['path'] as String,
+      );
+
+  Json toJson() => {
+        'year': year,
+        'city': city,
+        'category': category.name,
+        'rank': rank,
+        'average': average,
+        'count': count,
+        'path': path,
+      };
+}
+
+class BestOfEntryDto {
+  final int rank;
+  final String placeId;
+  final String name;
+  const BestOfEntryDto({required this.rank, required this.placeId, required this.name});
+
+  factory BestOfEntryDto.fromJson(Json j) =>
+      BestOfEntryDto(rank: j['rank'] as int, placeId: j['placeId'] as String, name: j['name'] as String);
+  Json toJson() => {'rank': rank, 'placeId': placeId, 'name': name};
+}
+
+/// The awarded places of a best-of list, best first.
+class BestOfDto {
+  final int year;
+  final String city;
+  final BestOfCategory category;
+  final String path;
+  final List<BestOfEntryDto> entries;
+
+  const BestOfDto({required this.year, required this.city, required this.category, required this.path, required this.entries});
+
+  factory BestOfDto.fromJson(Json j) => BestOfDto(
+        year: j['year'] as int,
+        city: j['city'] as String,
+        category: BestOfCategory.values.byName(j['category'] as String),
+        path: j['path'] as String,
+        entries: [for (final e in j['entries'] as List) BestOfEntryDto.fromJson(e as Json)],
+      );
+
+  Json toJson() => {
+        'year': year,
+        'city': city,
+        'category': category.name,
+        'path': path,
+        'entries': [for (final e in entries) e.toJson()],
+      };
 }
 
 /// Around a position: places that opened lately (newest first) and openings

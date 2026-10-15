@@ -1045,4 +1045,63 @@ void main() {
     final (_, derived) = await call('PUT', '/places/place-kebap/review', body: {'sauceRating': 2}, token: ida);
     expect(derived['rating'], 2, reason: 'rated Döner items take over');
   });
+
+  test('best-of lists: frozen once per year, on their page, the seal, the summary and the ranking', () async {
+    Future<(int, String)> page(String path) async {
+      final response = await handler(Request('GET', Uri.parse('http://localhost$path')));
+      return (response.statusCode, await response.readAsString());
+    }
+
+    // Teststadt, far from the other shops: shop i is rated 5.5 - 0.5 i by ten fans in 2026, shop 6
+    // only by nine. A review from 2025 doesn't count, vegan scores only exist at one shop.
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, address, city) SELECT "
+        "'best-' || i, 'Grill ' || i, 50 + i * 0.001, 10, 'Hauptstr. ' || i, 'Teststadt' FROM generate_series(1, 6) i");
+    await db.execute("INSERT INTO users (email, display_name) SELECT 'fan' || u || '@best.test', 'Fan ' || u FROM generate_series(1, 11) u");
+    await db.execute("INSERT INTO reviews (user_id, place_id, rating, vegan_rating, text, updated_at) "
+        "SELECT u.id, p.id, 5.5 - 0.5 * substr(p.google_place_id, 6)::int, "
+        "CASE WHEN p.google_place_id = 'best-2' THEN 5 END, "
+        "CASE u.display_name WHEN 'Fan 1' THEN 'Kurz' WHEN 'Fan 2' THEN 'Die längste Bewertung, mit <Soße>' END, "
+        "'2026-06-01 12:00+02' FROM users u, places p WHERE u.email LIKE '%@best.test' AND p.google_place_id LIKE 'best-%' "
+        "AND u.display_name <> 'Fan 11' AND NOT (p.google_place_id = 'best-6' AND u.display_name = 'Fan 10')");
+    await db.execute("INSERT INTO reviews (user_id, place_id, rating, updated_at) SELECT u.id, p.id, 5, '2025-12-31 23:30+01' "
+        "FROM users u, places p WHERE u.display_name = 'Fan 11' AND p.google_place_id = 'best-5'");
+
+    await computeBestOf(db, 2026);
+    await computeBestOf(db, 2026);
+    final rows = await db.execute("SELECT category, rank, (SELECT google_place_id FROM places WHERE id = place_id), count "
+        "FROM best_of WHERE city = 'Teststadt' ORDER BY category, rank");
+    expect([for (final r in rows) r.join(' ')], [
+      for (var i = 1; i <= 5; i++) 'overall $i best-$i 10',
+    ], reason: 'best-6 has nine reviews, the 2025 one is not counted, one vegan shop is fewer than $bestOfMinPlaces');
+
+    final (status, html) = await page('/bestenliste/teststadt/2026');
+    expect(status, 200);
+    expect(html, contains('Die besten Döner in Teststadt 2026'));
+    expect(html, contains('<q>Die längste Bewertung, mit &lt;Soße&gt;</q>'));
+    expect(html, isNot(contains('Fan 2')), reason: 'quotes without names');
+    expect(html, contains('Plätze 4–5'));
+    expect((await page('/bestenliste/teststadt/2026?lang=en')).$2, contains('The best döner in Teststadt 2026'));
+    expect((await page('/bestenliste/teststadt/2025')).$1, 404);
+    expect((await page('/bestenliste/nirgendwo/2026')).$1, 404);
+
+    final (sealStatus, seal) = await page('/siegel/best-1');
+    expect(sealStatus, 200);
+    expect(seal, allOf(contains('DÖNER-RANKING TESTSTADT'), contains('Platz 1<tspan'), contains('Ø 5,0 aus 10 Bewertungen im Jahr 2026')));
+    expect((await page('/siegel/best-1?lang=en')).$2, contains('Avg. 5.0 from 10 reviews in 2026'));
+    expect((await page('/siegel/best-4')).$1, 404, reason: 'only the first $bestOfAwardedRanks get a seal');
+    expect((await page('/b/best-2')).$2, contains('Platz 2 in Teststadt 2026'));
+
+    final (_, summary) = await call('GET', '/places/best-1/summary');
+    final award = PlaceSummaryDto.fromJson(summary as Map<String, dynamic>).awards.single;
+    expect((award.year, award.rank, award.category, award.path), (2026, 1, BestOfCategory.overall, '/bestenliste/teststadt/2026'));
+    expect(PlaceSummaryDto.fromJson((await call('GET', '/places/best-4/summary')).$2 as Map<String, dynamic>).awards, isEmpty);
+
+    final (token, _) = await signUp('bestenliste@example.org', 'Bestenleser');
+    final (_, ranking) = await call('GET', '/ranking?lat=50.001&lon=10&by=overall', token: token);
+    final bestOf = RankingDto.fromJson(ranking as Map<String, dynamic>).bestOf!;
+    expect(bestOf.entries.map((e) => e.name), ['Grill 1', 'Grill 2', 'Grill 3']);
+    expect(bestOf.path, '/bestenliste/teststadt/2026');
+    final (_, vegan) = await call('GET', '/ranking?lat=50.001&lon=10&by=vegan', token: token);
+    expect(RankingDto.fromJson(vegan as Map<String, dynamic>).bestOf, isNull);
+  });
 }

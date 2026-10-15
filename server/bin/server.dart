@@ -44,6 +44,12 @@ Future<void> startServer() async {
       print('Place cache maintenance failed: $error');
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
+    try {
+      await runSchedule(db, 'best_of', const Duration(hours: 24), () => computeDueBestOf(db));
+    } catch (error, stackTrace) {
+      print('Best-of lists failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
   }
   unawaited(runDueJobs());
   Timer.periodic(const Duration(minutes: 1), (_) => runDueJobs());

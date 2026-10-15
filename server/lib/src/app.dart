@@ -4,6 +4,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
+import 'agents.dart';
 import 'auth.dart';
 import 'best_of.dart';
 import 'deps.dart';
@@ -70,8 +71,9 @@ Handler buildHandler(Deps deps) {
   mountPush(api, deps);
   mountTesterRequests(api, deps);
 
-  final root = Router()
-    ..mount('/api/v1/', api.call)
+  final root = Router()..mount('/api/v1/', api.call);
+  mountAgents(root, deps);
+  root
     ..get('/', (Request request) => landingPage(request, english: false))
     ..get('/en', (Request request) => landingPage(request, english: true))
     ..get('/en/', (Request request) => landingPage(request, english: true))
@@ -102,5 +104,6 @@ Handler buildHandler(Deps deps) {
       .addMiddleware(logRequests())
       .addMiddleware(cors(deps.config.corsOrigin))
       .addMiddleware(errorHandling())
+      .addMiddleware(markdownForAgents(deps))
       .addHandler(root.call);
 }

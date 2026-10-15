@@ -1,0 +1,12 @@
+# Secret scan in .github/workflows/secrets.yml, on top of the gitleaks default rules.
+[extend]
+useDefault = true
+
+# Package hashes in lockfiles can trip the entropy rule generic-api-key. Only that rule
+# is skipped there, real token formats like ghp_ or AIza are still caught in these files.
+[[allowlists]]
+description = "Lockfile hashes"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)pubspec\.lock$''',
+]

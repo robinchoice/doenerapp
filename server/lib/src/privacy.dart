@@ -1,7 +1,29 @@
 import 'package:shelf/shelf.dart';
 
+import 'agents.dart';
+
 /// `/datenschutz` — privacy policy for the app stores and the web app.
 Response privacyPage(Request _) => Response.ok(_privacyHtml, headers: {'content-type': 'text/html; charset=utf-8'});
+
+/// The privacy policy as Markdown for agents (agents.dart). It exists in German only.
+PublicPage privacyPublicPage({required bool english}) => (
+      path: '/datenschutz',
+      title: english ? 'Privacy policy (German)' : 'Datenschutz',
+      description: english
+          ? 'What the Döner App stores, who processes it and your rights. Only available in German.'
+          : 'Was die Döner App speichert, wer es verarbeitet und welche Rechte du hast.',
+      body: _privacyMarkdown,
+    );
+
+/// Built from the HTML below, which only uses h1, h2, p, br and a.
+final _privacyMarkdown = RegExp(r'<main>([\s\S]*)</main>')
+    .firstMatch(_privacyHtml)![1]!
+    .replaceAll(RegExp(r'<h1>.*</h1>'), '')
+    .replaceAllMapped(RegExp(r'<h2>(.*)</h2>'), (m) => '## ${m[1]}\n')
+    .replaceAllMapped(RegExp(r'<a href="([^"]+)">([^<]+)</a>'), (m) => '[${m[2]}](${m[1]})')
+    .replaceAll('<br>', '  \n')
+    .replaceAll(RegExp(r'</?p>'), '')
+    .trim();
 
 const _privacyHtml = '''<!DOCTYPE html>
 <html lang="de">

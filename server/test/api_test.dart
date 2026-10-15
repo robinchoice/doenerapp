@@ -1239,4 +1239,51 @@ void main() {
     final (_, vegan) = await call('GET', '/ranking?lat=50.001&lon=10&by=vegan', token: token);
     expect(RankingDto.fromJson(vegan as Map<String, dynamic>).bestOf, isNull);
   });
+
+  test('public pages for agents: llms.txt, Markdown per page, no reviews or profiles', () async {
+    Future<Response> get(String path, [Map<String, String> headers = const {}]) async =>
+        await handler(Request('GET', Uri.parse('http://localhost$path'), headers: headers));
+
+    final llms = await get('/llms.txt');
+    expect(llms.headers['content-type'], 'text/plain; charset=utf-8');
+    final text = await llms.readAsString();
+    expect(text, startsWith('# Döner App\n\n> Döner bewertet nach Soße'));
+    expect(text, contains('https://doener.test/llms-full.txt'));
+    expect(text, contains('https://doener.test/llms.txt?lang=en'));
+    expect(text, contains('- [Döner App – Der beste Döner deiner Stadt](https://doener.test/index.md): '));
+    expect(text, contains('- [Die besten Döner in Teststadt 2026](https://doener.test/bestenliste/teststadt/2026.md): 1. Grill 1 · 2. Grill 2 · 3. Grill 3'));
+    expect(text, contains('(https://doener.test/datenschutz.md)'));
+
+    final english = await (await get('/llms.txt?lang=en', {'accept-language': 'de'})).readAsString();
+    expect(english, contains('The best döner in your city'));
+    expect(english, contains('https://doener.test/index.md?lang=en'));
+    expect(await (await get('/index.md', {'accept-language': 'en-US,en'})).readAsString(), contains('Honest ratings'));
+
+    final full = await (await get('/llms-full.txt')).readAsString();
+    for (final path in ['/index.md', '/bestenliste/teststadt/2026.md', '/datenschutz.md']) {
+      final response = await get(path);
+      expect(response.statusCode, 200, reason: path);
+      expect(response.headers['content-type'], 'text/markdown; charset=utf-8');
+      final markdown = await response.readAsString();
+      expect(markdown, startsWith('# '));
+      expect(full, contains(markdown.trim()));
+    }
+
+    final list = await (await get('/bestenliste/teststadt/2026.md?lang=en')).readAsString();
+    expect(list, contains('1. Grill 1 – Hauptstr. 1 · Avg. 5.0 · 10 reviews'));
+    expect(list, isNot(contains('längste Bewertung')), reason: 'no quotes from single reviews');
+    expect(await (await get('/datenschutz.md')).readAsString(), allOf(contains('## 1. Verantwortlicher'), isNot(contains('<'))));
+
+    // Accept: text/markdown gets the Markdown under the page's own URL, everyone else the HTML.
+    const md = {'accept': 'text/markdown'};
+    expect(await (await get('/', md)).readAsString(), startsWith('# Döner App – Der beste Döner deiner Stadt'));
+    expect(await (await get('/en', md)).readAsString(), startsWith('# Döner App – The best döner in your city'));
+    expect(await (await get('/bestenliste/teststadt/2026/', md)).readAsString(), startsWith('# Die besten Döner in Teststadt 2026'));
+    expect((await get('/')).headers['content-type'], 'text/html; charset=utf-8');
+
+    for (final path in ['/app.md', '/i/abc.md', '/b/best-1.md', '/bestenliste/teststadt/2025.md']) {
+      expect((await get(path)).statusCode, 404, reason: path);
+    }
+    expect((await get('/api/v1/health', md)).headers['content-type'], startsWith('application/json'));
+  });
 }

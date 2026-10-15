@@ -1,4 +1,4 @@
-# Local stack: API + web app on http://localhost:8080, Postgres on :5434.
+# Local stack: API + web app on http://localhost:8080, Postgres on 127.0.0.1:5434 (not reachable from the network).
 # Without SMTP_HOST, login codes are printed to the app log.
 services:
   app:
@@ -38,7 +38,7 @@ services:
       - POSTGRES_USER=doener
       - POSTGRES_PASSWORD=${DB_PASSWORD:-doener}
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U doener -d doener"]
       interval: 5s

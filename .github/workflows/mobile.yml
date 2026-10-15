@@ -5,6 +5,8 @@ name: Mobile
 # Beides bei jedem Push auf main, der die App ändert (öffentliches Repo, Minuten frei),
 # dazu bei Tags `v*` und per workflow_dispatch.
 # `gh workflow run Mobile -f platform=android` baut nur Android.
+# Release-Builds sind verschleiert, die Symbole für `flutter symbolize` bleiben 90 Tage als
+# Artefakt am Lauf (README, „Deployment“). Sie kommen nie ins Bundle oder ins Repo.
 
 on:
   workflow_dispatch:
@@ -80,7 +82,7 @@ jobs:
       - name: Flutter-Build vorbereiten
         working-directory: app
         # Firebase on iOS uses the bundle-restricted Maps key, which also allows FCM registration.
-        run: flutter build ios --release --no-codesign --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.GOOGLE_MAPS_IOS_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+        run: flutter build ios --release --no-codesign --obfuscate --split-debug-info=$RUNNER_TEMP/symbols --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.GOOGLE_MAPS_IOS_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - name: Archive bauen
         working-directory: app/ios
@@ -107,6 +109,13 @@ jobs:
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
             -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.ASC_ISSUER_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: symbols-ios
+          path: ${{ runner.temp }}/symbols
+          retention-days: 90
+          if-no-files-found: error
 
   # Only release tags reach the external testers: every build given to the
   # group „Erste Tester“ mails all of them. Other builds stay internal.
@@ -167,7 +176,7 @@ jobs:
         working-directory: app
         env:
           GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
-        run: flutter build appbundle --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_ANDROID_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+        run: flutter build appbundle --release --obfuscate --split-debug-info=$RUNNER_TEMP/symbols/aab --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_ANDROID_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - uses: actions/upload-artifact@v4
         with:
@@ -179,12 +188,20 @@ jobs:
         working-directory: app
         env:
           GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
-        run: flutter build apk --release --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_ANDROID_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
+        run: flutter build apk --release --obfuscate --split-debug-info=$RUNNER_TEMP/symbols/apk --dart-define=SENTRY_DSN=${{ vars.SENTRY_DSN }} --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_ANDROID_KEY }} --build-number=$((GITHUB_RUN_NUMBER + 10))
 
       - uses: actions/upload-artifact@v4
         with:
           name: doener-android-apk
           path: app/build/app/outputs/flutter-apk/app-release.apk
+
+      # aab/ and apk/ are separate builds with their own symbols.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: symbols-android
+          path: ${{ runner.temp }}/symbols
+          retention-days: 90
+          if-no-files-found: error
 
       # Play only accepts API uploads once the first bundle was uploaded by hand in the Play Console.
       - name: Upload zu Play (interner Test)

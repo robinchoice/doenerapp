@@ -5,6 +5,7 @@ import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
+import 'agents.dart';
 import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
@@ -116,6 +117,23 @@ Future<void> _mailTesterRequest(Deps deps, String to, String email, String platf
 /// straight on to the web app under `/app`.
 Response landingPage(Request _, {required bool english}) =>
     Response.ok(_page(english ? _en : _de), headers: {'content-type': 'text/html; charset=utf-8'});
+
+/// The landing page as Markdown for agents (agents.dart), without the example ranking.
+PublicPage landingPublicPage(String base, {required bool english}) {
+  final t = english ? _en : _de;
+  final page = english ? '$base/en' : base;
+  return (
+    path: '/',
+    title: t.title,
+    description: t.description,
+    body: [
+      t.lead,
+      for (final (_, title, text) in t.features) '## $title\n\n$text',
+      '## ${t.testH2}\n\n${t.testLead} ${t.formLead}\n\n${t.stores}',
+      '- [${t.ctaTest}]($page#test)\n- [${t.ctaBrowser}]($base/app)\n- [${t.privacy}]($base/datenschutz)',
+    ].join('\n\n'),
+  );
+}
 
 final _de = _Texts(
   lang: 'de',

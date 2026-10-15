@@ -163,6 +163,17 @@ Für die Testphase liegt ein Käfer-Knopf über allen Screens, auch über Sheets
 
 Über das Formular fragt man den Test an: iPhone (TestFlight) oder Android (Play-Test) und eine E-Mail. Der Server speichert die Anfrage 90 Tage, einmal pro Adresse und Plattform, und mailt sie an `FEEDBACK_EMAIL`. Freigeschaltet wird von Hand: iOS in App Store Connect unter TestFlight, Android in der Play Console unter Interner Test, dazu den Link per Antwort auf die Mail schicken.
 
+### Für Agenten
+
+Fremde Agenten lesen die öffentlichen Inhalte ohne HTML, nach [llms.txt](https://llmstxt.org). Quelle ist `publicPages` in `server/lib/src/agents.dart`: die Landingpage, jede Bestenliste und die Datenschutzerklärung.
+
+- `/llms.txt`: Einstieg mit Name, Beschreibung und allen öffentlichen Seiten als Links auf ihr Markdown.
+- `/llms-full.txt`: alle Seiten in einer Datei.
+- `<seite>.md`: jede Seite als Markdown, die Landingpage als `/index.md`. Wer mit `Accept: text/markdown` nach einer dieser Seiten fragt (auch `/en`), bekommt unter derselben URL gleich das Markdown, alle anderen das HTML.
+- Sprache: `?lang=de|en`, sonst `Accept-Language`, sonst Deutsch. Links behalten ein `?lang=`. Die Datenschutzerklärung gibt es nur auf Deutsch.
+- Nur öffentliche Inhalte: Bestenlisten mit Plätzen, Schnitt und Anzahl, aber ohne die Zitate aus Bewertungen. Keine Profile, keine Einladungen.
+- Ausprobieren: `curl localhost:8080/llms.txt` bei laufendem Server.
+
 ---
 
 ## Architektur
@@ -251,7 +262,7 @@ Voraussetzung: [Flutter-SDK](https://docs.flutter.dev/get-started/install) (brin
 ### Alles in einem
 
 ```bash
-docker compose up --build        # App + API auf http://localhost:8080, Postgres auf :5434
+docker compose up --build        # App + API auf http://localhost:8080, Postgres auf 127.0.0.1:5434
 ```
 
 Ohne `SMTP_HOST` landen die Login-Codes im Log (`docker compose logs app`).
@@ -331,6 +342,7 @@ cd app && flutter test
 | `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres) und App |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
 | `mobile.yml` | Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
+| `secrets.yml` | Jeder Push auf jedem Branch, PRs aus Forks | Secret-Scan mit gitleaks, siehe unten |
 
 Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, die Landingpage unter `/` und `/en`, alles andere ist die Web-App (`/app`).
 
@@ -341,7 +353,25 @@ Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, die Landin
 - Android: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` – ohne sie wird mit Debug-Keys signiert
 - Play: `PLAY_SERVICE_ACCOUNT_JSON` (Dienstkonto mit Release-Rechten für die App in der Play Console) – ohne es bleibt es beim Artefakt. Die API nimmt erst Uploads an, wenn das erste App Bundle von Hand hochgeladen wurde
 
-Die Build-Nummer steigt pro Lauf automatisch (TestFlight lehnt doppelte ab).
+Die Build-Nummer steigt pro Lauf automatisch (TestFlight lehnt doppelte ab): Sie ist die Run-Nummer von `mobile.yml` plus 10.
+
+**Stacktraces der App:** Release-Builds sind mit `--obfuscate` gebaut, Stacktraces aus der App (auch in GlitchTip) zeigen nur verschleierte Namen. Die Symbole liegen 90 Tage als Artefakt `symbols-android` (Unterordner `aab/` und `apk/`, je nachdem, was installiert ist) bzw. `symbols-ios` am Lauf. Zur Build-Nummer gehört die Run-Nummer minus 10, `gh run list -w mobile.yml --json number,databaseId` liefert die Run-ID dazu. Lesbar machen:
+
+```bash
+gh run download <run-id> -n symbols-android -D /tmp/symbols
+flutter symbolize -i trace.txt -d /tmp/symbols/apk/app.android-arm64.symbols   # iOS: app.ios-arm64.symbols
+```
+
+`trace.txt` ist der rohe Stacktrace mit `build_id` und `abs …/virt …`-Zeilen (z. B. aus `adb logcat`). Builds, die älter als 90 Tage sind, lassen sich nicht mehr symbolisieren. Keine Secrets im Client: Die Verschleierung schützt nichts, alles im App-Bundle lässt sich auslesen.
+
+### Secret-Scan
+
+Das Repo ist öffentlich, Code, Historie und CI-Logs. `.github/workflows/secrets.yml` läuft bei jedem Push auf jedem Branch und bei PRs aus Forks, ohne `paths-ignore`, und scannt mit gitleaks (Docker-Image, Version per Digest fest) die neuen Commits. Ein Fund macht den Lauf rot, der Wert steht dank `--redact` nicht im Log.
+
+- Regeln: die Standardregeln von gitleaks, dazu `.gitleaks.toml`. Die nimmt nur `generic-api-key` in `pubspec.lock` aus, dort können Paket-Hashes anschlagen. Echte Token-Formate fallen dort weiter auf.
+- Fehlalarm: den `Fingerprint` aus dem Log als Zeile in `.gitleaksignore` eintragen.
+- Echter Fund: Der Scan läuft erst nach dem Push, das Secret ist also schon öffentlich. Sofort rotieren, Entfernen aus dem Code oder der Historie reicht nicht.
+- Ganze Historie lokal: `docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --redact`
 
 ---
 

@@ -4,6 +4,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 
+import 'agents.dart';
 import 'deps.dart';
 import 'places.dart' show rankByWeight;
 
@@ -230,6 +231,44 @@ ${otherYears.isEmpty ? '' : '<p class="years">${t('Frühere Jahre', 'Earlier yea
   });
 </script>''';
   return _page(200, english, head, body, otherLang: english ? bestOfPath(city, year) : '${bestOfPath(city, year)}?lang=en');
+}
+
+/// Every best-of list as Markdown for agents (agents.dart): places, averages and
+/// counts like on the page, but no quotes, they come from single reviews.
+Future<List<PublicPage>> bestOfPublicPages(Session db, {required bool english}) async {
+  String t(String de, String en) => english ? en : de;
+  final rows = await query(
+    db,
+    'SELECT b.year, b.city, b.category, b.rank, b.average, b.count, p.name, p.address FROM best_of b '
+    'JOIN places p ON p.id = b.place_id ORDER BY b.year DESC, b.city, b.rank',
+  );
+  final lists = <String, List<Map<String, dynamic>>>{};
+  for (final r in rows) {
+    lists.putIfAbsent(bestOfPath(r['city'] as String, r['year'] as int), () => []).add(r);
+  }
+  final pages = <PublicPage>[];
+  for (final MapEntry(key: path, value: entries) in lists.entries) {
+    final (city, year) = (entries.first['city'] as String, entries.first['year'] as int);
+    List<Map<String, dynamic>> of(BestOfCategory c) => [for (final r in entries) if (r['category'] == c.name) r];
+    String line(Map<String, dynamic> r) => '${r['rank']}. ${r['name']}${r['address'] == null ? '' : ' – ${r['address']}'} · '
+        '${t('Ø', 'Avg.')} ${formatScore(r['average'] as double, english: english)} · ${r['count']} ${t('Bewertungen', 'reviews')}';
+    final top = [for (final r in of(BestOfCategory.overall).take(bestOfAwardedRanks)) '${r['rank']}. ${r['name']}'];
+    pages.add((
+      path: path,
+      title: t('Die besten Döner in $city $year', 'The best döner in $city $year'),
+      description: top.isEmpty ? t('Bestenliste $year', 'Best-of list $year') : top.join(' · '),
+      body: [
+        t('Läden mit mindestens $bestOfMinReviews Bewertungen aus $year, sortiert nach gewichtetem Schnitt. '
+            'Angezeigt werden der echte Schnitt (Ø) und die Anzahl der Bewertungen.',
+            'Shops with at least $bestOfMinReviews reviews from $year, sorted by weighted average. '
+            'Shown are the real average (Avg.) and the number of reviews.'),
+        for (final category in BestOfCategory.values)
+          if (of(category).isNotEmpty)
+            '## ${category == BestOfCategory.vegan ? 'Vegan' : t('Gesamt', 'Overall')}\n\n${of(category).map(line).join('\n')}',
+      ].join('\n\n'),
+    ));
+  }
+  return pages;
 }
 
 Response _page(int status, bool english, String head, String body, {String? otherLang}) => Response(

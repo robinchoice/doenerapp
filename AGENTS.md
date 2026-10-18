@@ -44,6 +44,7 @@
 
 ## Abweichungen vom Standard
 
+- Passkeys aus starter bleiben vorerst aus: Für den bisherigen reinen Dart-Server ist keine ausreichend geprüfte, gepflegte WebAuthn-Bibliothek gefunden. `passkeys_server` 1.0.0 prüft in `verifyRegistration`/`verifyLogin` weder Origin noch Ceremony-Typ oder User-Presence-/User-Verification-Flags; die letzte Änderung stammt vom 01.10.2025. Das gepflegte [`fido2`](https://pub.dev/packages/fido2) 2.0.1 benötigt dagegen Rust und eine native FFI-Bibliothek im Server-Image. Die Freigabe dieser Stack-Erweiterung steht als „Braucht Robin“ im Backlog; keine eigene WebAuthn-Kryptografie und kein Ausweichen auf eine alte Bibliotheksversion.
 - Registrierung: Neue Konten nur über `SIGNUP_ALLOWLIST` und Robins Freischaltung (Profil → Tester statt `/invite`, Bewerbungen von der Landingpage). Freundes-Links verbinden nur bestehende Konten, damit Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026, nimmt die vom Vormittag zurück). Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`.
 - TestFlight: Das Freischalten unter Profil → Tester lädt iPhones über die App Store Connect API in „Erste Tester“ ein, der Key liegt dafür auch in Coolify (`ASC_*`).
 

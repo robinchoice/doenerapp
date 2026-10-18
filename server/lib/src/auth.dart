@@ -12,7 +12,7 @@ import 'http.dart';
 import 'testflight.dart';
 
 const loginRequestTtl = Duration(minutes: 15);
-const sessionTtl = Duration(days: 180);
+const sessionTtl = Duration(days: 365);
 const maxLoginRequestsPerHour = 5;
 const maxCodeAttempts = 5;
 
@@ -57,14 +57,24 @@ class AuthUser {
 Future<AuthUser> requireUser(Deps deps, Request request) async {
   final header = request.headers['authorization'];
   if (header == null || !header.startsWith('Bearer ')) throw const ApiException.unauthorized();
+  final tokenHash = hashToken(header.substring(7).trim());
   final row = await queryOne(
     deps.db,
-    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places FROM sessions s '
+    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places, '
+    's.expires_at AS session_expires_at FROM sessions s '
     'JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
-    {'hash': hashToken(header.substring(7).trim())},
+    {'hash': tokenHash},
   );
   if (row == null) throw const ApiException.unauthorized('Sitzung abgelaufen');
+  final renewBefore = DateTime.now().toUtc().add(sessionTtl - const Duration(days: 1));
+  if (!(row['session_expires_at'] as DateTime).isAfter(renewBefore)) {
+    await deps.db.execute(
+      Sql.named("UPDATE sessions SET expires_at = now() + interval '365 days' "
+          "WHERE token_hash = @hash AND expires_at > now() AND expires_at <= now() + interval '364 days'"),
+      parameters: {'hash': tokenHash},
+    );
+  }
   return AuthUser(accountFromRow(deps, row));
 }
 

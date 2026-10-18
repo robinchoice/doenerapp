@@ -6,6 +6,8 @@ import 'dart:io';
 
 import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
+import 'package:doener_server/src/auth.dart' show hashToken;
+import 'package:doener_server/src/deps.dart' show queryOne;
 import 'package:doener_server/src/google_places.dart' show maxTileSearchesPerDay;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -226,6 +228,37 @@ void main() {
       final (status, body) = await call('POST', '/auth/verify', body: {'token': lastLinkToken()});
       expect(status, 200);
       expect(body['isNewUser'], isFalse);
+    });
+
+    test('sessions last a year and slide at most once a day, including old sessions', () async {
+      final (token, _) = await signUp('sliding@example.org', 'Sliding');
+      final hash = hashToken(token);
+      Future<DateTime> expiry() async =>
+          (await queryOne(db, 'SELECT expires_at FROM sessions WHERE token_hash = @hash', {'hash': hash}))!['expires_at'] as DateTime;
+      final initial = await expiry();
+      expect(initial.difference(DateTime.now()).inDays, 364);
+      expect((await call('GET', '/auth/me', token: token)).$1, 200);
+      expect(await expiry(), initial);
+
+      // A session issued by the old server is renewed on its next use.
+      await db.execute(
+        Sql.named("UPDATE sessions SET expires_at = now() + interval '180 days' WHERE token_hash = @hash"),
+        parameters: {'hash': hash},
+      );
+      final responses = await Future.wait(List.generate(3, (_) => call('GET', '/auth/me', token: token)));
+      expect(responses.map((response) => response.$1), everyElement(200));
+      final renewed = await expiry();
+      expect(renewed.difference(DateTime.now()).inDays, 364);
+      expect((await call('GET', '/auth/me', token: token)).$1, 200);
+      expect(await expiry(), renewed);
+
+      await db.execute(
+        Sql.named("UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token_hash = @hash"),
+        parameters: {'hash': hash},
+      );
+      final expired = await expiry();
+      expect((await call('GET', '/auth/me', token: token)).$1, 401);
+      expect(await expiry(), expired);
     });
 
     test('code is locked after too many wrong attempts', () async {

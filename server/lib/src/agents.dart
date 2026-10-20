@@ -28,8 +28,6 @@ String _markdownPath(String path) => path == '/' ? '/index.md' : '$path.md';
 
 String _markdown(PublicPage page) => '# ${page.title}\n\n> ${page.description}\n\n${page.body}';
 
-String _base(Deps deps, Request request) => deps.config.publicUrl ?? request.requestedUri.origin;
-
 /// `?lang=de|en`, else Accept-Language, else German. Links keep an explicit `?lang=`.
 ({bool english, String query}) _language(Request request) {
   final lang = request.url.queryParameters['lang'];
@@ -43,7 +41,7 @@ Response _text(String body, String type) => Response.ok('$body\n',
     headers: {'content-type': '$type; charset=utf-8', 'vary': 'accept, accept-language'});
 
 Future<Response?> _page(Deps deps, Request request, String markdownPath, {bool? english}) async {
-  final pages = await publicPages(deps, _base(deps, request), english: english ?? _language(request).english);
+  final pages = await publicPages(deps, deps.config.publicBase(request.requestedUri), english: english ?? _language(request).english);
   final page = pages.where((p) => _markdownPath(p.path) == markdownPath).firstOrNull;
   return page == null ? null : _text(_markdown(page), 'text/markdown');
 }
@@ -54,7 +52,7 @@ void mountAgents(Router router, Deps deps) {
     ..get('/llms.txt', (Request request) async {
       final (:english, :query) = _language(request);
       String t(String de, String en) => english ? en : de;
-      final base = _base(deps, request);
+      final base = deps.config.publicBase(request.requestedUri);
       final landing = landingPublicPage(base, english: english);
       final pages = await publicPages(deps, base, english: english);
       return _text(
@@ -71,7 +69,7 @@ void mountAgents(Router router, Deps deps) {
       );
     })
     ..get('/llms-full.txt', (Request request) async {
-      final pages = await publicPages(deps, _base(deps, request), english: _language(request).english);
+      final pages = await publicPages(deps, deps.config.publicBase(request.requestedUri), english: _language(request).english);
       return _text(pages.map(_markdown).join('\n\n---\n\n'), 'text/plain');
     })
     ..get('/<page|.+\\.md>', (Request request, String _) async =>

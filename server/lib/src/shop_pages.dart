@@ -12,8 +12,6 @@ final _placeIdPattern = RegExp(r'^[A-Za-z0-9_-]{1,300}$');
 
 const _escape = HtmlEscape(HtmlEscapeMode.attribute);
 
-String _base(Deps deps, Request request) => deps.config.publicUrl ?? request.requestedUri.origin;
-
 Future<Map<String, dynamic>?> _place(Deps deps, String placeId) async => _placeIdPattern.hasMatch(placeId)
     ? await queryOne(deps.db, 'SELECT name, city FROM place_view WHERE google_place_id = @id', {'id': placeId})
     : null;
@@ -42,7 +40,7 @@ Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) asyn
     '''<title>$title</title>
 <meta property="og:title" content="$title">
 <meta property="og:description" content="Bewerte den Laden in der Döner App.">
-<meta property="og:image" content="${_escape.convert(_base(deps, request))}/icons/Icon-512.png">
+<meta property="og:image" content="${_escape.convert(deps.config.publicBase(request.requestedUri))}/icons/Icon-512.png">
 <style>
   main { max-width: 420px; margin: 0 auto; padding: 48px 24px; text-align: center; }
   img { border-radius: 50%; }
@@ -66,7 +64,7 @@ Future<Response> posterPage(Deps deps, Request request, String placeId) async {
   }
   final name = _escape.convert(place['name'] as String);
   final city = place['city'] as String?;
-  final link = '${_base(deps, request)}/b/$placeId';
+  final link = '${deps.config.publicBase(request.requestedUri)}/b/$placeId';
   return _html(
     200,
     '''<title>Aushang: $name</title>
@@ -112,7 +110,7 @@ Future<Response> sealPage(Deps deps, Request request, String placeId) async {
         : _html(404, '<title>Kein Siegel</title></head><body><main><h1>Dieser Laden hat kein Siegel</h1></main></body>');
   }
   final english = request.url.queryParameters['lang'] == 'en';
-  final link = '${_base(deps, request)}/b/$placeId';
+  final link = '${deps.config.publicBase(request.requestedUri)}/b/$placeId';
   final name = _escape.convert(place!['name'] as String);
   return _html(
     200,

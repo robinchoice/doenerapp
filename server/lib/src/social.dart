@@ -379,10 +379,8 @@ Future<String> _newInviteCode(Deps deps, String userId) async {
   return code;
 }
 
-String _publicBase(Deps deps, Request request) => deps.config.publicUrl ?? request.requestedUri.origin;
-
 InviteDto _invite(Deps deps, Request request, String code) =>
-    InviteDto(code: code, url: '${_publicBase(deps, request)}/i/$code');
+    InviteDto(code: code, url: '${deps.config.publicBase(request.requestedUri)}/i/$code');
 
 Future<UserDto?> _inviter(Deps deps, String code) async {
   final row = await queryOne(deps.db, 'SELECT id, display_name FROM users WHERE invite_code = @code', {'code': code});
@@ -397,7 +395,7 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
   // All attributes below are double-quoted; slashes stay readable for link previews.
   const escape = HtmlEscape(HtmlEscapeMode.attribute);
   final inviter = await _inviter(deps, code);
-  final base = escape.convert(_publicBase(deps, request));
+  final base = escape.convert(deps.config.publicBase(request.requestedUri));
 
   // Only known codes are echoed into the page, and those consist of [_inviteAlphabet] only.
   final title = inviter == null

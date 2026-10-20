@@ -43,7 +43,7 @@ void mountModeration(Router router, Deps deps) {
     );
     final to = deps.config.feedbackEmail;
     if (inserted != null && to != null) {
-      final base = deps.config.publicUrl ?? request.requestedUri.origin;
+      final base = deps.config.publicBase(request.requestedUri);
       await _mailReport(deps, to, me, body.reason, note, review, base);
     }
     return noContent();

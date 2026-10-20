@@ -76,6 +76,8 @@ class Config {
     this.revision = 'dev',
   });
 
+  String publicBase(Uri requestedUri) => publicUrl ?? requestedUri.origin;
+
   factory Config.fromEnvironment(Map<String, String> env) {
     String? get(String key) {
       final value = env[key]?.trim();

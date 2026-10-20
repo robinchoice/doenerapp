@@ -199,7 +199,7 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
       {'city': city, 'year': year});
   final title = t('Die besten Döner in $city $year', 'The best döner in $city $year');
   final top = [for (final r in overall.take(bestOfAwardedRanks)) '${r['rank']}. ${r['name']}'].join(' · ');
-  final base = deps.config.publicUrl ?? request.requestedUri.origin;
+  final base = deps.config.publicBase(request.requestedUri);
   final url = '$base${bestOfPath(city, year)}';
   final head = '''<title>${_escape.convert(title)}</title>
 <meta name="description" content="${_escape.convert(top)}">

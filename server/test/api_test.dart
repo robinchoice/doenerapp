@@ -1285,6 +1285,26 @@ void main() {
     expect(RankingDto.fromJson(vegan as Map<String, dynamic>).bestOf, isNull);
   });
 
+  for (final publicUrl in [null, 'https://public.doener.test/preview']) {
+    test('public links use ${publicUrl ?? 'the request origin with its port'}', () async {
+      final config = Config(database: deps.config.database, publicUrl: publicUrl, webDir: '/nonexistent');
+      final pages = buildHandler(Deps(db: db, config: config, mailer: mailer, httpClient: deps.httpClient));
+      final base = publicUrl ?? 'http://localhost:9876';
+
+      for (final path in ['/b/best-1', '/i/unknown', '/bestenliste/teststadt/2026']) {
+        final response = await pages(Request('GET', Uri.parse('http://localhost:9876$path')));
+        expect(response.statusCode, path == '/i/unknown' ? 404 : 200);
+        final html = await response.readAsString();
+        expect(html.replaceAll('&#47;', '/'),
+            contains('content="$base/${path.startsWith('/bestenliste') ? 'og-image-de.png' : 'icons/Icon-512.png'}"'));
+      }
+
+      final response = await pages(Request('GET', Uri.parse('http://localhost:9876/llms.txt')));
+      expect(response.statusCode, 200);
+      expect(await response.readAsString(), contains('($base/index.md)'));
+    });
+  }
+
   test('public pages for agents: llms.txt, Markdown per page, no reviews or profiles', () async {
     Future<Response> get(String path, [Map<String, String> headers = const {}]) async =>
         await handler(Request('GET', Uri.parse('http://localhost$path'), headers: headers));

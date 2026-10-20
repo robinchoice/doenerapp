@@ -977,6 +977,18 @@ void main() {
       expect((await verify('liste@example.org')).$2['isNewUser'], isTrue);
     });
 
+    test('the login link for agents opens the test account once, without a mail', () async {
+      final before = mailer.sent.length;
+      final link = Uri.parse(await loginLink(deps, 'agent@example.org'));
+      expect('${link.origin}${link.path}', 'https://doener.test/login');
+      expect(mailer.sent.length, before);
+      final token = link.queryParameters['token'];
+      final (status, body) = await call('POST', '/auth/verify', body: {'token': token}, closed: true);
+      expect(status, 200);
+      expect(body['isNewUser'], isFalse);
+      expect((await call('POST', '/auth/verify', body: {'token': token}, closed: true)).$1, 401);
+    });
+
     test("a friend's invite link opens no account, testers can't bring in others", () async {
       final (frieda, _) = await signUp('frieda@example.org', 'Frieda');
       final code = (await call('GET', '/me/invite', token: frieda)).$2['code'] as String;

@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
 import 'package:http/http.dart' as http;
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:sentry/sentry.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // `server login-link <email>`: prints a login link for agent-access/login-link in the kontor.
+  if (args.length == 2 && args.first == 'login-link') return printLoginLink(args.last);
   await Sentry.init(
     (options) => options
       ..dsn = Platform.environment['SENTRY_DSN'] ?? ''
@@ -16,6 +19,19 @@ Future<void> main() async {
       ..tracesSampleRate = 0,
     appRunner: startServer,
   );
+}
+
+Future<void> printLoginLink(String email) async {
+  if (!Validation.isValidEmail(email)) {
+    stderr.writeln('usage: server login-link <email>');
+    exit(1);
+  }
+  final config = Config.fromEnvironment(Platform.environment);
+  final db = openPool(config);
+  final httpClient = http.Client();
+  print(await loginLink(Deps(db: db, config: config, mailer: LogMailer(), httpClient: httpClient), Validation.normalizeEmail(email)));
+  httpClient.close();
+  await db.close();
 }
 
 Future<void> startServer() async {

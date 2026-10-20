@@ -320,6 +320,28 @@ Future<(String, String?)> _consumeLoginRequest(Deps deps, VerifyRequest body) as
   return (email, row['invite_code'] as String?);
 }
 
+/// One-time login link for [email], valid like a mailed one, so an agent can
+/// log the Savor preview into the live app: `server login-link <email>`.
+/// Creates the account if needed; no code is mailed and none matches.
+Future<String> loginLink(Deps deps, String email) async {
+  final publicUrl = deps.config.publicUrl;
+  if (publicUrl == null) throw StateError('PUBLIC_URL not set');
+  if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE email = @email', {'email': email}) == null) {
+    await _createUser(deps, email, null);
+  }
+  final token = randomToken();
+  await deps.db.execute(
+    Sql.named('INSERT INTO login_requests (email, code_hash, token_hash, expires_at) VALUES (@email, @code, @token, @expires)'),
+    parameters: {
+      'email': email,
+      'code': hashToken(randomToken()),
+      'token': hashToken(token),
+      'expires': DateTime.now().toUtc().add(loginRequestTtl),
+    },
+  );
+  return '$publicUrl/login?token=$token';
+}
+
 /// New accounts get a random unique name; the app asks to change it afterwards.
 /// [inviteCode] records whose link brought the account in, if it is known.
 Future<Map<String, dynamic>> _createUser(Deps deps, String email, String? inviteCode) async {

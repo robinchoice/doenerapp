@@ -1,6 +1,7 @@
 library;
 
 export 'src/app.dart' show buildHandler;
+export 'src/auth.dart' show loginLink;
 export 'src/best_of.dart' show computeBestOf, computeDueBestOf, citySlug;
 export 'src/config.dart';
 export 'src/db.dart' show openPool, migrate, runSchedule;

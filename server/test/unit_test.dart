@@ -5,6 +5,7 @@ import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/google_places.dart';
 import 'package:doener_server/src/http.dart';
 import 'package:doener_server/src/places.dart';
+import 'package:doener_server/src/privacy.dart';
 import 'package:doener_server/src/social.dart';
 import 'package:http/http.dart' as http;
 import 'package:postgres/postgres.dart';
@@ -12,6 +13,15 @@ import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('privacy HTML and Markdown describe current sessions, city storage and push contents', () async {
+    final html = await privacyPage(Request('GET', Uri.parse('http://localhost/datenschutz'))).readAsString();
+    for (final text in [html, privacyPublicPage(english: false).body]) {
+      expect(text, allOf(contains('365 Tage'), contains('verlängert'), contains('speichert deren Namen'),
+          contains('Firebase Cloud Messaging'), contains('Nachrichtentext an FCM'), contains('Erinnerungen nach einem Besuch plant die App lokal')));
+      expect(text, isNot(contains('180 Tage angemeldet')));
+    }
+  });
+
   test('health fails while the database is unreachable', () async {
     final config = Config(database: Endpoint(host: 'localhost', port: 1, database: 'doener'), webDir: '/nonexistent');
     final db = openPool(config);

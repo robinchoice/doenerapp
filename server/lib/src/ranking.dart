@@ -119,8 +119,9 @@ void mountRanking(Router router, Deps deps) {
     await requireUser(deps, request);
     final rows = await query(
       deps.db,
-      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM active_place_view '
-      'WHERE city IS NOT NULL AND id IN (SELECT place_id FROM reviews) GROUP BY city ORDER BY n DESC, city LIMIT 50',
+      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM places '
+      "WHERE business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY' AND business_status IS DISTINCT FROM 'FUTURE_OPENING' "
+      'AND city IS NOT NULL AND id IN (SELECT place_id FROM reviews) GROUP BY city ORDER BY n DESC, city LIMIT 50',
     );
     return json([
       for (final r in rows)

@@ -117,7 +117,7 @@ class AppData extends ChangeNotifier {
     final distances = {
       for (final p in activePlaces) p.placeId: Geolocator.distanceBetween(lat, lon, p.latitude, p.longitude),
     };
-    return activePlaces.where((p) => distances[p.placeId]! <= meters).toList()
+    return [for (final e in distances.entries) if (e.value <= meters) places[e.key]!]
       ..sort((a, b) => distances[a.placeId]!.compareTo(distances[b.placeId]!));
   }
 

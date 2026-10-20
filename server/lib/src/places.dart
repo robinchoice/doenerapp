@@ -139,19 +139,21 @@ void mountPlaces(Router router, Deps deps) {
       if (tiles.length <= maxTilesPerRequest) await Future.wait(tiles.map((t) => _syncTile(deps, apiKey, t, user.id)));
     }
 
+    const bounds = 'latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon';
+    final area = {'minLat': minLat, 'maxLat': maxLat, 'minLon': minLon, 'maxLon': maxLon};
     final rows = await query(
       deps.db,
-      'SELECT * FROM active_place_view WHERE latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon '
+      'SELECT * FROM active_place_view WHERE $bounds '
       'ORDER BY review_count DESC, name LIMIT 300',
-      {'minLat': minLat, 'maxLat': maxLat, 'minLon': minLon, 'maxLon': maxLon},
+      area,
     );
     if (request.url.queryParameters['includeClosed'] == 'true') {
       rows.addAll(await query(
         deps.db,
         "SELECT * FROM place_view WHERE business_status = 'CLOSED_PERMANENTLY' "
-        'AND latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon '
+        'AND $bounds '
         'ORDER BY synced_at DESC, name LIMIT 300',
-        {'minLat': minLat, 'maxLat': maxLat, 'minLon': minLon, 'maxLon': maxLon},
+        area,
       ));
     }
     return json(rows.map((r) => placeFromRow(r).toJson()).toList());
@@ -222,7 +224,8 @@ void mountPlaces(Router router, Deps deps) {
       '    SELECT place_id FROM reviews WHERE updated_at > now() - make_interval(days => @days:int4)'
       '    UNION ALL'
       '    SELECT place_id FROM visits WHERE visited_at > now() - make_interval(days => @days:int4)'
-      '  ) x JOIN active_place_view p ON p.id = x.place_id WHERE ${withinRadius('p')}'
+      '  ) x JOIN places p ON p.id = x.place_id WHERE ${withinRadius('p')}'
+      "    AND p.business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY' AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING'"
       '  GROUP BY x.place_id ORDER BY activity DESC LIMIT @limit:int4'
       ') a JOIN place_view pv ON pv.id = a.place_id ORDER BY a.activity DESC, pv.name',
       {...area, 'days': days, 'limit': limit},

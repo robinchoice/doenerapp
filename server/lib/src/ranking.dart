@@ -45,7 +45,7 @@ Future<(int, String)?> cityRank(Session db, Map<String, dynamic> place) async {
   if (city == null) return null;
   final ranked = rankByWeight(await query(
     db,
-    'SELECT pv.*, pv.avg_rating AS avg, pv.review_count AS n FROM place_view pv WHERE pv.city = @city AND pv.review_count > 0',
+    'SELECT pv.*, pv.avg_rating AS avg, pv.review_count AS n FROM active_place_view pv WHERE pv.city = @city AND pv.review_count > 0',
     {'city': city},
   ));
   final index = ranked.indexWhere((r) => r['id'] == place['id']);
@@ -74,7 +74,7 @@ void mountRanking(Router router, Deps deps) {
 
     final rows = rankByWeight(await query(
       deps.db,
-      'SELECT pv.*, s.avg, s.n, pr.price FROM place_view pv JOIN ('
+      'SELECT pv.*, s.avg, s.n, pr.price FROM active_place_view pv JOIN ('
       '  SELECT place_id, avg(value)::float8 AS avg, count(*)::int AS n FROM ($ratings) x GROUP BY place_id'
       ') s ON s.place_id = pv.id LEFT JOIN ('
       '  SELECT place_id, round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::int AS price FROM reviews '
@@ -119,7 +119,7 @@ void mountRanking(Router router, Deps deps) {
     await requireUser(deps, request);
     final rows = await query(
       deps.db,
-      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM places '
+      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM active_place_view '
       'WHERE city IS NOT NULL AND id IN (SELECT place_id FROM reviews) GROUP BY city ORDER BY n DESC, city LIMIT 50',
     );
     return json([

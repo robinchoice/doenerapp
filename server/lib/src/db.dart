@@ -326,6 +326,12 @@ final migrations = <List<String>>[
     'ALTER TABLE places ADD COLUMN opening_pushed_at timestamptz',
     'UPDATE places SET opening_pushed_at = now() WHERE opened_on IS NOT NULL',
   ],
+  [
+    '''CREATE VIEW active_place_view AS
+      SELECT * FROM place_view
+      WHERE business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY'
+    ''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

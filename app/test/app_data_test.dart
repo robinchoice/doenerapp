@@ -3,11 +3,14 @@ import 'dart:typed_data';
 
 import 'package:doener_app/src/core/app_data.dart';
 import 'package:doener_app/src/core/session.dart';
+import 'package:doener_app/src/features/map/place_search_sheet.dart';
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
 import 'package:sembast/sembast_memory.dart';
 
 const _place = PlaceDto(placeId: 'p1', name: 'Kebap Haus', latitude: 48, longitude: 7.85);
@@ -18,6 +21,7 @@ class FakeServer {
   String mode = 'ok';
   final requests = <String>[];
   Map<String, dynamic>? lastBody;
+  List<PlaceDto> areaPlaces = [];
 
   http.Response _json(Object body, [int status = 200]) =>
       http.Response(jsonEncode(body), status, headers: {'content-type': 'application/json'});
@@ -27,6 +31,12 @@ class FakeServer {
     requests.add('${request.method} $path');
     if (path == '/auth/verify') return _json(AuthResponse(token: 't', user: _user, isNewUser: false).toJson());
     if (path.startsWith('/me/')) return _json([]);
+    if (path == '/places') {
+      return _json([
+        for (final p in areaPlaces)
+          if (!p.isClosed || request.url.queryParameters['includeClosed'] == 'true') p.toJson(),
+      ]);
+    }
     if (mode == 'offline') throw http.ClientException('offline');
     if (mode == '401') return _json({'error': 'Sitzung abgelaufen'}, 401);
     if (mode == '400') return _json({'error': 'Ungültig'}, 400);
@@ -180,6 +190,37 @@ void main() {
     data.places['near'] = const PlaceDto(placeId: 'near', name: 'Nebenan', latitude: 48.0005, longitude: 7.85);
     data.places['far'] = const PlaceDto(placeId: 'far', name: 'Weit weg', latitude: 48.01, longitude: 7.85);
     expect(data.placesWithin(48.0001, 7.85, 150).map((p) => p.placeId), ['p1', 'near']);
+  });
+
+  test('a refreshed closure stays in history but leaves discovery, also after restart', () async {
+    const closed = PlaceDto(placeId: 'p2', name: 'Kebap Closed', latitude: 48, longitude: 7.85, isClosed: true);
+    data.places.addAll({'p1': _place, 'p2': const PlaceDto(placeId: 'p2', name: 'Kebap Closed', latitude: 48, longitude: 7.85)});
+    server.areaPlaces = [_place, closed];
+    await data.loadArea(south: 47.99, west: 7.84, north: 48.01, east: 7.86);
+    expect(data.places['p2']!.isClosed, isTrue);
+    expect(data.activePlaces.map((p) => p.placeId), ['p1']);
+    expect(data.placesWithin(48, 7.85, 150).map((p) => p.placeId), ['p1']);
+    await db.transaction((_) async {});
+
+    final restarted = AppData(db, session);
+    await restarted.load();
+    expect((await restarted.place('p2')).isClosed, isTrue);
+    expect(restarted.activePlaces.map((p) => p.placeId), ['p1']);
+  });
+
+  testWidgets('search hides closed places kept in the cache', (tester) async {
+    data.places.addAll({
+      'p1': _place,
+      'p2': const PlaceDto(placeId: 'p2', name: 'Kebap Closed', latitude: 48, longitude: 7.85, isClosed: true),
+    });
+    await tester.pumpWidget(ChangeNotifierProvider.value(
+      value: data,
+      child: const MaterialApp(home: Scaffold(body: PlaceSearchSheet())),
+    ));
+    await tester.enterText(find.byType(TextField), 'Kebap');
+    await tester.pumpAndSettle();
+    expect(find.text('Kebap Haus'), findsOneWidget);
+    expect(find.text('Kebap Closed'), findsNothing);
   });
 
   test('logging in as someone else clears the previous account data', () async {

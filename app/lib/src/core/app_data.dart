@@ -54,6 +54,7 @@ class AppData extends ChangeNotifier {
   ApiClient get _api => session.api;
 
   final places = <String, PlaceDto>{};
+  Iterable<PlaceDto> get activePlaces => places.values.where((p) => !p.isClosed);
   final favorites = <String>{};
   final reviews = <String, LocalReview>{};
   List<LocalVisit> visits = [];
@@ -102,6 +103,7 @@ class AppData extends ChangeNotifier {
       'minLon': '$west',
       'maxLat': '$north',
       'maxLon': '$east',
+      'includeClosed': 'true',
     });
     await _cachePlaces(json as List);
   }
@@ -113,9 +115,9 @@ class AppData extends ChangeNotifier {
   /// Known places within [meters], nearest first.
   List<PlaceDto> placesWithin(double lat, double lon, double meters) {
     final distances = {
-      for (final p in places.values) p.placeId: Geolocator.distanceBetween(lat, lon, p.latitude, p.longitude),
+      for (final p in activePlaces) p.placeId: Geolocator.distanceBetween(lat, lon, p.latitude, p.longitude),
     };
-    return places.values.where((p) => distances[p.placeId]! <= meters).toList()
+    return activePlaces.where((p) => distances[p.placeId]! <= meters).toList()
       ..sort((a, b) => distances[a.placeId]!.compareTo(distances[b.placeId]!));
   }
 

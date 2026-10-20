@@ -2,6 +2,13 @@ import 'package:doener_models/doener_models.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('place closures round-trip while older place JSON remains readable', () {
+    const closed = PlaceDto(placeId: 'closed', name: 'Closed', latitude: 48, longitude: 7.85, isClosed: true);
+    expect(PlaceDto.fromJson(closed.toJson()).isClosed, isTrue);
+    final older = closed.toJson()..remove('isClosed');
+    expect(PlaceDto.fromJson(older).isClosed, isFalse);
+  });
+
   test('tier by reviewed places', () {
     expect(Tier.forReviewedPlaces(0), Tier.doenerneuling);
     expect(Tier.forReviewedPlaces(2), Tier.doenerneuling);

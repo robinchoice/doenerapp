@@ -33,6 +33,7 @@ PlaceDto placeFromRow(Map<String, dynamic> row) => PlaceDto(
       postalCode: row['postal_code'] as String?,
       city: row['city'] as String?,
       openingHours: row['opening_hours'] as String?,
+      isClosed: row['business_status'] == 'CLOSED_PERMANENTLY',
       avgRating: row['avg_rating'] as double?,
       reviewCount: row['review_count'] as int,
       avgVegetarian: row['avg_vegetarian'] as double?,
@@ -140,10 +141,19 @@ void mountPlaces(Router router, Deps deps) {
 
     final rows = await query(
       deps.db,
-      'SELECT * FROM place_view WHERE latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon '
+      'SELECT * FROM active_place_view WHERE latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon '
       'ORDER BY review_count DESC, name LIMIT 300',
       {'minLat': minLat, 'maxLat': maxLat, 'minLon': minLon, 'maxLon': maxLon},
     );
+    if (request.url.queryParameters['includeClosed'] == 'true') {
+      rows.addAll(await query(
+        deps.db,
+        "SELECT * FROM place_view WHERE business_status = 'CLOSED_PERMANENTLY' "
+        'AND latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon '
+        'ORDER BY synced_at DESC, name LIMIT 300',
+        {'minLat': minLat, 'maxLat': maxLat, 'minLon': minLon, 'maxLon': maxLon},
+      ));
+    }
     return json(rows.map((r) => placeFromRow(r).toJson()).toList());
   });
 
@@ -164,7 +174,7 @@ void mountPlaces(Router router, Deps deps) {
 
     final rated = rankByWeight(await query(
       deps.db,
-      'SELECT p.*, p.$avg AS avg, p.$count AS n FROM place_view p '
+      'SELECT p.*, p.$avg AS avg, p.$count AS n FROM active_place_view p '
       'WHERE p.$count > 0 ${veganFilter}AND ${withinRadius('p')}',
       area,
     )).take(limit).toList();
@@ -172,7 +182,7 @@ void mountPlaces(Router router, Deps deps) {
         ? const <Map<String, dynamic>>[]
         : await query(
             deps.db,
-            'SELECT * FROM place_view p WHERE p.$count = 0 $veganFilter'
+            'SELECT * FROM active_place_view p WHERE p.$count = 0 $veganFilter'
             'AND ${withinRadius('p')} ORDER BY ${distanceSql('p')} LIMIT @rest:int4',
             {...area, 'rest': limit - rated.length},
           );
@@ -185,7 +195,7 @@ void mountPlaces(Router router, Deps deps) {
     final area = radiusParams(queryDouble(request, 'lat'), queryDouble(request, 'lon'), communityRadius);
     final opened = await query(
       deps.db,
-      'SELECT * FROM place_view p WHERE p.opened_on > current_date - @days:int4 AND ${withinRadius('p')} '
+      'SELECT * FROM active_place_view p WHERE p.opened_on > current_date - @days:int4 AND ${withinRadius('p')} '
       'ORDER BY p.opened_on DESC, p.name',
       {...area, 'days': newPlaceDays},
     );
@@ -212,7 +222,7 @@ void mountPlaces(Router router, Deps deps) {
       '    SELECT place_id FROM reviews WHERE updated_at > now() - make_interval(days => @days:int4)'
       '    UNION ALL'
       '    SELECT place_id FROM visits WHERE visited_at > now() - make_interval(days => @days:int4)'
-      '  ) x JOIN places p ON p.id = x.place_id WHERE ${withinRadius('p')}'
+      '  ) x JOIN active_place_view p ON p.id = x.place_id WHERE ${withinRadius('p')}'
       '  GROUP BY x.place_id ORDER BY activity DESC LIMIT @limit:int4'
       ') a JOIN place_view pv ON pv.id = a.place_id ORDER BY a.activity DESC, pv.name',
       {...area, 'days': days, 'limit': limit},

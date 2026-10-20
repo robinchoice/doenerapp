@@ -1351,4 +1351,76 @@ void main() {
     }
     expect((await get('/api/v1/health', md)).headers['content-type'], startsWith('application/json'));
   });
+
+  test('closures leave discovery but keep reviews, visits, feeds and frozen awards after migration', () async {
+    final (owner, user) = await signUp('history@example.org', 'HistoryFan');
+    final (reader, _) = await signUp('history-reader@example.org', 'HistoryReader');
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city, business_status, opened_on) VALUES "
+        "('archive-open', 'Still Open', 49, 11, 'Archivstadt', 'OPERATIONAL', current_date), "
+        "('archive-closed', 'Now Closed', 49, 11, 'Archivstadt', 'OPERATIONAL', current_date), "
+        "('archive-temporary', 'Temporary Closure', 49, 11, 'Archivstadt', 'CLOSED_TEMPORARILY', current_date), "
+        "('archive-unknown', 'Unknown Status', 49, 11, 'Archivstadt', NULL, current_date), "
+        "('archive-unrated', 'Closed Unrated', 49, 11, 'Archivort', 'CLOSED_PERMANENTLY', current_date)");
+    await db.execute(
+      Sql.named('INSERT INTO reviews (user_id, place_id, rating, sauce_rating) '
+          "SELECT @user:uuid, id, 4, 4 FROM places WHERE city = 'Archivstadt'"),
+      parameters: {'user': user.id},
+    );
+    await db.execute(
+      Sql.named('INSERT INTO visits (id, user_id, place_id, visited_at) '
+          "SELECT gen_random_uuid(), @user:uuid, id, now() - interval '1 day' FROM places WHERE google_place_id = 'archive-closed'"),
+      parameters: {'user': user.id},
+    );
+    await db.execute("UPDATE places SET business_status = 'CLOSED_PERMANENTLY' WHERE google_place_id = 'archive-closed'");
+
+    await db.execute('DROP VIEW active_place_view');
+    await db.execute('DELETE FROM schema_migrations WHERE version = (SELECT max(version) FROM schema_migrations)');
+    await migrate(db);
+    await migrate(db);
+
+    Future<List<PlaceDto>> placesAt(String path) async {
+      final (status, body) = await call('GET', path, token: owner);
+      expect(status, 200, reason: path);
+      return [for (final p in body as List) PlaceDto.fromJson(p as Map<String, dynamic>)];
+    }
+
+    const bounds = '/places?minLat=48.99&minLon=10.99&maxLat=49.01&maxLon=11.01';
+    const active = ['archive-open', 'archive-temporary', 'archive-unknown'];
+    for (final path in [bounds, '/places/top?lat=49&lon=11', '/places/trending?lat=49&lon=11&limit=1']) {
+      final list = await placesAt(path);
+      expect(list, isNotEmpty);
+      expect(list.every((p) => active.contains(p.placeId)), isTrue, reason: path);
+    }
+    expect((await placesAt(bounds)).map((p) => p.placeId), unorderedEquals(active));
+    final synced = await placesAt('$bounds&includeClosed=true');
+    expect(synced.where((p) => p.isClosed).map((p) => p.placeId), unorderedEquals(['archive-closed', 'archive-unrated']));
+
+    final (_, newBody) = await call('GET', '/places/new?lat=49&lon=11');
+    expect(NewPlacesDto.fromJson(newBody as Map<String, dynamic>).opened.map((p) => p.placeId), unorderedEquals(active));
+    final (_, rankBody) = await call('GET', '/ranking?lat=49&lon=11&city=Archivstadt', token: owner);
+    expect(RankingDto.fromJson(rankBody as Map<String, dynamic>).entries.map((e) => e.place.placeId), unorderedEquals(active));
+    final (_, cities) = await call('GET', '/cities', token: owner);
+    expect([for (final c in cities as List) c['name']], isNot(contains('Archivort')));
+
+    expect((await placesAt('/me/places')).map((p) => p.placeId), contains('archive-closed'));
+    final (_, detail) = await call('GET', '/places/archive-closed', token: owner);
+    expect((detail['isClosed'], detail['reviewCount']), (true, 1));
+    for (final path in ['/me/reviews', '/me/visits', '/places/archive-closed/reviews']) {
+      final (status, body) = await call('GET', path, token: owner);
+      expect(status, 200);
+      expect([for (final entry in body as List) entry['placeId']], contains('archive-closed'), reason: path);
+    }
+    final (_, profileBody) = await call('GET', '/users/${user.id}/profile', token: owner);
+    final profile = ProfileDto.fromJson(profileBody as Map<String, dynamic>);
+    expect(profile.reviews.map((r) => r.placeId), contains('archive-closed'));
+    expect(profile.visits!.single.placeId, 'archive-closed');
+    final (feedStatus, feedBody) = await call('GET', '/feed?lat=49&lon=11', token: reader);
+    expect(feedStatus, 200);
+    expect(FeedPage.fromJson(feedBody as Map<String, dynamic>).items.map((i) => i.place.placeId), contains('archive-closed'));
+
+    await db.execute("UPDATE places SET business_status = 'CLOSED_PERMANENTLY' WHERE google_place_id = 'best-1'");
+    final awardPage = await handler(Request('GET', Uri.parse('http://localhost/bestenliste/teststadt/2026')));
+    expect(awardPage.statusCode, 200);
+    expect(await awardPage.readAsString(), contains('Grill 1'));
+  });
 }

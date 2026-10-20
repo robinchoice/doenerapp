@@ -91,7 +91,7 @@ class _MapScreenState extends State<MapScreen> {
     for (final v in data.visits) {
       visitCounts[v.dto.placeId] = (visitCounts[v.dto.placeId] ?? 0) + 1;
     }
-    final places = data.places.values
+    final places = data.activePlaces
         .where((p) => !_favoritesOnly || data.favorites.contains(p.placeId))
         .where((p) => diet != Diet.vegan || p.veganOptions != false)
         .toList();

@@ -250,6 +250,7 @@ class PlaceDto {
   final String? postalCode;
   final String? city;
   final String? openingHours;
+  final bool isClosed;
   final double? avgRating;
   final int reviewCount;
   final double? avgVegetarian;
@@ -275,6 +276,7 @@ class PlaceDto {
     this.postalCode,
     this.city,
     this.openingHours,
+    this.isClosed = false,
     this.avgRating,
     this.reviewCount = 0,
     this.avgVegetarian,
@@ -302,6 +304,7 @@ class PlaceDto {
         postalCode: j['postalCode'] as String?,
         city: j['city'] as String?,
         openingHours: j['openingHours'] as String?,
+        isClosed: j['isClosed'] as bool? ?? false,
         avgRating: _doubleOrNull(j['avgRating']),
         reviewCount: j['reviewCount'] as int? ?? 0,
         avgVegetarian: _doubleOrNull(j['avgVegetarian']),
@@ -322,6 +325,7 @@ class PlaceDto {
         'postalCode': postalCode,
         'city': city,
         'openingHours': openingHours,
+        'isClosed': isClosed,
         'avgRating': avgRating,
         'reviewCount': reviewCount,
         'avgVegetarian': avgVegetarian,

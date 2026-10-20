@@ -28,7 +28,7 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
     final query = _search.text.trim().toLowerCase();
     final places = query.isEmpty
         ? <PlaceDto>[]
-        : (context.watch<AppData>().places.values.where((p) => p.name.toLowerCase().contains(query)).toList()
+        : (context.watch<AppData>().activePlaces.where((p) => p.name.toLowerCase().contains(query)).toList()
           ..sort((a, b) => a.name.compareTo(b.name)));
 
     return ListView(

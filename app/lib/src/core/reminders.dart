@@ -6,7 +6,6 @@ import 'package:sembast/sembast.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../ui/widgets.dart' show formatRating;
 import 'session.dart';
 
 /// How long after a check-in the app asks how it was.
@@ -16,7 +15,7 @@ const reminderDelay = Duration(minutes: 30);
 /// whether the score still holds.
 (String, String) reminderText(String placeName, double? rating) => rating == null
     ? ('Wie war’s bei $placeName?', 'Tipp hier und bewerte deinen Besuch.')
-    : ('Bleibt’s bei ${formatRating(rating)}?', 'Dein Besuch bei $placeName – passt deine Bewertung noch?');
+    : ('Bleibt’s bei ${rating.toStringAsFixed(1).replaceAll('.', ',')}?', 'Dein Besuch bei $placeName – passt deine Bewertung noch?');
 
 /// "Wie war's bei X?" half an hour after a check-in, as a local notification
 /// on iOS and Android. Browsers can't schedule notifications; there the card

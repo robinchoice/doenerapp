@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
@@ -108,3 +109,16 @@ Middleware cors(String? origin) => (inner) => (request) async {
       final response = await inner(request);
       return response.change(headers: {...headers, 'access-control-allow-origin': origin});
     };
+
+/// Coolify's Traefik sets X-Forwarded-For; its last entry is the address
+/// Traefik saw. Without a proxy (tests, local compose) all share 'unknown'.
+String clientIp(Request request) => request.headers['x-forwarded-for']?.split(',').last.trim() ?? 'unknown';
+
+/// Stops taking connections and waits until the open ones are done. close()
+/// alone returns once the port is closed, while requests still run.
+Future<void> drain(HttpServer server) async {
+  await server.close();
+  while (server.connectionsInfo().total > 0) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+}

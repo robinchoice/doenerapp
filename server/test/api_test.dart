@@ -156,13 +156,17 @@ void main() {
 
   tearDownAll(() => db.close());
 
-  Future<(int, dynamic)> call(String method, String path, {Object? body, String? token, bool closed = false}) async {
+  // Each call comes from its own address unless [ip] is given, so the limits per IP stay out of the way.
+  var calls = 0;
+  Future<(int, dynamic)> call(String method, String path,
+      {Object? body, String? token, bool closed = false, String? ip}) async {
     final response = await (closed ? closedHandler : handler)(Request(
       method,
       Uri.parse('http://localhost/api/v1$path'),
       body: body == null ? null : jsonEncode(body),
       headers: {
         'content-type': 'application/json',
+        'x-forwarded-for': '203.0.113.1, ${ip ?? 'client-${calls++}'}',
         if (token != null) 'authorization': 'Bearer $token',
       },
     ));
@@ -269,6 +273,26 @@ void main() {
         await call('POST', '/auth/verify', body: {'email': 'brute@example.org', 'code': wrong});
       }
       expect((await call('POST', '/auth/verify', body: {'email': 'brute@example.org', 'code': code})).$1, 401);
+    });
+
+    test('link and code checks are limited per IP, a blocked link stays usable', () async {
+      await call('POST', '/auth/login', body: {'email': 'flood@example.org'});
+      final token = lastLinkToken();
+      for (var i = 0; i < 60; i++) {
+        expect((await call('POST', '/auth/verify', body: {'token': 'invalid'}, ip: 'flood')).$1, 401);
+      }
+      expect((await call('POST', '/auth/verify', body: {'token': token}, ip: 'flood')).$1, 429);
+      expect((await call('POST', '/auth/verify', body: {'token': token}, ip: 'elsewhere')).$1, 200);
+
+      await call('POST', '/auth/login', body: {'email': 'flood@example.org'});
+      final code = lastCode();
+      for (var i = 0; i < 30; i++) {
+        await call('POST', '/auth/verify', body: {'email': 'nobody@example.org', 'code': '000000'}, ip: 'guess');
+      }
+      final body = {'email': 'flood@example.org', 'code': code};
+      expect((await call('POST', '/auth/verify', body: body, ip: 'guess')).$1, 429);
+      await db.execute("UPDATE rate_limits SET reset_at = now() WHERE key = 'code-checks-per-ip:guess'");
+      expect((await call('POST', '/auth/verify', body: body, ip: 'guess')).$1, 200);
     });
 
     test('login requests are rate limited', () async {
@@ -1374,7 +1398,8 @@ void main() {
     await db.execute("UPDATE places SET business_status = 'CLOSED_PERMANENTLY' WHERE google_place_id = 'archive-closed'");
 
     await db.execute('DROP VIEW active_place_view');
-    await db.execute('DELETE FROM schema_migrations WHERE version = (SELECT max(version) FROM schema_migrations)');
+    await db.execute('DROP TABLE rate_limits');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 1 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

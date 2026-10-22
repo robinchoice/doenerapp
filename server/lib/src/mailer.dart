@@ -47,7 +47,8 @@ class SmtpMailer implements Mailer {
         m.StreamAttachment(Stream.value(attachment.bytes), attachment.contentType, fileName: attachment.fileName),
       );
     }
-    await m.send(message, _server);
+    // Each SMTP step waits 60 s by default; a hanging server would hold up the request and the shutdown.
+    await m.send(message, _server, timeout: const Duration(seconds: 10));
   }
 
   /// Accepts `Name <mail@host>` or a bare address.

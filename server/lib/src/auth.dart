@@ -16,6 +16,13 @@ const sessionTtl = Duration(days: 365);
 const maxLoginRequestsPerHour = 5;
 const maxCodeAttempts = 5;
 
+/// Per IP and 15 minutes, on top of the attempts per login request: links
+/// carry a long token, codes only 6 digits.
+const maxLinkChecksPerIp = 60;
+const maxCodeChecksPerIp = 30;
+
+const tooManyRequests = ApiException(429, 'Zu viele Anfragen – bitte später erneut versuchen.');
+
 final _random = Random.secure();
 
 String hashToken(String value) => sha256.convert(utf8.encode(value)).toString();
@@ -102,6 +109,11 @@ void mountAuth(Router router, Deps deps) {
 
   router.post('/auth/verify', (Request request) async {
     final body = await readBody(request, VerifyRequest.fromJson);
+    final ip = clientIp(request);
+    final allowed = Validation.clean(body.token) != null
+        ? await _rateLimit(deps, 'link-checks-per-ip:$ip', maxLinkChecksPerIp, const Duration(minutes: 15))
+        : await _rateLimit(deps, 'code-checks-per-ip:$ip', maxCodeChecksPerIp, const Duration(minutes: 15));
+    if (!allowed) throw tooManyRequests;
     final (email, storedInvite) = await _consumeLoginRequest(deps, body);
 
     var user = await queryOne(deps.db, 'SELECT $_accountColumns FROM users WHERE email = @email', {'email': email});
@@ -244,9 +256,7 @@ Future<void> _mailLoginCode(Deps deps, String email,
     "SELECT count(*)::int AS n FROM login_requests WHERE email = @email AND created_at > now() - interval '1 hour'",
     {'email': email},
   );
-  if ((recent!['n'] as int) >= maxLoginRequestsPerHour) {
-    throw const ApiException(429, 'Zu viele Anfragen – bitte später erneut versuchen.');
-  }
+  if ((recent!['n'] as int) >= maxLoginRequestsPerHour) throw tooManyRequests;
 
   final code = randomCode();
   final token = randomToken();
@@ -274,6 +284,28 @@ Future<void> _mailLoginCode(Deps deps, String email,
         'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '
         '${invitedBy == null ? 'Falls du das nicht angefordert hast, ignoriere diese Mail einfach.' : 'Danach meldest du dich jederzeit mit dieser Adresse an.'}',
   );
+}
+
+var _nextRateLimitSweep = DateTime(0);
+
+/// Counts a hit for [key] in Postgres, so all instances share it; false once
+/// it goes over [limit] within [window]. An expired window starts over at 1.
+Future<bool> _rateLimit(Deps deps, String key, int limit, Duration window) async {
+  if (DateTime.now().isAfter(_nextRateLimitSweep)) {
+    _nextRateLimitSweep = DateTime.now().add(window);
+    await deps.db.execute('DELETE FROM rate_limits WHERE reset_at < now()');
+  }
+  // Both CASEs see the old row.
+  final row = await queryOne(
+    deps.db,
+    "INSERT INTO rate_limits (key, count, reset_at) VALUES (@key, 1, now() + @seconds:int4 * interval '1 second') "
+    'ON CONFLICT (key) DO UPDATE SET '
+    'count = CASE WHEN rate_limits.reset_at <= now() THEN 1 ELSE rate_limits.count + 1 END, '
+    'reset_at = CASE WHEN rate_limits.reset_at <= now() THEN excluded.reset_at ELSE rate_limits.reset_at END '
+    'RETURNING count',
+    {'key': key, 'seconds': window.inSeconds},
+  );
+  return (row!['count'] as int) <= limit;
 }
 
 /// Validates a code or magic-link token and returns the verified email with

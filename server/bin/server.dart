@@ -36,6 +36,15 @@ Future<void> printLoginLink(List<String> args) async {
 }
 
 Future<void> startServer() async {
+  // Coolify stops the container with SIGTERM, Ctrl+C sends SIGINT. Watching
+  // them before the boot lets it finish first, then the server shuts down.
+  final stop = Completer<void>();
+  for (final signal in [ProcessSignal.sigterm, ProcessSignal.sigint]) {
+    signal.watch().listen((_) {
+      if (!stop.isCompleted) stop.complete();
+    });
+  }
+
   final config = Config.fromEnvironment(Platform.environment);
   final db = openPool(config);
   await migrate(db);
@@ -63,7 +72,7 @@ Future<void> startServer() async {
   );
 
   // Every instance polls; the claim in runSchedule lets one of them run it.
-  Future<void> runDueJobs() async {
+  Future<void> runJobs() async {
     try {
       await runSchedule(db, 'place_cache', const Duration(hours: 24), () => maintainPlaceCache(deps));
     } catch (error, stackTrace) {
@@ -77,15 +86,21 @@ Future<void> startServer() async {
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
   }
-  unawaited(runDueJobs());
-  Timer.periodic(const Duration(minutes: 1), (_) => runDueJobs());
+  // One run at a time, so the shutdown knows which one to wait for.
+  Future<void>? running;
+  void runDueJobs() => running ??= runJobs().whenComplete(() => running = null);
+  runDueJobs();
+  final timer = Timer.periodic(const Duration(minutes: 1), (_) => runDueJobs());
   final server = await io.serve(buildHandler(deps), InternetAddress.anyIPv4, config.port);
   print('Listening on :${server.port}');
 
-  ProcessSignal.sigterm.watch().listen((_) async {
-    await server.close();
-    await db.close();
-    await Sentry.close();
-    exit(0);
-  });
+  await stop.future;
+  print('Shutting down');
+  timer.cancel();
+  await drain(server);
+  await running;
+  httpClient.close();
+  await db.close();
+  await Sentry.close();
+  exit(0);
 }

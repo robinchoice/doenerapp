@@ -2,6 +2,8 @@
 # Without SMTP_HOST, login codes are printed to the app log.
 services:
   app:
+    # The server lets open requests and a running job finish on SIGTERM.
+    stop_grace_period: 30s
     build:
       context: .
       args:

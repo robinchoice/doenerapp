@@ -332,6 +332,10 @@ final migrations = <List<String>>[
       WHERE business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY'
     ''',
   ],
+  [
+    // Fixed-window counters of _rateLimit in auth.dart, shared by all instances.
+    'CREATE TABLE rate_limits (key text PRIMARY KEY, count int NOT NULL, reset_at timestamptz NOT NULL)',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

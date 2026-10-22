@@ -28,6 +28,7 @@
 
 ## Fallen
 
+- Secret-Scan: Gitleaks 8.30.1 liest zusätzlich zu `--gitleaks-ignore-path` auch `.gitleaksignore` aus dem Checkout. `secrets.yml` ersetzt diese Datei deshalb ebenfalls durch die Fassung aus `CONFIG_REF`, bei Fork-PRs also aus dem Base-Commit.
 - Die Adresse `doener-api.pleasance.org` bleibt für ausgelieferte Mobile-Clients erhalten. API-Änderungen müssen mit ihnen kompatibel bleiben.
 - Ausgelieferte Builds bis 1.0.x scheitern an unbekannten Namen von Bewertungspunkten. Neue `RatingItem`s kommen deshalb in `RatingItem.newItems`, das JSON trägt sie getrennt (`newRatings`, `newItems`).
 - Der Maps-JavaScript-Key der Web-Version (`GOOGLE_MAPS_WEB_KEY`) ist per Referrer auf die Domains beschränkt. Neue Domain: Referrer im Google-Projekt ergänzen.

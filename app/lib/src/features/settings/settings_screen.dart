@@ -79,9 +79,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _updateSettings({Diet? diet, bool? expertMode}) async {
+  Future<void> _updateSettings({Diet? diet, bool? expertMode, bool? updateMails}) async {
     try {
-      await context.read<Session>().updateSettings(diet: diet, expertMode: expertMode);
+      await context.read<Session>().updateSettings(diet: diet, expertMode: expertMode, updateMails: updateMails);
     } catch (e) {
       if (mounted) showMessage(context, 'Nicht gespeichert: $e');
     }
@@ -194,8 +194,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
               ),
             ),
+            header('Benachrichtigungen'),
             if (context.read<Push?>() != null) ...[
-              header('Benachrichtigungen'),
               SwitchListTile(
                 title: const Text('Freunde checken ein'),
                 subtitle: const Text('Wo deine Freunde gerade essen, höchstens alle 3 Stunden pro Person. Einzelne stellst du unter Freunde stumm.'),
@@ -209,6 +209,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) => _updatePush(pushNewPlaces: value),
               ),
             ],
+            SwitchListTile(
+              title: const Text('Neuigkeiten per Mail'),
+              subtitle: const Text('Selten, nur wenn sich an der App etwas Größeres ändert. Abbestellen mit einem Klick in jeder Mail.'),
+              value: session.user!.updateMails,
+              onChanged: (value) => _updateSettings(updateMails: value),
+            ),
             header('Bewerten'),
             SwitchListTile(
               title: const Text('Expertenmodus'),

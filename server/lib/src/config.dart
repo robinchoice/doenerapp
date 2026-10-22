@@ -26,6 +26,9 @@ class Config {
   /// Directory with the Flutter web build; served at `/` when it exists.
   final String webDir;
 
+  /// Drafts of news written as files (`updates/*.md` in the repo), imported on start.
+  final String updatesDir;
+
   /// Allowed CORS origin for local web development (e.g. `http://localhost:5000`).
   final String? corsOrigin;
 
@@ -65,6 +68,7 @@ class Config {
     this.smtp,
     this.mailFrom = 'Döner App <noreply@localhost>',
     this.webDir = 'web',
+    this.updatesDir = '../updates',
     this.corsOrigin,
     this.appDownloadUrl,
     this.feedbackEmail,
@@ -115,6 +119,7 @@ class Config {
             ),
       mailFrom: get('MAIL_FROM') ?? 'Döner App <noreply@localhost>',
       webDir: get('WEB_DIR') ?? 'web',
+      updatesDir: get('UPDATES_DIR') ?? '../updates',
       corsOrigin: get('CORS_ORIGIN'),
       appDownloadUrl: get('APP_DOWNLOAD_URL'),
       feedbackEmail: get('FEEDBACK_EMAIL'),

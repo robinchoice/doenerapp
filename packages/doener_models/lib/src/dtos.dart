@@ -150,7 +150,8 @@ class UpdateMeRequest {
   final bool? expertMode;
   final bool? pushFriends;
   final bool? pushNewPlaces;
-  const UpdateMeRequest({this.displayName, this.diet, this.expertMode, this.pushFriends, this.pushNewPlaces});
+  final bool? updateMails;
+  const UpdateMeRequest({this.displayName, this.diet, this.expertMode, this.pushFriends, this.pushNewPlaces, this.updateMails});
 
   factory UpdateMeRequest.fromJson(Json j) => UpdateMeRequest(
         displayName: j['displayName'] as String?,
@@ -158,6 +159,7 @@ class UpdateMeRequest {
         expertMode: j['expertMode'] as bool?,
         pushFriends: j['pushFriends'] as bool?,
         pushNewPlaces: j['pushNewPlaces'] as bool?,
+        updateMails: j['updateMails'] as bool?,
       );
   Json toJson() => {
         'displayName': ?displayName,
@@ -165,6 +167,7 @@ class UpdateMeRequest {
         'expertMode': ?expertMode,
         'pushFriends': ?pushFriends,
         'pushNewPlaces': ?pushNewPlaces,
+        'updateMails': ?updateMails,
       };
 }
 
@@ -206,6 +209,9 @@ class AccountDto extends UserDto {
   final bool pushFriends;
   final bool pushNewPlaces;
 
+  /// Opted in to news by mail ("Neuigkeiten per Mail"), off by default.
+  final bool updateMails;
+
   const AccountDto({
     required super.id,
     required super.displayName,
@@ -214,6 +220,7 @@ class AccountDto extends UserDto {
     this.admin = false,
     this.pushFriends = true,
     this.pushNewPlaces = true,
+    this.updateMails = false,
   });
 
   factory AccountDto.fromJson(Json j) => AccountDto(
@@ -224,6 +231,7 @@ class AccountDto extends UserDto {
         admin: j['admin'] as bool? ?? false,
         pushFriends: j['pushFriends'] as bool? ?? true,
         pushNewPlaces: j['pushNewPlaces'] as bool? ?? true,
+        updateMails: j['updateMails'] as bool? ?? false,
       );
   @override
   Json toJson() => {
@@ -233,6 +241,7 @@ class AccountDto extends UserDto {
         'admin': admin,
         'pushFriends': pushFriends,
         'pushNewPlaces': pushNewPlaces,
+        'updateMails': updateMails,
       };
 }
 
@@ -1143,19 +1152,129 @@ class ProfileDto {
 // MARK: - Push
 
 /// The device's FCM token. With a position the server learns the user's city
-/// for "a new shop opened".
+/// for "a new shop opened". [fetchKey] lets the device read what its pushes
+/// are about ([PushEventDto]) without the session; shipped clients send none
+/// and get a neutral notification instead.
 class PushTokenRequest {
   final String token;
   final String platform;
   final double? latitude;
   final double? longitude;
-  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude});
+  final String? fetchKey;
+  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude, this.fetchKey});
 
   factory PushTokenRequest.fromJson(Json j) => PushTokenRequest(
         token: j['token'] as String,
         platform: j['platform'] as String,
         latitude: _doubleOrNull(j['latitude']),
         longitude: _doubleOrNull(j['longitude']),
+        fetchKey: j['fetchKey'] as String?,
       );
-  Json toJson() => {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude};
+  Json toJson() => {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude, 'fetchKey': ?fetchKey};
+}
+
+/// What a push is about. The push itself carries only its type and event ID.
+class PushEventDto {
+  final String type;
+  final String title;
+  final String body;
+  final String? placeId;
+  const PushEventDto({required this.type, required this.title, required this.body, this.placeId});
+
+  factory PushEventDto.fromJson(Json j) => PushEventDto(
+        type: j['type'] as String,
+        title: j['title'] as String,
+        body: j['body'] as String,
+        placeId: j['placeId'] as String?,
+      );
+  Json toJson() => {'type': type, 'title': title, 'body': body, 'placeId': ?placeId};
+}
+
+/// What the notification says when the details can't be loaded: the type only.
+(String, String) neutralPushText(String? type) => switch (type) {
+      'friend_check_in' => ('Döner App', 'Ein Freund ist gerade beim Döner. Öffne die App für Details.'),
+      'new_place' => ('Döner App', 'Ein neuer Döner hat aufgemacht. Öffne die App für Details.'),
+      _ => ('Döner App', 'Es gibt Neues in der Döner App.'),
+    };
+
+// MARK: - News
+
+/// News about the app: a card on Start and, for those who opted in, a mail.
+class UpdateDto {
+  final String id;
+  final String title;
+  final List<String> features;
+  final bool inApp;
+  final bool byMail;
+  final DateTime? publishedAt;
+
+  /// Mail deliveries, for admins.
+  final int sent;
+  final int pending;
+  final int failed;
+
+  const UpdateDto({
+    required this.id,
+    required this.title,
+    required this.features,
+    this.inApp = true,
+    this.byMail = true,
+    this.publishedAt,
+    this.sent = 0,
+    this.pending = 0,
+    this.failed = 0,
+  });
+
+  factory UpdateDto.fromJson(Json j) => UpdateDto(
+        id: j['id'] as String,
+        title: j['title'] as String,
+        features: [for (final f in j['features'] as List) f as String],
+        inApp: j['inApp'] as bool? ?? true,
+        byMail: j['byMail'] as bool? ?? true,
+        publishedAt: _dateOrNull(j['publishedAt']),
+        sent: j['sent'] as int? ?? 0,
+        pending: j['pending'] as int? ?? 0,
+        failed: j['failed'] as int? ?? 0,
+      );
+  Json toJson() => {
+        'id': id,
+        'title': title,
+        'features': features,
+        'inApp': inApp,
+        'byMail': byMail,
+        'publishedAt': publishedAt?.toIso8601String(),
+        'sent': sent,
+        'pending': pending,
+        'failed': failed,
+      };
+}
+
+/// A draft as the admin writes it.
+class UpdateDraftRequest {
+  final String title;
+  final List<String> features;
+  final bool inApp;
+  final bool byMail;
+  const UpdateDraftRequest({required this.title, required this.features, this.inApp = true, this.byMail = true});
+
+  factory UpdateDraftRequest.fromJson(Json j) => UpdateDraftRequest(
+        title: j['title'] as String,
+        features: [for (final f in j['features'] as List) f as String],
+        inApp: j['inApp'] as bool? ?? true,
+        byMail: j['byMail'] as bool? ?? true,
+      );
+  Json toJson() => {'title': title, 'features': features, 'inApp': inApp, 'byMail': byMail};
+}
+
+/// The admin's list of news, with how many get the mail.
+class AdminUpdatesDto {
+  final int subscribers;
+  final List<UpdateDto> updates;
+  const AdminUpdatesDto({required this.subscribers, required this.updates});
+
+  factory AdminUpdatesDto.fromJson(Json j) => AdminUpdatesDto(
+        subscribers: j['subscribers'] as int,
+        updates: [for (final u in j['updates'] as List) UpdateDto.fromJson(u as Json)],
+      );
+  Json toJson() => {'subscribers': subscribers, 'updates': [for (final u in updates) u.toJson()]};
 }

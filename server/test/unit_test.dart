@@ -17,7 +17,7 @@ void main() {
     final html = await privacyPage(Request('GET', Uri.parse('http://localhost/datenschutz'))).readAsString();
     for (final text in [html, privacyPublicPage(english: false).body]) {
       expect(text, allOf(contains('365 Tage'), contains('verlängert'), contains('speichert deren Namen'),
-          contains('Firebase Cloud Messaging'), contains('Nachrichtentext an FCM'), contains('Erinnerungen nach einem Besuch plant die App lokal')));
+          contains('Firebase Cloud Messaging'), contains('nur die Art des Ereignisses'), contains('Neuigkeiten per Mail'), contains('Erinnerungen nach einem Besuch plant die App lokal')));
       expect(text, isNot(contains('180 Tage angemeldet')));
     }
   });
@@ -161,6 +161,29 @@ void main() {
     expect(summary.specials, [Ingredient.mais, Ingredient.granatapfel]);
     expect(summary.meat, Meat.kalb);
     expect(summary.bread, Bread.homemade);
+  });
+
+  test('news drafts: format and every file in updates/', () {
+    final draft = parseDraft('x', '# Neu\n\n- Eins\n- Zwei\n');
+    expect(draft.title, 'Neu');
+    expect(draft.features, ['Eins', 'Zwei']);
+    for (final broken in ['- Eins', '# Neu', '# Neu\nText', '# Neu\n- ${'x' * 301}']) {
+      expect(() => parseDraft('x', broken), throwsFormatException, reason: broken);
+    }
+    expect(readDrafts('../updates'), isNotEmpty);
+  });
+
+  test('news mail: escaped HTML, plain text and one-click unsubscribe', () {
+    final mail = updateMail(
+      const UpdateDto(id: 'u', title: 'Karte <neu>', features: ['Läden & mehr']),
+      '11111111-1111-4111-8111-111111111111',
+      'https://doener.test',
+    );
+    expect(mail.subject, 'Neu in der Döner App: Karte <neu>');
+    expect(mail.html, allOf(contains('Karte &lt;neu&gt;'), contains('Läden &amp; mehr'), isNot(contains('<neu>'))));
+    expect(mail.text, contains('Abbestellen: https://doener.test/abmelden?token=11111111-1111-4111-8111-111111111111'));
+    expect(mail.headers['List-Unsubscribe'], '<https://doener.test/api/v1/updates/unsubscribe?token=11111111-1111-4111-8111-111111111111>');
+    expect(mail.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
   });
 
   test('city slugs for best-of URLs', () {

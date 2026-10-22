@@ -61,6 +61,9 @@ Future<void> startApp() async {
   // A shop's review link (https://…/b/<placeId>) leads here as ?review=<placeId>.
   final reviewFromLink = kIsWeb ? Uri.base.queryParameters['review'] : null;
   if (reviewFromLink != null) await data.requestReview(reviewFromLink);
+  // A push tapped in the browser (web/firebase-messaging-sw.js) opens ?place=<placeId>.
+  final placeFromPush = kIsWeb ? Uri.base.queryParameters['place'] : null;
+  if (placeFromPush != null) push?.opened.value = placeFromPush;
   final inviteCode = await pendingInviteRecord.get(db) as String?;
   final invitePromptDone = await settingsStore.record('invitePromptDone').get(db) == true;
 

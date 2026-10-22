@@ -350,11 +350,16 @@ class _HomeShellState extends State<HomeShell> {
     }
   }
 
-  /// A tapped reminder opens the review of its place.
+  /// A tapped reminder opens the review of its place. Notifications shown
+  /// for a push come through the same plugin and open their shop.
   void _openReminder() {
     final placeId = _reminders?.opened.value;
     if (placeId == null || !mounted) return;
     _reminders!.opened.value = null;
+    if (placeId.startsWith(pushPayloadPrefix)) {
+      _push?.opened.value = placeId.substring(pushPayloadPrefix.length);
+      return;
+    }
     final place = context.read<AppData>().places[placeId];
     if (place != null) showAppSheet(context, (_) => ReviewSheet(place: place));
   }

@@ -1,10 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
 import 'package:doener_models/doener_models.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
+import 'push_worker_stub.dart' if (dart.library.js_interop) 'push_worker_web.dart';
+import 'reminders.dart';
 import 'session.dart';
 
 /// The platform's Firebase API key from the build (`--dart-define=FIREBASE_API_KEY=…`).
@@ -25,8 +32,75 @@ FirebaseOptions get _options => FirebaseOptions(
 
 String get _platform => kIsWeb ? 'web' : defaultTargetPlatform.name;
 
+/// Payload of a notification shown for a push; the rest is the shop's ID.
+const pushPayloadPrefix = 'push:';
+
+/// The device's key for what its pushes are about (`/push-events/<id>`) and
+/// the API it belongs to. Apart from the session and readable after the first
+/// unlock, so a push to a locked iPhone still gets its details.
+const _storage = FlutterSecureStorage(iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock));
+const _keyName = 'push_fetch_key';
+const _apiName = 'push_api_base';
+
+/// Turns a signal (event type and ID) into a notification: the text comes
+/// from the server, and without it the notification only names the type.
+/// Runs in the background isolate as well, which has to set up the plugin.
+Future<void> showPushSignal(RemoteMessage message, {bool setUp = false}) async {
+  final type = message.data['type'] as String?;
+  final id = message.data['id'] as String?;
+  if (type == null || id == null) return;
+  var (title, body) = neutralPushText(type);
+  String? placeId;
+  try {
+    final key = await _storage.read(key: _keyName);
+    final api = await _storage.read(key: _apiName);
+    if (key != null && api != null) {
+      final response = await http
+          .get(Uri.parse('$api/push-events/$id'), headers: {'authorization': 'Push $key'})
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final event = PushEventDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+        (title, body, placeId) = (event.title, event.body, event.placeId);
+      }
+    }
+  } catch (_) {
+    // Offline or locked out: the neutral text stays.
+  }
+  final plugin = FlutterLocalNotificationsPlugin();
+  if (setUp) {
+    await plugin.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        ),
+      ),
+      onDidReceiveNotificationResponse: onNotificationTapped,
+    );
+  }
+  await plugin.show(
+    id: id.hashCode & 0x7fffffff,
+    title: title,
+    body: body,
+    payload: placeId == null ? null : '$pushPayloadPrefix$placeId',
+    notificationDetails: const NotificationDetails(
+      android: AndroidNotificationDetails('push', 'Freunde und neue Läden', importance: Importance.high, priority: Priority.high),
+      iOS: DarwinNotificationDetails(),
+    ),
+  );
+}
+
+/// Signals while the app is in the background or closed. Android wakes it for
+/// each; iOS only when it decides to (not after the app was swiped away).
+@pragma('vm:entry-point')
+Future<void> pushBackgroundHandler(RemoteMessage message) => showPushSignal(message, setUp: true);
+
 /// Pushes through Firebase Cloud Messaging: friends' check-ins and new shops.
-/// The server decides who gets what; the app only hands it its token.
+/// The server decides who gets what and sends only signals; the app fetches
+/// the text and shows the notification itself (on the web the service worker,
+/// `web/firebase-messaging-sw.js`).
 class Push {
   static bool get supported => _apiKey.isNotEmpty;
 
@@ -37,17 +111,16 @@ class Push {
 
   Future<void> init() async {
     await Firebase.initializeApp(options: _options);
-    // iOS shows pushes while the app is open only when asked to.
-    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(alert: true, sound: true);
-    FirebaseMessaging.onMessageOpenedApp.listen(_open);
-    final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) _open(initial);
+    if (kIsWeb) return;
+    FirebaseMessaging.onBackgroundMessage(pushBackgroundHandler);
+    // In the foreground the app shows them itself, with the plugin the
+    // reminders have set up already.
+    FirebaseMessaging.onMessage.listen((message) => showPushSignal(message).catchError((_) {}));
   }
 
-  void _open(RemoteMessage message) => opened.value = message.data['placeId'] as String?;
-
   /// Asks for permission (once; browsers only on a tap, see [ask]) and gives
-  /// the server this device's token, with the position for the user's city.
+  /// the server this device's token and fetch key, with the position for the
+  /// user's city.
   Future<void> register(Session session, {double? latitude, double? longitude, bool ask = true}) async {
     final messaging = FirebaseMessaging.instance;
     final settings = ask ? await messaging.requestPermission() : await messaging.getNotificationSettings();
@@ -60,17 +133,32 @@ class Push {
     // ignore: deprecated_member_use
     final token = await messaging.getToken();
     if (token == null) return;
+    final key = await _fetchKey(session.apiBase);
     Future<void> send(String token) async {
       _token = token;
       await session.api.put(
         '/me/push-token',
-        PushTokenRequest(token: token, platform: _platform, latitude: latitude, longitude: longitude).toJson(),
+        PushTokenRequest(token: token, platform: _platform, latitude: latitude, longitude: longitude, fetchKey: key).toJson(),
       );
     }
 
     await send(token);
     // ignore: deprecated_member_use
     _refresh ??= messaging.onTokenRefresh.listen((token) => send(token).catchError((_) {}));
+  }
+
+  /// Made once per device; stays when someone else signs in there.
+  Future<String> _fetchKey(String apiBase) async {
+    var key = await _storage.read(key: _keyName);
+    if (key == null) {
+      final random = Random.secure();
+      key = base64Url.encode(List<int>.generate(32, (_) => random.nextInt(256))).replaceAll('=', '');
+      await _storage.write(key: _keyName, value: key);
+    }
+    await _storage.write(key: _apiName, value: apiBase);
+    // Without it the browser shows the neutral text, push still works.
+    await shareWithServiceWorker(key, apiBase).catchError((_) {});
+    return key;
   }
 
   /// Before logging out: this device no longer belongs to the account.

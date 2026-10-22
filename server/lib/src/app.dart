@@ -17,6 +17,7 @@ import 'push.dart';
 import 'ranking.dart';
 import 'shop_pages.dart';
 import 'social.dart';
+import 'updates.dart';
 
 /// Lets iOS open invite and review links in the installed app instead of the browser (Universal Links).
 const _appSiteAssociation = {
@@ -69,6 +70,7 @@ Handler buildHandler(Deps deps) {
   mountSocial(api, deps);
   mountModeration(api, deps);
   mountPush(api, deps);
+  mountUpdates(api, deps);
   mountTesterRequests(api, deps);
 
   final root = Router()..mount('/api/v1/', api.call);
@@ -83,6 +85,8 @@ Handler buildHandler(Deps deps) {
     ..get('/siegel/<placeId>', (Request request, String placeId) => sealPage(deps, request, placeId))
     ..get('/bestenliste/<city>/<year>', (Request request, String city, String year) => bestOfPage(deps, request, city, year))
     ..get('/datenschutz', privacyPage)
+    ..get('/abmelden', (Request request) => unsubscribePage(deps, request))
+    ..post('/abmelden', (Request request) => unsubscribePage(deps, request))
     ..get('/.well-known/apple-app-site-association', (Request _) => json(_appSiteAssociation))
     ..get('/.well-known/assetlinks.json', (Request _) => json(_assetLinks));
 

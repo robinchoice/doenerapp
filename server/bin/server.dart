@@ -71,8 +71,17 @@ Future<void> startServer() async {
     pusher: fcm == null ? const LogPusher() : FcmPusher(fcm, httpClient),
   );
 
+  await importDrafts(deps);
+
   // Every instance polls; the claim in runSchedule lets one of them run it.
   Future<void> runJobs() async {
+    try {
+      await deleteOldPushEvents(deps);
+      await deliverUpdateMails(deps);
+    } catch (error, stackTrace) {
+      print('News mails failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
     try {
       await runSchedule(db, 'place_cache', const Duration(hours: 24), () => maintainPlaceCache(deps));
     } catch (error, stackTrace) {

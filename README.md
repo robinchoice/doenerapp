@@ -104,6 +104,7 @@ Nur im Dezember, sonst ausgegraut. Jahresrückblick auf 5 Seiten auf dunklem Gru
 Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freiburg):
 
 - Ganz oben die Freunde, die gerade essen
+- Die neueste Neuigkeit zur App als Karte, bis man sie ausblendet (siehe „Neuigkeiten“)
 - Startaufgaben, bis sie erledigt sind: „Bewerte deinen Stammladen“ (führt zur Karte) und „Hol deine Freunde per QR-Code“
 - „Neu in [Stadt]“: Läden, die in den letzten 30 Tagen aufgemacht haben, und Eröffnungen, die Google angekündigt hat („Bald: … Laut Google am 15. Oktober“)
 - „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
@@ -145,6 +146,18 @@ Am 1. Januar friert der Server für jede Stadt die Bestenliste des Vorjahres ein
 - **Neue Läden in deiner Stadt:** sobald ein angekündigter Laden aufmacht, einmal an alle in der Stadt. Die Stadt nimmt der Server vom nächsten Laden zur Position, die das Gerät mit seinem Token schickt
 
 Ein Tipp auf den Push öffnet den Laden. Handys fragen beim Start nach der Erlaubnis, Browser erst beim Einschalten eines Schalters, weil sie das nur nach einem Tipp erlauben. Beim Abmelden meldet die App das Gerät ab, Tokens, die FCM nicht mehr kennt, löscht der Server.
+
+Ein Push ist nur ein Signal: Er trägt die Art (`friend_check_in`, `new_place`) und eine Ereignis-ID, keine Namen und Läden. Den Text legt der Server 7 Tage lang in `push_events` ab, das Gerät holt ihn über `GET /push-events/:id` mit seinem Geräteschlüssel (`Authorization: Push …`, beim Token gemeldet, auf dem iPhone nach dem ersten Entsperren lesbar) und zeigt die Meldung selbst an: Android und iOS mit `flutter_local_notifications`, das Web im Service Worker `firebase-messaging-sw.js`. Scheitert der Abruf, steht nur die Art da („Ein Freund ist gerade beim Döner …“). Ausgelieferte Versionen ohne Schlüssel bekommen immer diesen neutralen Text als normale Benachrichtigung. Zustellung ohne Garantie: Android weckt die App in der Regel für jedes Signal, aber nicht nach einem erzwungenen Stopp und nicht zuverlässig bei aggressivem Energiesparen. iOS stellt Hintergrund-Pushes nur zu, wenn es will, gedrosselt und gar nicht mehr, nachdem man die App weggewischt hat. Browser nur, solange sie laufen; ist der Tab gerade offen und sichtbar, zeigt das Web wie bisher keine Meldung.
+
+### Neuigkeiten
+
+Was neu ist in der App, steht als Karte auf Start und geht auf Wunsch per Mail raus.
+
+- Opt-in: „Neuigkeiten per Mail“ ist aus, bis man es auf der Karte („Auch per Mail bekommen“) oder unter Einstellungen → Benachrichtigungen einschaltet. `users.updates_consent_at` hält den Zeitpunkt als Nachweis; die Adresse ist durch den Login schon bestätigt.
+- Abmelden: Jede Mail hat einen Link auf `/abmelden?token=…` (Seite mit Knopf, damit Link-Scanner niemanden abmelden) und `List-Unsubscribe` mit One-Click auf `POST /api/v1/updates/unsubscribe?token=…`. Der Token steht pro Konto in `users.unsubscribe_token`.
+- Schreiben: Admins (`ADMIN_EMAILS`) unter Profil → Neuigkeiten, mit Vorschau der Karte und „Testmail an mich“. Agenten schreiben Entwürfe als `updates/<datum>-<thema>.md` (`# Titel`, darunter Punkte `- …`); der Server legt jede Datei beim Start einmal als Entwurf an und überschreibt ihn nie, die Server-Tests prüfen alle Dateien.
+- Veröffentlichen: nur ein Admin, nie ein Agent, auch nicht per API oder Datenbank, denn die Mail geht in Robins Namen an andere. Angekreuzt wird, ob die Karte erscheint und ob die Mail rausgeht. Danach ist der Text fest.
+- Versand: Jede Minute schickt jede Instanz bis zu 5 fällige Mails aus `update_deliveries`, drei Versuche je Mail. Wer inzwischen abbestellt hat, wird übersprungen.
 
 ### Melden und Blockieren
 
@@ -237,7 +250,14 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/me/invite/reset` | Neuer Einladungslink, der alte verfällt |
 | GET | `/invites/:code` | Wer einlädt (ohne Login) |
 | POST | `/invites/:code/accept` | Einladung annehmen → sofort befreundet |
-| PUT | `/me/push-token` | FCM-Token des Geräts, optional mit Position für die Stadt |
+| PUT | `/me/push-token` | FCM-Token des Geräts mit Geräteschlüssel, optional mit Position für die Stadt |
+| GET | `/push-events/:id` | Text eines Pushes, mit `Authorization: Push <Geräteschlüssel>` statt Sitzung |
+| GET | `/updates/current` | Neueste Neuigkeit für die Karte, 204 ohne |
+| POST | `/updates/:id/dismiss` | Karte ausblenden |
+| POST | `/updates/unsubscribe?token=` | One-Click-Abmeldung aus der Mail, ohne Login |
+| GET, POST | `/admin/updates` | Neuigkeiten mit Versandzahlen, neuer Entwurf (Admins) |
+| PUT | `/admin/updates/:id` | Entwurf ändern |
+| POST | `/admin/updates/:id/test`, `/admin/updates/:id/publish` | Testmail an sich, veröffentlichen |
 | DELETE | `/me/push-tokens/:token` | Gerät abmelden |
 | PUT, DELETE | `/me/mutes/:userId` | Freund stummschalten, wieder laut |
 | POST | `/feedback` | Feedback mit optionalem Screenshot |
@@ -314,6 +334,7 @@ cd app && flutter test
 | `APP_VERSION` | `dev` (Commit im Image) | Von `/api/v1/health` als `revision` gemeldet |
 | `MAIL_FROM` | `Döner App <noreply@localhost>` | Absender |
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
+| `UPDATES_DIR` | `../updates` | Entwürfe für Neuigkeiten, im Image `/app/updates` |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
 | `APP_DOWNLOAD_URL` | – | App-Link in der Mail einer Admin-Einladung |
 | `FCM_SERVICE_ACCOUNT` | – | JSON-Key (base64) des Dienstkontos, das über FCM sendet; ohne stehen Pushes nur im Log |

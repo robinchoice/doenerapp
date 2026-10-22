@@ -53,8 +53,10 @@ class FakeServer {
       '/users/me' => json(AccountDto(
           id: _me.id,
           displayName: _me.displayName,
-          diet: Diet.values.byName((jsonDecode(request.body) as Map<String, dynamic>)['diet'] as String),
+          diet: Diet.values.byName((jsonDecode(request.body) as Map<String, dynamic>)['diet'] as String? ?? 'all'),
+          updateMails: (jsonDecode(request.body) as Map<String, dynamic>)['updateMails'] as bool? ?? false,
         ).toJson()),
+      '/updates/current' => json(const UpdateDto(id: 'n1', title: 'Neuigkeiten in der App', features: ['Eine Karte auf Start']).toJson()),
       '/places/new' => json(NewPlacesDto(
           opened: [PlaceDto(placeId: 'p4', name: 'Anatolia Grill', latitude: 48, longitude: 7.86, city: 'Freiburg', openedOn: DateTime(2026, 10, 2))],
           upcoming: const [PlaceDto(placeId: 'p5', name: 'Grillhaus Dreisam', latitude: 48, longitude: 7.87, opensOn: '2026-10-15')],
@@ -134,6 +136,28 @@ void main() {
     await tester.tap(find.text('Nur Freunde'));
     await tester.pumpAndSettle();
     expect(server.calls('/feed').last.queryParameters.containsKey('lat'), isFalse);
+  });
+
+  testWidgets('news show as a card that offers the mail and goes away when dismissed', (tester) async {
+    final server = await _pump(tester, StartScreen(onOpenMap: () {}), position: const LatLng(48, 7.85));
+
+    expect(find.text('Neuigkeiten in der App'), findsOneWidget);
+    expect(find.text('Eine Karte auf Start'), findsOneWidget);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Auch per Mail bekommen'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Kommt auch per Mail'), findsOneWidget);
+    expect(server.calls('/users/me'), isNotEmpty);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Ausblenden'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Neuigkeiten in der App'), findsNothing);
+    expect(server.calls('/updates/n1/dismiss'), hasLength(1));
   });
 
   testWidgets('ranking shows the city, the friends per place and switches dimensions', (tester) async {

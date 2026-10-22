@@ -336,6 +336,52 @@ final migrations = <List<String>>[
     // Fixed-window counters of _rateLimit in auth.dart, shared by all instances.
     'CREATE TABLE rate_limits (key text PRIMARY KEY, count int NOT NULL, reset_at timestamptz NOT NULL)',
   ],
+  [
+    // A push is only a signal (type and event ID); the device fetches what it
+    // is about with its fetch key. Events are kept for a week (push.dart).
+    '''CREATE TABLE push_events (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      type text NOT NULL,
+      title text NOT NULL,
+      body text NOT NULL,
+      place_id text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )''',
+    'CREATE INDEX push_events_created ON push_events (created_at)',
+    // A refreshed token keeps the device's key, so a key may sit on several rows.
+    'ALTER TABLE push_tokens ADD COLUMN fetch_key_hash text',
+    'CREATE INDEX push_tokens_fetch_key ON push_tokens (fetch_key_hash)',
+    // News: a card on Start and a mail for those who opted in (updates.dart).
+    'ALTER TABLE users ADD COLUMN updates_consent_at timestamptz',
+    'ALTER TABLE users ADD COLUMN unsubscribe_token uuid NOT NULL UNIQUE DEFAULT gen_random_uuid()',
+    '''CREATE TABLE updates (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug text UNIQUE,
+      title text NOT NULL,
+      features text[] NOT NULL,
+      in_app boolean NOT NULL DEFAULT true,
+      by_mail boolean NOT NULL DEFAULT true,
+      published_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )''',
+    '''CREATE TABLE update_dismissals (
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      update_id uuid NOT NULL REFERENCES updates (id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, update_id)
+    )''',
+    '''CREATE TABLE update_deliveries (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      update_id uuid NOT NULL REFERENCES updates (id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'skipped', 'failed')),
+      attempts int NOT NULL DEFAULT 0,
+      attempted_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (update_id, user_id)
+    )''',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

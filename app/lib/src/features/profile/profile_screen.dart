@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_data.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
+import '../news/news.dart';
 import '../settings/settings_screen.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
@@ -99,6 +100,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.person_add_alt,
                       label: 'Tester',
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _TestersScreen())),
+                    ),
+                  if (user?.admin ?? false)
+                    _MenuRow(
+                      icon: Icons.campaign_outlined,
+                      label: 'Neuigkeiten',
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewsAdminScreen())),
                     ),
                   _MenuRow(
                     icon: Icons.storefront,

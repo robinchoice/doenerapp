@@ -40,7 +40,8 @@ const signupClosed = ApiException.forbidden(
   'Sign-up is still closed, there is no account for this address yet. Apply as a tester.',
 );
 
-const _accountColumns = 'id, email, display_name, diet, expert_mode, push_friends, push_new_places';
+const _accountColumns =
+    'id, email, display_name, diet, expert_mode, push_friends, push_new_places, updates_consent_at IS NOT NULL AS update_mails';
 
 AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       id: row['id'] as String,
@@ -50,6 +51,7 @@ AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       admin: deps.config.adminEmails.contains(row['email']),
       pushFriends: row['push_friends'] as bool,
       pushNewPlaces: row['push_new_places'] as bool,
+      updateMails: row['update_mails'] as bool,
     );
 
 class AuthUser {
@@ -68,6 +70,7 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   final row = await queryOne(
     deps.db,
     'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places, '
+    'u.updates_consent_at IS NOT NULL AS update_mails, '
     's.expires_at AS session_expires_at FROM sessions s '
     'JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
@@ -111,8 +114,8 @@ void mountAuth(Router router, Deps deps) {
     final body = await readBody(request, VerifyRequest.fromJson);
     final ip = clientIp(request);
     final allowed = Validation.clean(body.token) != null
-        ? await _rateLimit(deps, 'link-checks-per-ip:$ip', maxLinkChecksPerIp, const Duration(minutes: 15))
-        : await _rateLimit(deps, 'code-checks-per-ip:$ip', maxCodeChecksPerIp, const Duration(minutes: 15));
+        ? await rateLimit(deps, 'link-checks-per-ip:$ip', maxLinkChecksPerIp, const Duration(minutes: 15))
+        : await rateLimit(deps, 'code-checks-per-ip:$ip', maxCodeChecksPerIp, const Duration(minutes: 15));
     if (!allowed) throw tooManyRequests;
     final (email, storedInvite) = await _consumeLoginRequest(deps, body);
 
@@ -148,7 +151,9 @@ void mountAuth(Router router, Deps deps) {
     return noContent();
   });
 
-  // PATCH /users/me — name, diet, expert mode, push settings; only what is set changes.
+  // PATCH /users/me — name, diet, expert mode, push settings, news by mail;
+  // only what is set changes. Switching the mails on keeps the time of the
+  // first consent as proof.
   router.patch('/users/me', (Request request) async {
     final user = await requireUser(deps, request);
     final body = await readBody(request, UpdateMeRequest.fromJson);
@@ -159,7 +164,9 @@ void mountAuth(Router router, Deps deps) {
         deps.db,
         'UPDATE users SET display_name = coalesce(@name:text, display_name), diet = coalesce(@diet:text, diet), '
         'expert_mode = coalesce(@expert:boolean, expert_mode), push_friends = coalesce(@friends:boolean, push_friends), '
-        'push_new_places = coalesce(@places:boolean, push_new_places) WHERE id = @id:uuid '
+        'push_new_places = coalesce(@places:boolean, push_new_places), updates_consent_at = CASE '
+        'WHEN @mails:boolean IS NULL THEN updates_consent_at WHEN @mails:boolean THEN coalesce(updates_consent_at, now()) END '
+        'WHERE id = @id:uuid '
         'RETURNING $_accountColumns',
         {
           'name': body.displayName?.trim(),
@@ -167,6 +174,7 @@ void mountAuth(Router router, Deps deps) {
           'expert': body.expertMode,
           'friends': body.pushFriends,
           'places': body.pushNewPlaces,
+          'mails': body.updateMails,
           'id': user.id,
         },
       );
@@ -290,7 +298,7 @@ var _nextRateLimitSweep = DateTime(0);
 
 /// Counts a hit for [key] in Postgres, so all instances share it; false once
 /// it goes over [limit] within [window]. An expired window starts over at 1.
-Future<bool> _rateLimit(Deps deps, String key, int limit, Duration window) async {
+Future<bool> rateLimit(Deps deps, String key, int limit, Duration window) async {
   if (DateTime.now().isAfter(_nextRateLimitSweep)) {
     _nextRateLimitSweep = DateTime.now().add(window);
     await deps.db.execute('DELETE FROM rate_limits WHERE reset_at < now()');

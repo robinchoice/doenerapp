@@ -11,6 +11,7 @@ import '../../core/maps.dart';
 import '../../core/reminders.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
+import '../news/news.dart';
 import '../place/place_detail.dart';
 import '../place/review_sheet.dart';
 import '../ranking/city_picker.dart';
@@ -53,7 +54,11 @@ class _StartScreenState extends State<StartScreen> {
   LatLng? _center;
   String? _loadedFor;
 
+  /// A pull to refresh loads the news card anew as well.
+  Key _newsKey = UniqueKey();
+
   Future<void> _refresh() async {
+    setState(() => _newsKey = UniqueKey());
     _center = context.read<LocationService>().center;
     await Future.wait([_loadArea(), _loadLive(), _reloadFeed()]);
   }
@@ -223,6 +228,7 @@ class _StartScreenState extends State<StartScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
+              NewsCard(key: _newsKey),
               for (final task in tasks) Padding(padding: const EdgeInsets.only(bottom: 10), child: task),
               if (_news.opened.isNotEmpty || _news.upcoming.isNotEmpty) ...[
                 _NewPlacesCard(news: _news),

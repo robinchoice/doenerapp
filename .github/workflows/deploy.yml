@@ -9,6 +9,7 @@ on:
       - 'packages/**'
       - 'app/**'
       - 'Dockerfile'
+      - 'updates/**'
       - '.github/workflows/deploy.yml'
 
 env:

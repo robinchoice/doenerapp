@@ -17,6 +17,14 @@ const reminderDelay = Duration(minutes: 30);
     ? ('Wie war’s bei $placeName?', 'Tipp hier und bewerte deinen Besuch.')
     : ('Bleibt’s bei ${rating.toStringAsFixed(1).replaceAll('.', ',')}?', 'Dein Besuch bei $placeName – passt deine Bewertung noch?');
 
+/// Payload of a tapped local notification (a reminder or a push), until the
+/// app has handled it.
+final notificationTapped = ValueNotifier<String?>(null);
+
+/// The plugin's tap callback. Every set-up passes this one, so a push that sets
+/// the plugin up again in the background (push.dart) doesn't lose the taps.
+void onNotificationTapped(NotificationResponse response) => notificationTapped.value = response.payload;
+
 /// "Wie war's bei X?" half an hour after a check-in, as a local notification
 /// on iOS and Android. Browsers can't schedule notifications; there the card
 /// on Start does the asking ([AppData.toReview]), which the apps show as well.
@@ -32,7 +40,7 @@ class Reminders {
   final _plugin = FlutterLocalNotificationsPlugin();
 
   /// The place of a tapped reminder, until the app has opened its review.
-  final opened = ValueNotifier<String?>(null);
+  ValueNotifier<String?> get opened => notificationTapped;
   bool enabled = true;
 
   Reminders(this._db);
@@ -52,7 +60,7 @@ class Reminders {
           requestSoundPermission: false,
         ),
       ),
-      onDidReceiveNotificationResponse: (response) => opened.value = response.payload,
+      onDidReceiveNotificationResponse: onNotificationTapped,
     );
     final launch = await _plugin.getNotificationAppLaunchDetails();
     if (launch?.didNotificationLaunchApp ?? false) opened.value = launch!.notificationResponse?.payload;

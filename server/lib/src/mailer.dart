@@ -12,6 +12,8 @@ abstract interface class Mailer {
     required String text,
     String? replyTo,
     MailAttachment? attachment,
+    String? html,
+    Map<String, String> headers = const {},
   });
 }
 
@@ -35,12 +37,16 @@ class SmtpMailer implements Mailer {
     required String text,
     String? replyTo,
     MailAttachment? attachment,
+    String? html,
+    Map<String, String> headers = const {},
   }) async {
     final message = m.Message()
       ..from = _parseAddress(_from)
       ..recipients.add(to)
       ..subject = subject
-      ..text = text;
+      ..text = text
+      ..html = html;
+    message.headers.addAll(headers);
     if (replyTo != null) message.headers['Reply-To'] = replyTo;
     if (attachment != null) {
       message.attachments.add(
@@ -68,6 +74,8 @@ class LogMailer implements Mailer {
     required String text,
     String? replyTo,
     MailAttachment? attachment,
+    String? html,
+    Map<String, String> headers = const {},
   }) async {
     print('--- mail to $to${replyTo == null ? '' : ' (reply to $replyTo)'}: $subject\n$text');
     if (attachment != null) print('[attachment ${attachment.fileName}, ${attachment.contentType}, ${attachment.bytes.length} bytes]');

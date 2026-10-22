@@ -19,7 +19,15 @@ import 'package:test/test.dart';
 /// TEST_DB_HOST / TEST_DB_USER / TEST_DB_PASSWORD); the database
 /// `doener_test` is recreated on every run.
 class CapturingMailer implements Mailer {
-  final sent = <({String to, String subject, String text, String? replyTo, MailAttachment? attachment})>[];
+  final sent = <({
+    String to,
+    String subject,
+    String text,
+    String? replyTo,
+    MailAttachment? attachment,
+    String? html,
+    Map<String, String> headers,
+  })>[];
   @override
   Future<void> send({
     required String to,
@@ -27,17 +35,19 @@ class CapturingMailer implements Mailer {
     required String text,
     String? replyTo,
     MailAttachment? attachment,
+    String? html,
+    Map<String, String> headers = const {},
   }) async =>
-      sent.add((to: to, subject: subject, text: text, replyTo: replyTo, attachment: attachment));
+      sent.add((to: to, subject: subject, text: text, replyTo: replyTo, attachment: attachment, html: html, headers: headers));
 }
 
 class CapturingPusher implements Pusher {
-  final sent = <({List<String> tokens, String title, String body, Map<String, String> data})>[];
+  final sent = <({List<String> tokens, String? title, String? body, Map<String, String> data})>[];
 
   /// Tokens FCM reports as uninstalled.
   final gone = <String>{};
   @override
-  Future<List<String>> send(List<String> tokens, {required String title, required String body, Map<String, String> data = const {}}) async {
+  Future<List<String>> send(List<String> tokens, {String? title, String? body, Map<String, String> data = const {}}) async {
     sent.add((tokens: tokens, title: title, body: body, data: data));
     return [for (final t in tokens) if (gone.contains(t)) t];
   }
@@ -170,6 +180,13 @@ void main() {
         if (token != null) 'authorization': 'Bearer $token',
       },
     ));
+    final text = await response.readAsString();
+    return (response.statusCode, text.isEmpty ? null : jsonDecode(text));
+  }
+
+  /// What a push is about, fetched with the device's key as the app does.
+  Future<(int, dynamic)> pushEvent(String id, String key) async {
+    final response = await handler(Request('GET', Uri.parse('http://localhost/api/v1/push-events/$id'), headers: {'authorization': 'Push $key'}));
     final text = await response.readAsString();
     return (response.statusCode, text.isEmpty ? null : jsonDecode(text));
   }
@@ -421,7 +438,8 @@ void main() {
     });
 
     test('push: friends hear about a check-in happening now, at most every 3 hours', () async {
-      final token = {'token': 'tok-bob', 'platform': 'android', 'latitude': 48.0, 'longitude': 7.85};
+      final key = 'k' * 43;
+      final token = {'token': 'tok-bob', 'platform': 'android', 'latitude': 48.0, 'longitude': 7.85, 'fetchKey': key};
       expect((await call('PUT', '/me/push-token', body: token, token: bob)).$1, 204);
       final city = await db.execute(Sql.named('SELECT city FROM users WHERE id = @id:uuid'), parameters: {'id': bobUser.id});
       expect(city.first.first, 'Berlin', reason: 'the city of the nearest shop');
@@ -445,9 +463,24 @@ void main() {
       expect(pusher.sent.length, before + 1);
       final push = pusher.sent.last;
       expect(push.tokens, ['tok-bob']);
-      expect(push.title, 'Anna isst gerade 🌯');
-      expect(push.body, startsWith('bei Kebap Haus'));
-      expect(push.data, {'placeId': 'place-kebap'});
+      expect((push.title, push.body), (null, null), reason: 'only a signal');
+      expect(push.data.keys, unorderedEquals(['type', 'id']));
+      expect(push.data['type'], 'friend_check_in');
+      final (status, event) = await pushEvent(push.data['id']!, key);
+      expect(status, 200);
+      final details = PushEventDto.fromJson(event as Map<String, dynamic>);
+      expect(details.title, 'Anna isst gerade 🌯');
+      expect(details.body, startsWith('bei Kebap Haus'));
+      expect(details.placeId, 'place-kebap');
+      expect((await pushEvent(push.data['id']!, 'x' * 43)).$1, 404, reason: 'another device');
+      final eventId = {'id': push.data['id']};
+      await db.execute(Sql.named("UPDATE push_events SET created_at = now() - interval '8 days' WHERE id = @id:uuid"), parameters: eventId);
+      expect((await pushEvent(push.data['id']!, key)).$1, 404, reason: 'kept a week');
+      await deleteOldPushEvents(deps);
+      final left = await db.execute(Sql.named('SELECT count(*)::int FROM push_events WHERE id = @id:uuid'), parameters: eventId);
+      expect(left.single.single, 0);
+      final (unauthorized, _) = await call('GET', '/push-events/${push.data['id']}', token: anna);
+      expect(unauthorized, 401, reason: 'the session is no fetch key');
       await checkIn();
       expect(pusher.sent.length, before + 1, reason: 'at most every 3 hours');
 
@@ -471,7 +504,14 @@ void main() {
       final tokens = await db.execute('SELECT count(*)::int FROM push_tokens');
       expect(tokens.first.first, 0, reason: 'a token FCM no longer knows is dropped');
       pusher.gone.clear();
-      await call('PUT', '/me/push-token', body: token, token: bob);
+
+      // Shipped clients have no fetch key: a neutral notification, no details.
+      await call('PUT', '/me/push-token', body: {...token}..remove('fetchKey'), token: bob);
+      await resetLimit();
+      await checkIn();
+      expect(pusher.sent.last.title, 'Döner App');
+      expect(pusher.sent.last.body, neutralPushText('friend_check_in').$2);
+      expect(pusher.sent.last.data, isEmpty);
       expect((await call('DELETE', '/me/push-tokens/tok-bob', token: bob)).$1, 204);
       expect((await db.execute('SELECT count(*)::int FROM push_tokens')).first.first, 0);
     });
@@ -1226,8 +1266,9 @@ void main() {
     await maintainPlaceCache(deps);
     expect(pusher.sent.length, pushes + 1);
     expect(pusher.sent.last.tokens, ['tok-olga'], reason: 'everyone in the city');
-    expect(pusher.sent.last.title, 'Neuer Döner in Freiburg');
-    expect(pusher.sent.last.body, 'Neuer Grill hat aufgemacht');
+    expect(pusher.sent.last.title, 'Döner App', reason: 'no fetch key, neutral');
+    final event = await db.execute("SELECT title, body FROM push_events WHERE type = 'new_place'");
+    expect(event.single, ['Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht']);
     await maintainPlaceCache(deps);
     expect(pusher.sent.length, pushes + 1, reason: 'once per opening');
 
@@ -1397,9 +1438,13 @@ void main() {
     );
     await db.execute("UPDATE places SET business_status = 'CLOSED_PERMANENTLY' WHERE google_place_id = 'archive-closed'");
 
+    // Replays the migration of active_place_view and the ones after it.
     await db.execute('DROP VIEW active_place_view');
     await db.execute('DROP TABLE rate_limits');
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 1 FROM schema_migrations)');
+    await db.execute('DROP TABLE push_events, update_deliveries, update_dismissals, updates');
+    await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash');
+    await db.execute('ALTER TABLE users DROP COLUMN updates_consent_at, DROP COLUMN unsubscribe_token');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 2 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 
@@ -1447,5 +1492,75 @@ void main() {
     final awardPage = await handler(Request('GET', Uri.parse('http://localhost/bestenliste/teststadt/2026')));
     expect(awardPage.statusCode, 200);
     expect(await awardPage.readAsString(), contains('Grill 1'));
+  });
+
+  test('news: admins publish a card and a mail for those who opted in', () async {
+    final (admin, _) = await signUp('robin@doener.test', 'Robin');
+    final (reader, _) = await signUp('leser@example.org', 'Leser');
+    final (other, _) = await signUp('andere@example.org', 'Andere');
+    final (_, me) = await call('PATCH', '/users/me', body: {'updateMails': true}, token: reader);
+    expect(me['updateMails'], isTrue);
+    expect((await call('PATCH', '/users/me', body: {'displayName': 'Leserin'}, token: reader)).$2['updateMails'], isTrue,
+        reason: 'unchanged when not sent');
+
+    expect((await call('GET', '/admin/updates', token: reader)).$1, 403);
+    expect((await call('POST', '/admin/updates', body: {'title': 'Leer', 'features': ['  ']}, token: admin)).$1, 400);
+    final (created, draft) = await call('POST', '/admin/updates', body: {'title': 'Neu', 'features': ['Karte']}, token: admin);
+    expect(created, 200);
+    final id = draft['id'] as String;
+    final (edited, body) = await call('PUT', '/admin/updates/$id', body: {'title': 'Neue Karte', 'features': ['Eins', 'Zwei']}, token: admin);
+    expect(edited, 200);
+    expect(body['features'], ['Eins', 'Zwei']);
+    expect((await call('GET', '/updates/current', token: reader)).$1, 204, reason: 'not published yet');
+
+    expect((await call('POST', '/admin/updates/$id/test', token: admin)).$1, 204);
+    final test = mailer.sent.last;
+    expect((test.to, test.subject), ('robin@doener.test', '[Test] Neu in der Döner App: Neue Karte'));
+    expect(test.html, contains('Zwei'));
+
+    final (published, update) = await call('POST', '/admin/updates/$id/publish', token: admin);
+    expect(published, 200);
+    expect((update['publishedAt'] != null, update['pending']), (true, 1), reason: 'only the reader opted in');
+    expect((await call('POST', '/admin/updates/$id/publish', token: admin)).$1, 409);
+    expect((await call('PUT', '/admin/updates/$id', body: {'title': 'X', 'features': ['Y']}, token: admin)).$1, 409);
+
+    final (shown, card) = await call('GET', '/updates/current', token: other);
+    expect((shown, card['title']), (200, 'Neue Karte'));
+    expect((await call('POST', '/updates/$id/dismiss', token: other)).$1, 204);
+    expect((await call('GET', '/updates/current', token: other)).$1, 204);
+    expect((await call('GET', '/updates/current', token: reader)).$1, 200, reason: 'dismissed per account');
+
+    final mails = mailer.sent.length;
+    await deliverUpdateMails(deps, pause: Duration.zero);
+    expect(mailer.sent.length, mails + 1);
+    final mail = mailer.sent.last;
+    expect((mail.to, mail.subject), ('leser@example.org', 'Neu in der Döner App: Neue Karte'));
+    expect(mail.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+    final (_, list) = await call('GET', '/admin/updates', token: admin);
+    final listed = AdminUpdatesDto.fromJson(list as Map<String, dynamic>);
+    expect(listed.subscribers, 1);
+    expect([for (final u in listed.updates) if (u.id == id) (u.sent, u.pending)], [(1, 0)]);
+
+    final unsubscribeToken = RegExp(r'abmelden\?token=([0-9a-f-]+)').firstMatch(mail.text)!.group(1)!;
+    Future<Response> page(String method, String token) async =>
+        await handler(Request(method, Uri.parse('http://localhost/abmelden?token=$token')));
+    final confirm = await page('GET', unsubscribeToken);
+    expect(await confirm.readAsString(), contains('<form method="post"'));
+    expect((await call('GET', '/auth/me', token: reader)).$2['updateMails'], isTrue, reason: 'opening the link changes nothing');
+    expect((await page('POST', 'nope')).statusCode, 400);
+    final done = await page('POST', unsubscribeToken);
+    expect(done.statusCode, 200);
+    expect(await done.readAsString(), contains('Abbestellt'));
+    expect((await call('GET', '/auth/me', token: reader)).$2['updateMails'], isFalse);
+
+    // Unsubscribed with one click after publishing: skipped.
+    await call('PATCH', '/users/me', body: {'updateMails': true}, token: reader);
+    final (_, second) = await call('POST', '/admin/updates', body: {'title': 'Noch was', 'features': ['Drei']}, token: admin);
+    await call('POST', '/admin/updates/${second['id']}/publish', token: admin);
+    expect((await call('POST', '/updates/unsubscribe?token=$unsubscribeToken')).$1, 204);
+    await deliverUpdateMails(deps, pause: Duration.zero);
+    expect(mailer.sent.length, mails + 1);
+    final skipped = await db.execute(Sql.named('SELECT status FROM update_deliveries WHERE update_id = @id:uuid'), parameters: {'id': second['id']});
+    expect(skipped.single.single, 'skipped');
   });
 }

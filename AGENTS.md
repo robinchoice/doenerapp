@@ -17,7 +17,7 @@
 
 ## Deploy
 
-- Ein Push auf `main`, der `server/`, `packages/`, `app/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
+- Ein Push auf `main`, der `server/`, `packages/`, `app/`, `updates/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
 - `mobile.yml` baut die iOS-App für TestFlight und die Android-App für den internen Play-Test bei jedem Push auf `main`, der `app/`, `packages/` oder `mobile.yml` ändert. Das Repo ist öffentlich, die Actions-Minuten kosten nichts.
 - Externe Tester (TestFlight-Gruppe „Erste Tester“, Public Link) bekommen nicht jeden Build: TestFlight mailt allen bei jedem Build, der der Gruppe zugeordnet wird. Zugeordnet und zur Beta-Prüfung eingereicht wird nur der Build eines Release-Tags `v*` (Job `testflight-release` in `mobile.yml`, `server/tool/testflight_release.dart`), und den setzt ein Agent nur auf Robins Anstoß. Alle anderen Builds landen nur in der internen Gruppe „Doener App Pioniere“.
 - Außerdem bei Tags `v*` und von Hand: `gh workflow run Mobile` baut iOS und Android, `gh workflow run Mobile -f platform=android` nur Android.
@@ -36,6 +36,7 @@
 - Die Bestenliste eines Jahres friert der Zeitplan `best_of` am 1. Januar einmal ein (`best_of_years` merkt sich das Jahr). Wer die Regeln ändert und ein Jahr neu rechnen will, löscht dessen Zeilen in `best_of` und `best_of_years`, dann rechnet der nächste Lauf es neu.
 - `active_place_view` blendet dauerhaft geschlossene Läden aus aktuellen Listen aus. `place_view` bleibt für Historie, Feed und direkte Ladenaufrufe erhalten. Die App synchronisiert über `/places?includeClosed=true` auch den Schließstatus bereits gecachter Läden und filtert `isClosed` nur bei Karte, Suche und der Auswahl zum Einchecken.
 - Die Landingpage lädt Schrift und Wortmarke aus dem Flutter-Build (`/assets/assets/…`). Wer Assets in `app/pubspec.yaml` verschiebt, muss die Pfade in `server/lib/src/landing.dart` nachziehen.
+- Ein Push ist nur ein Signal mit Art und Ereignis-ID, den Text holt das Gerät mit seinem Geräteschlüssel von `/push-events/:id` (README, „Push“). Keine Namen, Läden oder anderen Inhalte in den Push, auch nicht als Notlösung. Die neutralen Texte stehen zweimal: `neutralPushText` in `doener_models` und im Service Worker `app/web/firebase-messaging-sw.js`.
 - Push läuft über Firebase. Die Firebase-Konfiguration steht fest in `app/lib/src/core/push.dart`, nur die API-Keys kommen per `--dart-define=FIREBASE_API_KEY` aus der CI. iOS nutzt dafür den Maps-Key `GOOGLE_MAPS_IOS_KEY`, der dazu auch Firebase Installations und FCM-Registrierung erlaubt. Den Web-Key setzt das `Dockerfile` zusätzlich in `firebase-messaging-sw.js` ein.
 
 ## Konventionen
@@ -45,6 +46,8 @@
 - Für Agenten lesbar (README, „Für Agenten“): Jede öffentliche Seite mit eigenem Inhalt steht in `publicPages` in `server/lib/src/agents.dart`, mit Titel, Beschreibung und Inhalt als Markdown, auf Deutsch und Englisch. Daraus entstehen `/llms.txt`, `/llms-full.txt` und `<seite>.md`. Eine neue öffentliche Seite kommt im selben Zug dazu. Hinein kommt nur, was jeder ohne Login sieht: keine einzelnen Bewertungen (auch keine Zitate), keine Profile, keine Einladungen, nichts unter `/app` oder `/api`.
 
 ## Abweichungen vom Standard
+
+- Update-Mails heißen hier „Neuigkeiten“ und erscheinen auch als Karte auf Start (Robins Entscheidung vom 22.10.2026). Opt-in auf der Karte und in den Einstellungen statt unter dem Login, ohne Bestätigungsmail, weil die Adresse durch den Login bestätigt ist. Nur Deutsch, ohne Bild, wie die App. Admin-Seite in der App (Profil → Neuigkeiten) statt `/admin/updates`, Entwürfe als `updates/*.md` mit `# Titel`. Der Versand läuft in der API (siehe Zeitpläne unten). Veröffentlichen darf nur ein Admin, kein Agent.
 
 - Passkeys aus starter bleiben vorerst aus: Für den bisherigen reinen Dart-Server ist keine ausreichend geprüfte, gepflegte WebAuthn-Bibliothek gefunden. `passkeys_server` 1.0.0 prüft in `verifyRegistration`/`verifyLogin` weder Origin noch Ceremony-Typ oder User-Presence-/User-Verification-Flags; die letzte Änderung stammt vom 01.10.2025. Das gepflegte [`fido2`](https://pub.dev/packages/fido2) 2.0.1 benötigt dagegen Rust und eine native FFI-Bibliothek im Server-Image. Die Freigabe dieser Stack-Erweiterung steht als „Braucht Robin“ im Backlog; keine eigene WebAuthn-Kryptografie und kein Ausweichen auf eine alte Bibliotheksversion.
 - Registrierung: Neue Konten nur über `SIGNUP_ALLOWLIST` und Robins Freischaltung (Profil → Tester statt `/invite`, Bewerbungen von der Landingpage). Freundes-Links verbinden nur bestehende Konten, damit Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026, nimmt die vom Vormittag zurück). Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`.

@@ -82,7 +82,7 @@ Ein Profil für alle, ein Tipp auf einen Namen (Feed, Laden, Freundesliste, Such
 - **Bewertungen:** alle Bewertungen der Person
 - **Check-ins:** nur für Freunde und einen selbst, für alle anderen gesperrt
 
-Am fremden Profil stehen „Als Freund hinzufügen“ und ⋮ zum Blockieren. Das eigene Profil zeigt zusätzlich, wie viele Läden bis zur nächsten Stufe fehlen, die Zahl der Check-ins und Freunde, noch nicht übertragene Einträge (markiert) und das Menü mit Freunden, „Meine Läden“ (alle besuchten oder bewerteten Läden, sortierbar nach Bewertung, Besuchen oder zuletzt besucht) und Wrapped.
+Am fremden Profil stehen „Als Freund hinzufügen“ und ⋮ zum Blockieren. Das eigene Profil zeigt zusätzlich die Reaktionen der Freunde unter Bewertungen und Check-ins, wie viele Läden bis zur nächsten Stufe fehlen, die Zahl der Check-ins und Freunde, noch nicht übertragene Einträge (markiert) und das Menü mit Freunden, „Meine Läden“ (alle besuchten oder bewerteten Läden, sortierbar nach Bewertung, Besuchen oder zuletzt besucht) und Wrapped.
 
 Die Stufe steht neben dem Namen und richtet sich nach bewerteten Läden (`Tier` in `packages/doener_models`):
 
@@ -110,6 +110,7 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 - „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
 - „Gerade im Trend“: meiste Check-ins und Bewertungen der letzten 7 Tage, Check-ins zählen anonym
 - Feed: Check-ins und Bewertungen der Freunde (mit Linie in der Akzentfarbe) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Freunde. Der Filter „Nur Freunde“ blendet die anderen aus, die eigene Aktivität steht im Profil
+- Reaktionen: Unter Check-ins und Bewertungen von Freunden reagiert man mit 🤤, 🥙 oder 🙋, eine Reaktion pro Person und Post, ein zweiter Tipp nimmt sie zurück. Angezeigt wird die Zahl je Emoji, keine Namen. Reagieren dürfen nur Freunde der Person, die Ladenseite zeigt keine Reaktionen. Wer gepostet hat, sieht sie im eigenen Profil, ohne Push
 
 ### Ranking
 
@@ -236,11 +237,12 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | PUT | `/places/:placeId/review` | Eigene Bewertung speichern, optional mit Foto (`photoBase64`) oder ohne das bisherige (`removePhoto`) |
 | GET | `/photos/:id` | Foto einer Bewertung (ohne Login) |
 | POST | `/places/:placeId/visits` | Check-in (idempotent über Client-ID) |
-| GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten |
+| GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten, Check-ins und Bewertungen mit den Reaktionen der Freunde |
 | GET | `/users/:id/profile` | Öffentliches Profil: Stufe und Bewertungen, für Freunde auch die Check-ins |
 | DELETE | `/me/live-status` | Live-Status beenden |
 | GET | `/feed?cursor[&lat&lon]` | Check-ins und Bewertungen der Freunde, mit `lat`/`lon` auch alle Bewertungen im Umkreis (Keyset-Pagination) |
 | GET | `/feed/live` | Live-Status der Freunde |
+| PUT/DELETE | `/visits/:id/reaction`, `/reviews/:id/reaction` | Auf den Post eines Freundes reagieren (`emoji`) oder die Reaktion zurücknehmen |
 | GET | `/users/search?q` | Nutzer suchen |
 | GET | `/friends` | Freundschaften |
 | POST | `/friends/requests` | Anfrage senden |
@@ -413,7 +415,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 - **Kern:** Bewertungen und das Ranking der Stadt, nicht Menge oder Spiel.
 - **Zwei Ebenen:** Bewertungen (ab Phase 2 auch Fragen) sieht jeder im Umkreis von 10 km, mit Namen. Check-ins sehen nur Freunde. Freunde verbinden sich per QR-Code oder Einladungslink.
-- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren mit 🤤, 🥙 oder 🙋. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
+- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren im Feed mit 🤤, 🥙 oder 🙋, auch auf Bewertungen. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
 - **Bewertung:** optional mit Foto. Bewerten darf jeder, wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
 - **Push nur für Freunde und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar.
 - **Belohnung:** Ab Phase 2 zählen die Upvotes zur Stufe.
@@ -425,7 +427,8 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 
 ### Phase 2 – Community
 
-- Fragen an den Umkreis, Antworten mit verlinktem Laden, Kommentare
+- Fragen an den Umkreis, Antworten mit verlinktem Laden
+- Kommentare unter Freunden an Check-ins und Bewertungen im Feed, wie bei Instagram. Sie bleiben am Post und erscheinen nicht auf der Ladenseite, damit sie Laden und Bewertungen nicht überfluten (Tester-Feedback vom 23.10.2026)
 - Up- und Downvotes, ab −5 ausgeblendet, Upvotes neben dem Namen
 - Kenner des Monats 👑 (meiste Upvotes in der Stadt)
 - Favoriten werden zur Merkliste „Will ich probieren“

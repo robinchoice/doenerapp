@@ -382,6 +382,19 @@ final migrations = <List<String>>[
       UNIQUE (update_id, user_id)
     )''',
   ],
+  [
+    // Friends react to each other's check-ins and reviews, one emoji per person and post.
+    '''CREATE TABLE reactions (
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      visit_id uuid REFERENCES visits (id) ON DELETE CASCADE,
+      review_id uuid REFERENCES reviews (id) ON DELETE CASCADE,
+      emoji text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CHECK ((visit_id IS NULL) <> (review_id IS NULL))
+    )''',
+    'CREATE UNIQUE INDEX reactions_visit ON reactions (visit_id, user_id) WHERE visit_id IS NOT NULL',
+    'CREATE UNIQUE INDEX reactions_review ON reactions (review_id, user_id) WHERE review_id IS NOT NULL',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

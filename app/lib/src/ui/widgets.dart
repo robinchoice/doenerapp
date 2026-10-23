@@ -260,6 +260,9 @@ class ActivityCard extends StatelessWidget {
   /// [ContentMenu] on someone else's activity.
   final Widget? menu;
 
+  /// Below the post, e.g. friends' reactions.
+  final Widget? footer;
+
   const ActivityCard({
     super.key,
     required this.type,
@@ -281,6 +284,7 @@ class ActivityCard extends StatelessWidget {
     this.highlight = false,
     this.onTap,
     this.menu,
+    this.footer,
   });
 
   @override
@@ -349,6 +353,7 @@ class ActivityCard extends StatelessWidget {
               Text(text!, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
             ],
             if (photo != null || photoId != null) ...[const SizedBox(height: 10), ReviewPhoto(photoId: photoId, bytes: photo)],
+            if (footer != null) ...[const SizedBox(height: 10), footer!],
           ],
         ),
       ),

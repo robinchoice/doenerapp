@@ -18,6 +18,7 @@ import '../ranking/city_picker.dart';
 import '../social/friends.dart';
 import '../social/invite.dart';
 import '../social/moderation.dart';
+import '../social/reactions.dart';
 import '../profile/profile_view.dart';
 
 /// Moving further than this loads the area around the new position.
@@ -304,6 +305,14 @@ class _StartScreenState extends State<StartScreen> {
                     onSite: item.onSite,
                     regular: item.regular,
                     highlight: item.fromFriend,
+                    footer: item.fromFriend
+                        ? ReactionBar(
+                            key: ValueKey(item.id),
+                            path: '/${item.type == FeedItemType.visit ? 'visits' : 'reviews'}/${item.id}',
+                            reactions: item.reactions,
+                            mine: item.myReaction,
+                          )
+                        : null,
                   onTap: () => showPlaceDetail(context, item.place),
                   menu: ContentMenu(
                     user: item.user,

@@ -17,6 +17,12 @@ Map<RatingItem, T> _itemMap<T>(Object? json, T Function(Object? value) value) =>
 /// bread as fields of their own, as before there were other items), so those
 /// carry rounded values and `ratings` the exact ones. [RatingItem.newItems]
 /// go in `newRatings`, see there.
+/// {emoji: count} of [reactionEmojis], absent or empty when nobody reacted.
+Map<String, int> _reactionsFromJson(Object? j) => {
+      if (j is Map)
+        for (final e in j.entries) e.key as String: e.value as int,
+    };
+
 Map<RatingItem, double> _ratingsFromJson(Json j) => {
       ...j['ratings'] is Map
           ? _itemMap(j['ratings'], (v) => (v as num).toDouble())
@@ -460,6 +466,9 @@ class ReviewDto {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Friends' reactions, only on one's own reviews (`/me/reviews`), never on the shop page.
+  final Map<String, int> reactions;
+
   const ReviewDto({
     required this.id,
     required this.userId,
@@ -482,6 +491,7 @@ class ReviewDto {
     this.regular = false,
     required this.createdAt,
     required this.updatedAt,
+    this.reactions = const {},
   });
 
   /// What the review shows to someone with [diet]. For the Döner the stored
@@ -510,6 +520,7 @@ class ReviewDto {
         regular: j['regular'] as bool? ?? false,
         createdAt: _date(j['createdAt']),
         updatedAt: _date(j['updatedAt']),
+        reactions: _reactionsFromJson(j['reactions']),
       );
 
   Json toJson() => {
@@ -535,6 +546,7 @@ class ReviewDto {
         'regular': regular,
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
+        if (reactions.isNotEmpty) 'reactions': reactions,
       };
 }
 
@@ -614,6 +626,9 @@ class VisitDto {
   final DateTime visitedAt;
   final String? foodType;
 
+  /// Friends' reactions, only on one's own check-ins (`/me/visits`).
+  final Map<String, int> reactions;
+
   const VisitDto({
     required this.id,
     required this.userId,
@@ -622,6 +637,7 @@ class VisitDto {
     required this.placeName,
     required this.visitedAt,
     this.foodType,
+    this.reactions = const {},
   });
 
   factory VisitDto.fromJson(Json j) => VisitDto(
@@ -632,6 +648,7 @@ class VisitDto {
         placeName: j['placeName'] as String,
         visitedAt: _date(j['visitedAt']),
         foodType: j['foodType'] as String?,
+        reactions: _reactionsFromJson(j['reactions']),
       );
 
   Json toJson() => {
@@ -642,6 +659,7 @@ class VisitDto {
         'placeName': placeName,
         'visitedAt': visitedAt.toUtc().toIso8601String(),
         'foodType': foodType,
+        if (reactions.isNotEmpty) 'reactions': reactions,
       };
 }
 
@@ -670,6 +688,18 @@ class CreateVisitRequest {
 
 enum FeedItemType { visit, review }
 
+/// What friends react with to each other's check-ins and reviews, one per person and post.
+const reactionEmojis = ['🤤', '🥙', '🙋'];
+
+class ReactionRequest {
+  final String emoji;
+  const ReactionRequest(this.emoji);
+
+  factory ReactionRequest.fromJson(Json j) => ReactionRequest(j['emoji'] as String);
+
+  Json toJson() => {'emoji': emoji};
+}
+
 /// Check-ins come from friends only; reviews from friends and from everyone
 /// around — [fromFriend] tells them apart.
 class FeedItem {
@@ -691,6 +721,10 @@ class FeedItem {
   final bool onSite;
   final bool regular;
 
+  /// {emoji: count} and the own pick; only on posts of friends, who are the only ones to react.
+  final Map<String, int> reactions;
+  final String? myReaction;
+
   const FeedItem({
     required this.id,
     required this.type,
@@ -705,6 +739,8 @@ class FeedItem {
     this.photoId,
     this.onSite = false,
     this.regular = false,
+    this.reactions = const {},
+    this.myReaction,
   });
 
   /// See [ReviewDto.headline].
@@ -724,6 +760,8 @@ class FeedItem {
         photoId: j['photoId'] as String?,
         onSite: j['onSite'] as bool? ?? false,
         regular: j['regular'] as bool? ?? false,
+        reactions: _reactionsFromJson(j['reactions']),
+        myReaction: j['myReaction'] as String?,
       );
 
   Json toJson() => {
@@ -741,6 +779,8 @@ class FeedItem {
         'photoId': photoId,
         'onSite': onSite,
         'regular': regular,
+        'reactions': reactions,
+        'myReaction': myReaction,
       };
 }
 

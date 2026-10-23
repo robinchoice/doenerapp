@@ -10,6 +10,7 @@ import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
 import '../social/friends.dart';
 import '../social/moderation.dart';
+import '../social/reactions.dart';
 
 Future<void> showUserProfile(BuildContext context, UserDto user) =>
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserProfileScreen(user: user)));
@@ -226,6 +227,7 @@ class _ProfileTabsState extends State<ProfileTabs> {
             onSite: r.dto.onSite,
             regular: r.dto.regular,
             pending: r.pending,
+            footer: r.dto.reactions.isEmpty ? null : ReactionBar(reactions: r.dto.reactions),
             onTap: () => _openPlace(context, r.dto.placeId),
             menu: widget.own ? null : ContentMenu(user: widget.user, reviewId: r.dto.id, onBlocked: widget.onBlocked ?? () {}),
           ),
@@ -254,6 +256,7 @@ class _ProfileTabsState extends State<ProfileTabs> {
             timestamp: v.dto.visitedAt,
             foodType: v.dto.foodType,
             pending: v.pending,
+            footer: v.dto.reactions.isEmpty ? null : ReactionBar(reactions: v.dto.reactions),
             onTap: () => _openPlace(context, v.dto.placeId),
           ),
       ],

@@ -65,6 +65,17 @@ const reviewPhotoId = '(SELECT id FROM review_photos WHERE review_id = r.id) AS 
 const reviewVisitCount = '(SELECT count(DISTINCT (v.created_at AT TIME ZONE \'Europe/Berlin\')::date) FROM visits v '
     'WHERE v.user_id = r.user_id AND v.place_id = r.place_id)::int AS visit_count';
 
+/// Select expressions for the reactions to [column] (`visit_id` or `review_id`) = [id] as
+/// {emoji: count}, and the emoji the user `@me` picked.
+String reactionCounts(String column, String id) => '(SELECT jsonb_object_agg(emoji, n) FROM '
+    '(SELECT emoji, count(*)::int AS n FROM reactions WHERE $column = $id GROUP BY emoji) rc) AS reactions';
+String myReaction(String column, String id) =>
+    '(SELECT emoji FROM reactions WHERE $column = $id AND user_id = @me:uuid) AS my_reaction';
+
+/// The `reactions` column of [reactionCounts], empty where the query has none.
+Map<String, int> reactionsFromRow(Map<String, dynamic> row) =>
+    {...?(row['reactions'] as Map?)?.map((emoji, n) => MapEntry(emoji as String, n as int))};
+
 /// Select expression: how many places the user [userId] (an SQL expression) reviewed — gives their tier.
 String reviewedPlacesOf(String userId) => '(SELECT count(*) FROM reviews rp WHERE rp.user_id = $userId)::int';
 
@@ -97,6 +108,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       regular: row['visit_count'] as int >= regularVisits,
       createdAt: row['created_at'] as DateTime,
       updatedAt: row['updated_at'] as DateTime,
+      reactions: reactionsFromRow(row),
     );
 
 VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
@@ -107,6 +119,7 @@ VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
       placeName: row['place_name'] as String,
       visitedAt: row['visited_at'] as DateTime,
       foodType: row['food_type'] as String?,
+      reactions: reactionsFromRow(row),
     );
 
 final _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, u.display_name, '
@@ -418,17 +431,22 @@ void mountPlaces(Router router, Deps deps) {
 
   router.get('/me/visits', (Request request) async {
     final user = await requireUser(deps, request);
-    final rows = await query(deps.db, '$_visitSelect WHERE v.user_id = @user:uuid ORDER BY v.visited_at DESC', {
-      'user': user.id,
-    });
+    // With the friends' reactions, which only the author sees outside the feed.
+    final rows = await query(
+      deps.db,
+      'SELECT v.*, ${reactionCounts('visit_id', 'v.id')} FROM ($_visitSelect WHERE v.user_id = @user:uuid) v ORDER BY v.visited_at DESC',
+      {'user': user.id},
+    );
     return json(rows.map((r) => visitFromRow(r).toJson()).toList());
   });
 
   router.get('/me/reviews', (Request request) async {
     final user = await requireUser(deps, request);
-    final rows = await query(deps.db, '$_reviewSelect WHERE r.user_id = @user:uuid ORDER BY r.updated_at DESC', {
-      'user': user.id,
-    });
+    final rows = await query(
+      deps.db,
+      'SELECT r.*, ${reactionCounts('review_id', 'r.id')} FROM ($_reviewSelect WHERE r.user_id = @user:uuid) r ORDER BY r.updated_at DESC',
+      {'user': user.id},
+    );
     return json(rows.map((r) => reviewFromRow(r).toJson()).toList());
   });
 

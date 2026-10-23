@@ -53,12 +53,12 @@ void mountSocial(Router router, Deps deps) {
       '  SELECT \'visit\' AS type, v.id, v.user_id, v.place_id, v.visited_at AS ts, NULL::text AS text,'
       '         NULL::real AS rating, NULL::real AS sauce_rating, NULL::real AS fleisch_rating, NULL::real AS brot_rating,'
       '         NULL::jsonb AS items, NULL::uuid AS photo_id, 0 AS visit_count,'
-      '         v.food_type, true AS from_friend'
+      '         v.food_type, true AS from_friend, ${reactionCounts('visit_id', 'v.id')}, ${myReaction('visit_id', 'v.id')}'
       '  FROM visits v WHERE v.user_id IN (SELECT id FROM friends)'
       '  UNION ALL'
       '  SELECT \'review\', r.id, r.user_id, r.place_id, r.updated_at, r.text,'
       '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, NULL,'
-      '         r.user_id IN (SELECT id FROM friends)'
+      '         r.user_id IN (SELECT id FROM friends), ${reactionCounts('review_id', 'r.id')}, ${myReaction('review_id', 'r.id')}'
       '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE (r.user_id IN (SELECT id FROM friends)'
       '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}) AND ${notBlocked('r.user_id')}'
       ') f ${cursor == null ? '' : 'WHERE (f.ts, f.id) < (@ts:timestamptz, @id:uuid)'}'
@@ -93,6 +93,9 @@ void mountSocial(Router router, Deps deps) {
           photoId: r['photo_id'] as String?,
           onSite: r['visit_count'] as int > 0,
           regular: r['visit_count'] as int >= regularVisits,
+          // Only friends react: on posts of others around, the viewer sees none.
+          reactions: r['from_friend'] as bool ? reactionsFromRow(r) : const {},
+          myReaction: r['from_friend'] as bool ? r['my_reaction'] as String? : null,
         ),
     ];
     final last = page.isEmpty ? null : page.last;
@@ -102,6 +105,36 @@ void mountSocial(Router router, Deps deps) {
       hasMore: hasMore,
     ).toJson());
   });
+
+  // PUT/DELETE /visits/<id>/reaction and /reviews/<id>/reaction — friends react to each
+  // other's posts, one emoji per person. The shop page leaves them out.
+  for (final (table, column) in [('visits', 'visit_id'), ('reviews', 'review_id')]) {
+    router.put('/$table/<id>/reaction', (Request request, String id) async {
+      final me = await requireUser(deps, request);
+      final body = await readBody(request, ReactionRequest.fromJson);
+      if (!reactionEmojis.contains(body.emoji)) throw const ApiException.badRequest('Unbekannte Reaktion');
+      final params = {'me': me.id, 'id': requireUuid(id)};
+      if (await queryOne(deps.db, '$friendIdsCte SELECT 1 FROM $table WHERE id = @id:uuid AND user_id IN (SELECT id FROM friends)', params) ==
+          null) {
+        throw const ApiException.notFound('Nicht gefunden');
+      }
+      await deps.db.execute(
+        Sql.named('INSERT INTO reactions (user_id, $column, emoji) VALUES (@me:uuid, @id:uuid, @emoji) '
+            'ON CONFLICT ($column, user_id) WHERE $column IS NOT NULL DO UPDATE SET emoji = EXCLUDED.emoji, created_at = now()'),
+        parameters: {...params, 'emoji': body.emoji},
+      );
+      return noContent();
+    });
+
+    router.delete('/$table/<id>/reaction', (Request request, String id) async {
+      final me = await requireUser(deps, request);
+      await deps.db.execute(
+        Sql.named('DELETE FROM reactions WHERE user_id = @me:uuid AND $column = @id:uuid'),
+        parameters: {'me': me.id, 'id': requireUuid(id)},
+      );
+      return noContent();
+    });
+  }
 
   router.get('/feed/live', (Request request) async {
     final me = await requireUser(deps, request);

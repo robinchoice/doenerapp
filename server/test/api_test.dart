@@ -597,6 +597,36 @@ void main() {
       expect(annaFeed['items'], isEmpty, reason: 'own activity is not in the friends feed');
     });
 
+    test('friends react to posts in the feed, the author sees it, the shop page does not', () async {
+      final (_, feed) = await call('GET', '/feed', token: bob);
+      final items = FeedPage.fromJson(feed as Map<String, dynamic>).items;
+      final review = items.firstWhere((i) => i.type == FeedItemType.review);
+      final visit = items.firstWhere((i) => i.type == FeedItemType.visit);
+
+      expect((await call('PUT', '/reviews/${review.id}/reaction', body: {'emoji': '🤤'}, token: bob)).$1, 204);
+      expect((await call('PUT', '/reviews/${review.id}/reaction', body: {'emoji': '🙋'}, token: bob)).$1, 204);
+      expect((await call('PUT', '/visits/${visit.id}/reaction', body: {'emoji': '🥙'}, token: bob)).$1, 204);
+      expect((await call('PUT', '/visits/${visit.id}/reaction', body: {'emoji': '👍'}, token: bob)).$1, 400);
+      expect((await call('PUT', '/reviews/${review.id}/reaction', body: {'emoji': '🤤'}, token: anna)).$1, 404, reason: 'not on own posts');
+      final (rita, _) = await signUp('rita@example.org', 'Rita');
+      expect((await call('PUT', '/reviews/${review.id}/reaction', body: {'emoji': '🤤'}, token: rita)).$1, 404, reason: 'friends only');
+
+      final (_, after) = await call('GET', '/feed', token: bob);
+      final reacted = FeedPage.fromJson(after as Map<String, dynamic>).items.firstWhere((i) => i.id == review.id);
+      expect([reacted.reactions, reacted.myReaction], [{'🙋': 1}, '🙋'], reason: 'one per person, the last one counts');
+
+      final (_, myReviews) = await call('GET', '/me/reviews', token: anna);
+      expect((myReviews as List).single['reactions'], {'🙋': 1});
+      final (_, myVisits) = await call('GET', '/me/visits', token: anna);
+      expect((myVisits as List).firstWhere((v) => v['id'] == visit.id)['reactions'], {'🥙': 1});
+      final (_, shop) = await call('GET', '/places/place-kebap/reviews', token: bob);
+      expect((shop as List).single.containsKey('reactions'), isFalse);
+
+      expect((await call('DELETE', '/reviews/${review.id}/reaction', token: bob)).$1, 204);
+      final (_, cleared) = await call('GET', '/feed', token: bob);
+      expect(FeedPage.fromJson(cleared as Map<String, dynamic>).items.firstWhere((i) => i.id == review.id).reactions, isEmpty);
+    });
+
     test('reviews rate more than the Döner and tell about the place', () async {
       final (status, body) = await call('PUT', '/places/place-kebap/review', token: bob, body: {
         'brotRating': 3,
@@ -1444,7 +1474,8 @@ void main() {
     await db.execute('DROP TABLE push_events, update_deliveries, update_dismissals, updates');
     await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash');
     await db.execute('ALTER TABLE users DROP COLUMN updates_consent_at, DROP COLUMN unsubscribe_token');
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 2 FROM schema_migrations)');
+    await db.execute('DROP TABLE reactions');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 3 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

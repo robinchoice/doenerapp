@@ -110,7 +110,7 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 - „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
 - „Gerade im Trend“: meiste Check-ins und Bewertungen der letzten 7 Tage, Check-ins zählen anonym
 - Feed: Check-ins und Bewertungen der Freunde (mit Linie in der Akzentfarbe) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Freunde. Der Filter „Nur Freunde“ blendet die anderen aus, die eigene Aktivität steht im Profil
-- Reaktionen: Unter Check-ins und Bewertungen von Freunden reagiert man mit 🤤, 🥙 oder 🙋, eine Reaktion pro Person und Post, ein zweiter Tipp nimmt sie zurück. Angezeigt wird die Zahl je Emoji, keine Namen. Reagieren dürfen nur Freunde der Person, die Ladenseite zeigt keine Reaktionen. Wer gepostet hat, sieht sie im eigenen Profil, ohne Push
+- Reaktionen: Unter Check-ins und Bewertungen von Freunden reagiert man mit 🤤, 🥙 oder 🙋, eine Reaktion pro Person und Post, ein zweiter Tipp nimmt sie zurück. Angezeigt wird die Zahl je Emoji, darunter, wer reagiert hat: mit Namen nur eigene Freunde („Tom 🤤, Anna 🥙 und 2 weitere“), so verrät der Post nicht, wer mit wem befreundet ist. Reagieren dürfen nur Freunde der Person, die Ladenseite zeigt keine Reaktionen. Wer gepostet hat, sieht sie im eigenen Profil, ohne Push
 
 ### Ranking
 

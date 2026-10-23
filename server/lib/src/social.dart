@@ -53,12 +53,14 @@ void mountSocial(Router router, Deps deps) {
       '  SELECT \'visit\' AS type, v.id, v.user_id, v.place_id, v.visited_at AS ts, NULL::text AS text,'
       '         NULL::real AS rating, NULL::real AS sauce_rating, NULL::real AS fleisch_rating, NULL::real AS brot_rating,'
       '         NULL::jsonb AS items, NULL::uuid AS photo_id, 0 AS visit_count,'
-      '         v.food_type, true AS from_friend, ${reactionCounts('visit_id', 'v.id')}, ${myReaction('visit_id', 'v.id')}'
+      '         v.food_type, true AS from_friend, ${reactionCounts('visit_id', 'v.id')}, ${myReaction('visit_id', 'v.id')},'
+      '         ${reactorsOf('visit_id', 'v.id')}'
       '  FROM visits v WHERE v.user_id IN (SELECT id FROM friends)'
       '  UNION ALL'
       '  SELECT \'review\', r.id, r.user_id, r.place_id, r.updated_at, r.text,'
       '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, NULL,'
-      '         r.user_id IN (SELECT id FROM friends), ${reactionCounts('review_id', 'r.id')}, ${myReaction('review_id', 'r.id')}'
+      '         r.user_id IN (SELECT id FROM friends), ${reactionCounts('review_id', 'r.id')}, ${myReaction('review_id', 'r.id')},'
+      '         ${reactorsOf('review_id', 'r.id')}'
       '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE (r.user_id IN (SELECT id FROM friends)'
       '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}) AND ${notBlocked('r.user_id')}'
       ') f ${cursor == null ? '' : 'WHERE (f.ts, f.id) < (@ts:timestamptz, @id:uuid)'}'
@@ -96,6 +98,7 @@ void mountSocial(Router router, Deps deps) {
           // Only friends react: on posts of others around, the viewer sees none.
           reactions: r['from_friend'] as bool ? reactionsFromRow(r) : const {},
           myReaction: r['from_friend'] as bool ? r['my_reaction'] as String? : null,
+          reactors: r['from_friend'] as bool ? reactorsFromRow(r) : const [],
         ),
     ];
     final last = page.isEmpty ? null : page.last;

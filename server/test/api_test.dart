@@ -614,13 +614,17 @@ void main() {
       final (_, after) = await call('GET', '/feed', token: bob);
       final reacted = FeedPage.fromJson(after as Map<String, dynamic>).items.firstWhere((i) => i.id == review.id);
       expect([reacted.reactions, reacted.myReaction], [{'🙋': 1}, '🙋'], reason: 'one per person, the last one counts');
+      expect(reacted.reactors, isEmpty, reason: 'oneself is not named');
 
       final (_, myReviews) = await call('GET', '/me/reviews', token: anna);
       expect((myReviews as List).single['reactions'], {'🙋': 1});
+      expect(myReviews.single['reactors'], [
+        {'emoji': '🙋', 'user': {'id': bobUser.id, 'displayName': 'Bob', 'reviewedPlaces': 0}},
+      ], reason: 'the author sees which friends reacted');
       final (_, myVisits) = await call('GET', '/me/visits', token: anna);
       expect((myVisits as List).firstWhere((v) => v['id'] == visit.id)['reactions'], {'🥙': 1});
       final (_, shop) = await call('GET', '/places/place-kebap/reviews', token: bob);
-      expect((shop as List).single.containsKey('reactions'), isFalse);
+      expect((shop as List).single.keys, isNot(anyOf(contains('reactions'), contains('reactors'))));
 
       expect((await call('DELETE', '/reviews/${review.id}/reaction', token: bob)).$1, 204);
       final (_, cleared) = await call('GET', '/feed', token: bob);

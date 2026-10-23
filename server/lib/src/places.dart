@@ -14,6 +14,7 @@ import 'google_places.dart';
 import 'http.dart';
 import 'moderation.dart';
 import 'push.dart';
+import 'social.dart';
 
 const liveStatusDuration = Duration(hours: 1);
 const _maxSyncSpanDeg = 0.5;
@@ -72,6 +73,16 @@ String reactionCounts(String column, String id) => '(SELECT jsonb_object_agg(emo
 String myReaction(String column, String id) =>
     '(SELECT emoji FROM reactions WHERE $column = $id AND user_id = @me:uuid) AS my_reaction';
 
+/// Select expression: who reacted to [column] = [id], oldest first. Only friends of `@me`
+/// are named, so it needs [friendIdsCte].
+String reactorsOf(String column, String id) => '(SELECT jsonb_agg(jsonb_build_object(\'emoji\', x.emoji, '
+    '\'user\', jsonb_build_object(\'id\', u.id, \'displayName\', u.display_name)) ORDER BY x.created_at) '
+    'FROM reactions x JOIN users u ON u.id = x.user_id WHERE x.$column = $id AND x.user_id IN (SELECT id FROM friends)) AS reactors';
+
+/// The `reactors` column of [reactorsOf].
+List<Reactor> reactorsFromRow(Map<String, dynamic> row) =>
+    [for (final r in row['reactors'] as List? ?? const []) Reactor.fromJson((r as Map).cast<String, dynamic>())];
+
 /// The `reactions` column of [reactionCounts], empty where the query has none.
 Map<String, int> reactionsFromRow(Map<String, dynamic> row) =>
     {...?(row['reactions'] as Map?)?.map((emoji, n) => MapEntry(emoji as String, n as int))};
@@ -109,6 +120,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       createdAt: row['created_at'] as DateTime,
       updatedAt: row['updated_at'] as DateTime,
       reactions: reactionsFromRow(row),
+      reactors: reactorsFromRow(row),
     );
 
 VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
@@ -120,6 +132,7 @@ VisitDto visitFromRow(Map<String, dynamic> row) => VisitDto(
       visitedAt: row['visited_at'] as DateTime,
       foodType: row['food_type'] as String?,
       reactions: reactionsFromRow(row),
+      reactors: reactorsFromRow(row),
     );
 
 final _reviewSelect = 'SELECT r.*, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, u.display_name, '
@@ -434,8 +447,9 @@ void mountPlaces(Router router, Deps deps) {
     // With the friends' reactions, which only the author sees outside the feed.
     final rows = await query(
       deps.db,
-      'SELECT v.*, ${reactionCounts('visit_id', 'v.id')} FROM ($_visitSelect WHERE v.user_id = @user:uuid) v ORDER BY v.visited_at DESC',
-      {'user': user.id},
+      '$friendIdsCte SELECT v.*, ${reactionCounts('visit_id', 'v.id')}, ${reactorsOf('visit_id', 'v.id')} '
+      'FROM ($_visitSelect WHERE v.user_id = @me:uuid) v ORDER BY v.visited_at DESC',
+      {'me': user.id},
     );
     return json(rows.map((r) => visitFromRow(r).toJson()).toList());
   });
@@ -444,8 +458,9 @@ void mountPlaces(Router router, Deps deps) {
     final user = await requireUser(deps, request);
     final rows = await query(
       deps.db,
-      'SELECT r.*, ${reactionCounts('review_id', 'r.id')} FROM ($_reviewSelect WHERE r.user_id = @user:uuid) r ORDER BY r.updated_at DESC',
-      {'user': user.id},
+      '$friendIdsCte SELECT r.*, ${reactionCounts('review_id', 'r.id')}, ${reactorsOf('review_id', 'r.id')} '
+      'FROM ($_reviewSelect WHERE r.user_id = @me:uuid) r ORDER BY r.updated_at DESC',
+      {'me': user.id},
     );
     return json(rows.map((r) => reviewFromRow(r).toJson()).toList());
   });

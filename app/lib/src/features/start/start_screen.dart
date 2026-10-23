@@ -311,6 +311,7 @@ class _StartScreenState extends State<StartScreen> {
                             path: '/${item.type == FeedItemType.visit ? 'visits' : 'reviews'}/${item.id}',
                             reactions: item.reactions,
                             mine: item.myReaction,
+                            reactors: item.reactors,
                           )
                         : null,
                   onTap: () => showPlaceDetail(context, item.place),

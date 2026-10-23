@@ -7,12 +7,14 @@ import '../../ui/widgets.dart';
 
 /// Friends' reactions under a check-in or review. With [path] (`/visits/<id>` or
 /// `/reviews/<id>`) a tap picks one of [reactionEmojis] or takes it back; without,
-/// it only shows what others picked, as on one's own posts.
+/// it only shows what others picked, as on one's own posts. Below, who reacted: friends
+/// of the viewer by name, the others as a number.
 class ReactionBar extends StatefulWidget {
   final String? path;
   final Map<String, int> reactions;
   final String? mine;
-  const ReactionBar({super.key, this.path, required this.reactions, this.mine});
+  final List<Reactor> reactors;
+  const ReactionBar({super.key, this.path, required this.reactions, this.mine, this.reactors = const []});
 
   @override
   State<ReactionBar> createState() => _ReactionBarState();
@@ -51,7 +53,9 @@ class _ReactionBarState extends State<ReactionBar> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final emojis = widget.path == null ? [for (final e in reactionEmojis) if (_counts.containsKey(e)) e] : reactionEmojis;
-    return Wrap(spacing: 8, runSpacing: 6, children: [
+    final total = _counts.values.fold(0, (a, b) => a + b);
+    final others = total - widget.reactors.length - (_mine == null ? 0 : 1);
+    final pills = Wrap(spacing: 8, runSpacing: 6, children: [
       for (final emoji in emojis)
         Material(
           color: emoji == _mine ? context.accent.withValues(alpha: 0.12) : Colors.transparent,
@@ -65,6 +69,16 @@ class _ReactionBarState extends State<ReactionBar> {
             ),
           ),
         ),
+    ]);
+    if (widget.reactors.isEmpty) return pills;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      pills,
+      const SizedBox(height: 6),
+      Text(
+        [for (final r in widget.reactors) '${r.user.displayName} ${r.emoji}'].join(', ') +
+            (others > 0 ? ' und $others ${others == 1 ? 'weitere Person' : 'weitere'}' : ''),
+        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+      ),
     ]);
   }
 }

@@ -23,6 +23,8 @@ Map<String, int> _reactionsFromJson(Object? j) => {
         for (final e in j.entries) e.key as String: e.value as int,
     };
 
+List<Reactor> _reactorsFromJson(Object? j) => [if (j is List) for (final r in j) Reactor.fromJson(r as Json)];
+
 Map<RatingItem, double> _ratingsFromJson(Json j) => {
       ...j['ratings'] is Map
           ? _itemMap(j['ratings'], (v) => (v as num).toDouble())
@@ -468,6 +470,7 @@ class ReviewDto {
 
   /// Friends' reactions, only on one's own reviews (`/me/reviews`), never on the shop page.
   final Map<String, int> reactions;
+  final List<Reactor> reactors;
 
   const ReviewDto({
     required this.id,
@@ -492,6 +495,7 @@ class ReviewDto {
     required this.createdAt,
     required this.updatedAt,
     this.reactions = const {},
+    this.reactors = const [],
   });
 
   /// What the review shows to someone with [diet]. For the Döner the stored
@@ -521,6 +525,7 @@ class ReviewDto {
         createdAt: _date(j['createdAt']),
         updatedAt: _date(j['updatedAt']),
         reactions: _reactionsFromJson(j['reactions']),
+        reactors: _reactorsFromJson(j['reactors']),
       );
 
   Json toJson() => {
@@ -547,6 +552,7 @@ class ReviewDto {
         'createdAt': createdAt.toUtc().toIso8601String(),
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         if (reactions.isNotEmpty) 'reactions': reactions,
+        if (reactors.isNotEmpty) 'reactors': [for (final r in reactors) r.toJson()],
       };
 }
 
@@ -628,6 +634,7 @@ class VisitDto {
 
   /// Friends' reactions, only on one's own check-ins (`/me/visits`).
   final Map<String, int> reactions;
+  final List<Reactor> reactors;
 
   const VisitDto({
     required this.id,
@@ -638,6 +645,7 @@ class VisitDto {
     required this.visitedAt,
     this.foodType,
     this.reactions = const {},
+    this.reactors = const [],
   });
 
   factory VisitDto.fromJson(Json j) => VisitDto(
@@ -649,6 +657,7 @@ class VisitDto {
         visitedAt: _date(j['visitedAt']),
         foodType: j['foodType'] as String?,
         reactions: _reactionsFromJson(j['reactions']),
+        reactors: _reactorsFromJson(j['reactors']),
       );
 
   Json toJson() => {
@@ -660,6 +669,7 @@ class VisitDto {
         'visitedAt': visitedAt.toUtc().toIso8601String(),
         'foodType': foodType,
         if (reactions.isNotEmpty) 'reactions': reactions,
+        if (reactors.isNotEmpty) 'reactors': [for (final r in reactors) r.toJson()],
       };
 }
 
@@ -690,6 +700,18 @@ enum FeedItemType { visit, review }
 
 /// What friends react with to each other's check-ins and reviews, one per person and post.
 const reactionEmojis = ['🤤', '🥙', '🙋'];
+
+/// Who reacted with what. Named are only friends of whoever looks, never oneself;
+/// the others only count in the reactions.
+class Reactor {
+  final String emoji;
+  final UserDto user;
+  const Reactor({required this.emoji, required this.user});
+
+  factory Reactor.fromJson(Json j) => Reactor(emoji: j['emoji'] as String, user: UserDto.fromJson(j['user'] as Json));
+
+  Json toJson() => {'emoji': emoji, 'user': user.toJson()};
+}
 
 class ReactionRequest {
   final String emoji;
@@ -724,6 +746,7 @@ class FeedItem {
   /// {emoji: count} and the own pick; only on posts of friends, who are the only ones to react.
   final Map<String, int> reactions;
   final String? myReaction;
+  final List<Reactor> reactors;
 
   const FeedItem({
     required this.id,
@@ -741,6 +764,7 @@ class FeedItem {
     this.regular = false,
     this.reactions = const {},
     this.myReaction,
+    this.reactors = const [],
   });
 
   /// See [ReviewDto.headline].
@@ -762,6 +786,7 @@ class FeedItem {
         regular: j['regular'] as bool? ?? false,
         reactions: _reactionsFromJson(j['reactions']),
         myReaction: j['myReaction'] as String?,
+        reactors: _reactorsFromJson(j['reactors']),
       );
 
   Json toJson() => {
@@ -781,6 +806,7 @@ class FeedItem {
         'regular': regular,
         'reactions': reactions,
         'myReaction': myReaction,
+        'reactors': [for (final r in reactors) r.toJson()],
       };
 }
 

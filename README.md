@@ -205,6 +205,7 @@ server/                       Dart-API + Auslieferung der Web-App
 ├── lib/src/google_places.dart
 ├── lib/src/db.dart           SQL-Migrationen (nur anhängen, nie ändern)
 └── tool/seed_dev.dart        Test-Läden in Freiburg für Entwicklung ohne Google-Key
+cli/                          Befehlszeile `doener` gegen dieselbe API, siehe „CLI“
 packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und Ernährung (`menu.dart`), Ranking-Regel, Stufen und Essenstypen
 ```
 
@@ -317,6 +318,7 @@ In der App lässt sich die Backend-URL auch unter Einstellungen → Backend-URL 
 ```bash
 cd packages/doener_models && dart test
 cd server && TEST_DB_PORT=5434 TEST_DB_USER=doener TEST_DB_PASSWORD=doener dart test   # legt DB doener_test neu an
+cd cli && TEST_DB_PORT=5434 TEST_DB_USER=doener TEST_DB_PASSWORD=doener dart test      # legt DB doener_cli_test neu an
 cd app && flutter test
 ```
 
@@ -358,11 +360,23 @@ cd app && flutter test
 
 ---
 
+## CLI
+
+`cli/` ist die Befehlszeile der App, damit Agenten, Skripte und Tests sie über Befehle für die Sache selbst bedienen statt über die UI. Sie spricht nur mit der HTTP-API unter `/api/v1` wie die App, nie mit der Datenbank. So gelten dieselben Rechte, Rate-Limits und die geschlossene Registrierung samt Robins Freischaltung. Die DTOs kommen aus `packages/doener_models`, die Argumente liest `package:args`.
+
+- Bauen: `cd cli && mkdir -p build && dart compile exe bin/doener.dart -o build/doener`, eine einzelne Datei von gut 7 MB für die Plattform, auf der sie gebaut wird. Eingebaut ist die Live-API `https://doener-api.pleasance.org`, `--define=CLI_URL=<url>` beim Bauen nennt eine andere. `--url` wählt sie pro Aufruf, etwa `http://localhost:8080` gegen den lokalen Server, danach gilt die Adresse des letzten Logins. Ohne Bauen: `dart run bin/doener.dart <befehl>`.
+- Anmelden: `doener login` fragt nach der Adresse und dem Code aus der Mail, wie die App. `doener login --link <link>` löst einen Login-Link aus der Mail ein, `--link -` liest ihn von stdin. Danach liegt der Token dieses Geräts mit `0600` in `$XDG_CONFIG_HOME/doener/session.json` (sonst `~/.config`, unter macOS `~/Library/Application Support`, unter Windows `%APPDATA%`), zusammen mit der Adresse, an andere Adressen geht er nie. Er ist eine gewöhnliche Session als Bearer: gehasht in `sessions`, 365 Tage, verlängert sich bei Nutzung, jedes Gerät hat seine eigene. `whoami` zeigt das Konto, `logout` widerruft den Token auf dem Server und löscht die Datei, ein neuer Login widerruft den alten.
+- Befehle: `doener --help`. Kern-Feature ist `nearby --lat <breite> --lon <länge>`, die besten Läden im Umkreis wie auf Start (`/places/top`, mit `--radius`, `--by overall|vegetarian|vegan`, `--limit`).
+- Ausgabe: Text für Menschen, mit `--json` genau ein JSON-Wert auf stdout, auch Fehler als `{"error": "…"}` und die Hilfe als Liste der Befehle. Exit-Codes: 0 erledigt, 1 Fehler (auch Absagen der API wie die geschlossene Registrierung), 2 falscher Aufruf, 3 nicht angemeldet.
+- Eigene Befehle: Datei in `cli/lib/src/commands` nach dem Beispiel `nearby.dart` und in `commands` in `cli/lib/cli.dart` eintragen. Ein Befehl nennt Hilfezeilen, Optionen und `run`. Das ruft über `ctx.api` die API auf, liest die Antwort mit dem `fromJson` des Modells (`parse`) und gibt `(data:, text:)` zurück, `data` für `--json`. `currentUser(ctx)` verlangt den Login, Fehler enden als `Failure` mit einem Code aus `Exit`. Die Tests in `cli/test/cli_test.dart` rufen die CLI im Prozess gegen den echten Server auf einem freien Port auf, mit eigener Testdatenbank.
+- Agenten: nur mit dem Testkonto admin@pleasance.org, nie mit Kundenkonten. Den Token holen sie über den Login-Link aus dem Kontor, per Pipe, so steht der Link nicht in ihrem Kontext: `login-link doener | cli/build/doener login --link -`. Danach bleibt die CLI auf diesem Rechner angemeldet.
+- Verteilen: Die CI baut die Datei bei jedem Lauf zur Probe, veröffentlicht sie aber nicht. Release-Artefakte erst, wenn die CLI an Menschen außerhalb des Repos geht.
+
 ## Deployment
 
 | Workflow | Auslöser | Macht |
 |---|---|---|
-| `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres) und App |
+| `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres), CLI und App, dazu ein Probe-Build der CLI |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
 | `mobile.yml` | Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
 | `secrets.yml` | Jeder Push auf jedem Branch, PRs aus Forks | Secret-Scan mit gitleaks, siehe unten |

@@ -2,7 +2,7 @@
 
 ## Zweck & Links
 
-- Döner-Community für iOS, Android und Web aus einer Flutter-Codebase, Server in Dart. Web und API laufen unter https://doener-api.pleasance.org (Landingpage unter `/` und `/en`, API unter `/api/v1`, Web-App unter `/app`).
+- Döner-Community für iOS, Android und Web aus einer Flutter-Codebase, Server in Dart, Befehlszeile `doener` in `cli/`. Web und API laufen unter https://doener-api.pleasance.org (Landingpage unter `/` und `/en`, API unter `/api/v1`, Web-App unter `/app`).
 - Coolify auf VPS 1, Projekt `pleasance-doener`, Datenbank `doener-db`.
 - Öffentlicher TestFlight-Link: https://testflight.apple.com/join/nJJ5wARs (externe Gruppe „Erste Tester“). Er steht als `APP_DOWNLOAD_URL` in Coolify und in der Mail einer Einladung ohne Android. `/i/<code>` und `/b/<placeId>` führen statt dorthin zur Bewerbung, weil ohne Konto nichts geht.
 - Fachliche Regeln und der geplante Umbau: README.md.
@@ -12,8 +12,11 @@
 ```sh
 (cd packages/doener_models && dart pub get && dart analyze && dart test) &&
 (cd server && dart pub get && dart analyze && dart test) &&
+(cd cli && dart pub get && dart analyze && dart test && mkdir -p build && dart compile exe bin/doener.dart -o build/doener) &&
 (cd app && flutter pub get && flutter analyze && flutter test)
 ```
+
+Server- und CLI-Tests brauchen Postgres über `TEST_DB_PORT` (README, „Tests“), sonst überspringen sie sich.
 
 ## Deploy
 
@@ -44,6 +47,7 @@
 - Das Repo ist öffentlich, auch seine CI-Logs. `secrets.yml` scannt jeden Push und PR mit gitleaks (README, „Secret-Scan“). Fehlalarme eng abfangen, per Fingerprint in `.gitleaksignore` oder per Pfad und Regel in `.gitleaks.toml`, nie eine Regel ganz abschalten. Ein echter Fund ist schon öffentlich: das Secret sofort rotieren.
 - Keine Secrets im Client: Alles in Web-Bundle und App lässt sich auslesen, mit LLMs auch aus kompilierten Apps. Berechtigungen prüft nur der Server. Die Maps- und Firebase-Keys im Client sind per Referrer, Bundle-ID bzw. Paketname beschränkt. Release-Builds der App laufen mit `--obfuscate --split-debug-info`, das macht sie kleiner und nimmt Klassen- und Funktionsnamen heraus, ist aber kein Schutz. Weitere Verschleierung (String-Verschlüsselung, kommerzielle Tools) nicht. Stacktraces symbolisieren: README, „Deployment“.
 - Für Agenten lesbar (README, „Für Agenten“): Jede öffentliche Seite mit eigenem Inhalt steht in `publicPages` in `server/lib/src/agents.dart`, mit Titel, Beschreibung und Inhalt als Markdown, auf Deutsch und Englisch. Daraus entstehen `/llms.txt`, `/llms-full.txt` und `<seite>.md`. Eine neue öffentliche Seite kommt im selben Zug dazu. Hinein kommt nur, was jeder ohne Login sieht: keine einzelnen Bewertungen (auch keine Zitate), keine Profile, keine Einladungen, nichts unter `/app` oder `/api`.
+- CLI (README, „CLI“): Jedes Kern-Feature bekommt im selben Zug einen Befehl in `cli/lib/src/commands` nach dem Beispiel `nearby.dart`, mit Text und `--json` und einem Test in `cli/test/cli_test.dart`. Die CLI spricht nur mit der HTTP-API, nie mit der Datenbank, so gelten Rechte, Rate-Limits und die Registrierungssperre. Agenten melden sie nur mit admin@pleasance.org an (`login-link doener | cli/build/doener login --link -`), nie mit Kundenkonten.
 
 ## Abweichungen vom Standard
 
@@ -54,3 +58,4 @@
 - TestFlight: Das Freischalten unter Profil → Tester lädt iPhones über die App Store Connect API in „Erste Tester“ ein, der Key liegt dafür auch in Coolify (`ASC_*`).
 
 - Zeitpläne laufen in der API statt in einem eigenen Worker: Jede Instanz fragt jede Minute `runSchedule` (Tabelle `schedules`), der atomare Claim lässt genau eine den Job ausführen. Ein neuer Job bekommt seine Zeile per Migration. Ein Worker als zweite Coolify-Anwendung bräuchte Kopien von DB-Zugang und Google-Key, die Agenten über die Coolify-API nicht lesen können.
+- CLI in Dart unter `cli/` statt mit Bun in `apps/cli`, weil Server und Modelle hier Dart sind. Nur Deutsch wie die App, und ohne ALTCHA, weil `/auth/login` hier keins verlangt.

@@ -35,6 +35,14 @@ jobs:
           TEST_DB_PASSWORD: postgres
         run: dart pub get && dart analyze && dart test
 
+      # The CLI against the server in-process, then built once to check it compiles (README, „CLI“)
+      - name: CLI
+        working-directory: cli
+        env:
+          TEST_DB_PORT: 5432
+          TEST_DB_PASSWORD: postgres
+        run: dart pub get && dart analyze && dart test && mkdir -p build && dart compile exe bin/doener.dart -o build/doener
+
       - name: App
         working-directory: app
         run: flutter pub get && flutter analyze && flutter test

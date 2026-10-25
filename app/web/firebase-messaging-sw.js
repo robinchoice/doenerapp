@@ -33,11 +33,23 @@ firebase.messaging().onBackgroundMessage(async (payload) => {
   } catch (_) {
     // Offline or no key yet: the neutral text stays.
   }
-  await self.registration.showNotification(title, { body, icon: '/icons/Icon-192.png', tag: id, data: { placeId } });
+  // The same event again (friends checking in close together) replaces it.
+  await self.registration.showNotification(title, {
+    body,
+    icon: '/icons/Icon-192.png',
+    tag: id,
+    renotify: true,
+    actions: [{ action: 'less', title: 'Weniger davon' }],
+    data: { placeId, type, id },
+  });
 });
 
+// "Weniger davon" asks in the app what to leave out (main.dart, ?less=).
 self.addEventListener('notificationclick', (event) => {
-  const placeId = event.notification.data && event.notification.data.placeId;
+  const { placeId, type, id } = event.notification.data || {};
   event.notification.close();
-  event.waitUntil(clients.openWindow(placeId ? `/app?place=${encodeURIComponent(placeId)}` : '/app'));
+  const url = event.action === 'less' && type && id
+    ? `/app?less=${encodeURIComponent(`${type}:${id}`)}`
+    : placeId ? `/app?place=${encodeURIComponent(placeId)}` : '/app';
+  event.waitUntil(clients.openWindow(url));
 });

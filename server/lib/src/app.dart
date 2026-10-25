@@ -9,6 +9,7 @@ import 'auth.dart';
 import 'best_of.dart';
 import 'deps.dart';
 import 'http.dart';
+import 'inbox.dart';
 import 'landing.dart';
 import 'moderation.dart';
 import 'places.dart';
@@ -70,6 +71,7 @@ Handler buildHandler(Deps deps) {
   mountSocial(api, deps);
   mountModeration(api, deps);
   mountPush(api, deps);
+  mountInbox(api, deps);
   mountUpdates(api, deps);
   mountTesterRequests(api, deps);
 

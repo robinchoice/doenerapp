@@ -21,9 +21,29 @@ const reminderDelay = Duration(minutes: 30);
 /// app has handled it.
 final notificationTapped = ValueNotifier<String?>(null);
 
+/// The action "Weniger davon" on a push; its payload comes with this prefix.
+const lessAction = 'less';
+
+/// Every set-up uses these. iOS knows the action only from its category.
+final notificationSettings = InitializationSettings(
+  android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+  // Asked for with the first check-in or push, not on start.
+  iOS: DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+    notificationCategories: [
+      DarwinNotificationCategory('push', actions: [
+        DarwinNotificationAction.plain(lessAction, 'Weniger davon', options: {DarwinNotificationActionOption.foreground}),
+      ]),
+    ],
+  ),
+);
+
 /// The plugin's tap callback. Every set-up passes this one, so a push that sets
 /// the plugin up again in the background (push.dart) doesn't lose the taps.
-void onNotificationTapped(NotificationResponse response) => notificationTapped.value = response.payload;
+void onNotificationTapped(NotificationResponse response) =>
+    notificationTapped.value = response.actionId == lessAction ? '$lessAction:${response.payload}' : response.payload;
 
 /// "Wie war's bei X?" half an hour after a check-in, as a local notification
 /// on iOS and Android. Browsers can't schedule notifications; there the card
@@ -50,20 +70,9 @@ class Reminders {
     tz.initializeTimeZones();
     final zone = (await FlutterTimezone.getLocalTimezone()).identifier;
     tz.setLocalLocation(tz.timeZoneDatabase.locations[zone] ?? tz.UTC);
-    await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        // Asked for with the first check-in, not on start.
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestBadgePermission: false,
-          requestSoundPermission: false,
-        ),
-      ),
-      onDidReceiveNotificationResponse: onNotificationTapped,
-    );
+    await _plugin.initialize(settings: notificationSettings, onDidReceiveNotificationResponse: onNotificationTapped);
     final launch = await _plugin.getNotificationAppLaunchDetails();
-    if (launch?.didNotificationLaunchApp ?? false) opened.value = launch!.notificationResponse?.payload;
+    if (launch?.notificationResponse case final response? when launch!.didNotificationLaunchApp) onNotificationTapped(response);
   }
 
   Future<void> schedule(PlaceDto place, DateTime visitedAt, {double? rating}) async {

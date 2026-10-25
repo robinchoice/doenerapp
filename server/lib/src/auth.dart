@@ -41,7 +41,9 @@ const signupClosed = ApiException.forbidden(
 );
 
 const _accountColumns =
-    'id, email, display_name, diet, expert_mode, push_friends, push_new_places, updates_consent_at IS NOT NULL AS update_mails';
+    'id, email, display_name, diet, expert_mode, push_friends, push_new_places, updates_consent_at IS NOT NULL AS update_mails, '
+    'CASE WHEN push_paused_until > now() THEN push_paused_until END AS push_paused_until, '
+    'quiet_hours, quiet_days, quiet_start, quiet_end';
 
 AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       id: row['id'] as String,
@@ -52,6 +54,11 @@ AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       pushFriends: row['push_friends'] as bool,
       pushNewPlaces: row['push_new_places'] as bool,
       updateMails: row['update_mails'] as bool,
+      pushPausedUntil: row['push_paused_until'] as DateTime?,
+      quietHours: row['quiet_hours'] as bool,
+      quietDays: row['quiet_days'] as int,
+      quietStart: row['quiet_start'] as int,
+      quietEnd: row['quiet_end'] as int,
     );
 
 class AuthUser {
@@ -71,6 +78,8 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
     deps.db,
     'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places, '
     'u.updates_consent_at IS NOT NULL AS update_mails, '
+    'CASE WHEN u.push_paused_until > now() THEN u.push_paused_until END AS push_paused_until, '
+    'u.quiet_hours, u.quiet_days, u.quiet_start, u.quiet_end, '
     's.expires_at AS session_expires_at FROM sessions s '
     'JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
@@ -151,21 +160,28 @@ void mountAuth(Router router, Deps deps) {
     return noContent();
   });
 
-  // PATCH /users/me — name, diet, expert mode, push settings, news by mail;
-  // only what is set changes. Switching the mails on keeps the time of the
-  // first consent as proof.
+  // PATCH /users/me — name, diet, expert mode, push settings, pause and quiet
+  // hours, news by mail; only what is set changes. Switching the mails on
+  // keeps the time of the first consent as proof.
   router.patch('/users/me', (Request request) async {
     final user = await requireUser(deps, request);
     final body = await readBody(request, UpdateMeRequest.fromJson);
     final error = body.displayName == null ? null : Validation.displayNameError(body.displayName!);
     if (error != null) throw ApiException.badRequest(error);
+    bool minute(int? m) => m == null || (m >= 0 && m < 24 * 60);
+    if (!minute(body.quietStart) || !minute(body.quietEnd) || (body.quietDays != null && (body.quietDays! < 0 || body.quietDays! > 127))) {
+      throw const ApiException.badRequest('Ungültige Ruhezeiten');
+    }
     try {
       final row = await queryOne(
         deps.db,
         'UPDATE users SET display_name = coalesce(@name:text, display_name), diet = coalesce(@diet:text, diet), '
         'expert_mode = coalesce(@expert:boolean, expert_mode), push_friends = coalesce(@friends:boolean, push_friends), '
         'push_new_places = coalesce(@places:boolean, push_new_places), updates_consent_at = CASE '
-        'WHEN @mails:boolean IS NULL THEN updates_consent_at WHEN @mails:boolean THEN coalesce(updates_consent_at, now()) END '
+        'WHEN @mails:boolean IS NULL THEN updates_consent_at WHEN @mails:boolean THEN coalesce(updates_consent_at, now()) END, '
+        'push_paused_until = coalesce(@paused:timestamptz, push_paused_until), quiet_hours = coalesce(@quiet:boolean, quiet_hours), '
+        'quiet_days = coalesce(@days:int2, quiet_days), quiet_start = coalesce(@start:int2, quiet_start), '
+        'quiet_end = coalesce(@end:int2, quiet_end) '
         'WHERE id = @id:uuid '
         'RETURNING $_accountColumns',
         {
@@ -175,6 +191,11 @@ void mountAuth(Router router, Deps deps) {
           'friends': body.pushFriends,
           'places': body.pushNewPlaces,
           'mails': body.updateMails,
+          'paused': body.pushPausedUntil,
+          'quiet': body.quietHours,
+          'days': body.quietDays,
+          'start': body.quietStart,
+          'end': body.quietEnd,
           'id': user.id,
         },
       );

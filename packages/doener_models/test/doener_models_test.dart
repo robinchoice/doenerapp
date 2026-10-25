@@ -225,7 +225,17 @@ void main() {
     expect(account.diet, Diet.all);
     expect(account.expertMode, isFalse);
     expect(account.admin, isFalse);
+    expect([account.quietHours, account.quietDays, account.quietStart, account.quietEnd], [true, 127, 1320, 480]);
+    expect(account.pushPaused, isFalse);
     expect(const UpdateMeRequest(diet: Diet.vegan).toJson(), {'diet': 'vegan'});
+  });
+
+  test('the bell counts what came after it was last opened', () {
+    final seen = DateTime.utc(2026, 10, 26, 8);
+    InboxItemDto item(int hour) => InboxItemDto(type: 'news', id: '$hour', timestamp: DateTime.utc(2026, 10, 26, hour), title: 'x');
+    final inbox = InboxDto.fromJson(InboxDto(items: [item(9), item(7)], seenAt: seen).toJson());
+    expect(inbox.unread, 1);
+    expect(InboxDto(items: [item(9), item(7)]).unread, 2, reason: 'never opened');
   });
 
   test('login requests from shipped clients carry no invite code', () {

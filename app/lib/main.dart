@@ -64,6 +64,9 @@ Future<void> startApp() async {
   // A push tapped in the browser (web/firebase-messaging-sw.js) opens ?place=<placeId>.
   final placeFromPush = kIsWeb ? Uri.base.queryParameters['place'] : null;
   if (placeFromPush != null) push?.opened.value = placeFromPush;
+  // "Weniger davon" on a push in the browser opens ?less=<type>:<event ID>.
+  final lessFromPush = kIsWeb ? Uri.base.queryParameters['less']?.split(':') : null;
+  if (lessFromPush != null && lessFromPush.length == 2) push?.less.value = (lessFromPush[0], lessFromPush[1]);
   final inviteCode = await pendingInviteRecord.get(db) as String?;
   final invitePromptDone = await settingsStore.record('invitePromptDone').get(db) == true;
 

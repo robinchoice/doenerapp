@@ -68,9 +68,21 @@ class Session extends ChangeNotifier {
     await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));
   }
 
-  /// Diet, expert mode, push settings and news by mail follow the account. The
-  /// change shows right away and is taken back if the server doesn't take it.
-  Future<void> updateSettings({Diet? diet, bool? expertMode, bool? pushFriends, bool? pushNewPlaces, bool? updateMails}) async {
+  /// Diet, expert mode, push settings, pause, quiet hours and news by mail
+  /// follow the account. The change shows right away and is taken back if
+  /// the server doesn't take it. A [pushPausedUntil] that has passed resumes.
+  Future<void> updateSettings({
+    Diet? diet,
+    bool? expertMode,
+    bool? pushFriends,
+    bool? pushNewPlaces,
+    bool? updateMails,
+    DateTime? pushPausedUntil,
+    bool? quietHours,
+    int? quietDays,
+    int? quietStart,
+    int? quietEnd,
+  }) async {
     final previous = user!;
     await _setUser(AccountDto(
       id: previous.id,
@@ -81,6 +93,11 @@ class Session extends ChangeNotifier {
       pushFriends: pushFriends ?? previous.pushFriends,
       pushNewPlaces: pushNewPlaces ?? previous.pushNewPlaces,
       updateMails: updateMails ?? previous.updateMails,
+      pushPausedUntil: pushPausedUntil ?? previous.pushPausedUntil,
+      quietHours: quietHours ?? previous.quietHours,
+      quietDays: quietDays ?? previous.quietDays,
+      quietStart: quietStart ?? previous.quietStart,
+      quietEnd: quietEnd ?? previous.quietEnd,
     ));
     try {
       final json = await api.patch(
@@ -91,6 +108,11 @@ class Session extends ChangeNotifier {
           pushFriends: pushFriends,
           pushNewPlaces: pushNewPlaces,
           updateMails: updateMails,
+          pushPausedUntil: pushPausedUntil,
+          quietHours: quietHours,
+          quietDays: quietDays,
+          quietStart: quietStart,
+          quietEnd: quietEnd,
         ).toJson(),
       );
       await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));

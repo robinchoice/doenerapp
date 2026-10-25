@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:doener_app/src/core/app_data.dart';
 import 'package:doener_app/src/core/location.dart';
 import 'package:doener_app/src/core/session.dart';
+import 'package:doener_app/src/features/inbox/inbox.dart';
 import 'package:doener_app/src/features/place/check_in_sheet.dart';
 import 'package:doener_app/src/features/ranking/ranking_screen.dart';
+import 'package:doener_app/src/features/settings/quiet_hours.dart';
 import 'package:doener_app/src/features/social/friends.dart';
 import 'package:doener_app/src/features/start/start_screen.dart';
 import 'package:doener_app/src/ui/widgets.dart';
@@ -28,6 +30,7 @@ const _meatOnly = PlaceDto(placeId: 'p3', name: 'Fleischerei Grill', latitude: 4
 
 class FakeServer {
   final requests = <Uri>[];
+  final settings = <Map<String, dynamic>>[];
 
   Iterable<Uri> calls(String path) => requests.where((u) => u.path == '/api/v1$path');
 
@@ -48,6 +51,7 @@ class FakeServer {
         foodType: body.foodType,
       ).toJson());
     }
+    if (path == '/users/me') settings.add(jsonDecode(request.body) as Map<String, dynamic>);
     return switch (path) {
       '/auth/verify' => json(const AuthResponse(token: 't', user: _me, isNewUser: false).toJson()),
       '/users/me' => json(AccountDto(
@@ -56,6 +60,10 @@ class FakeServer {
           diet: Diet.values.byName((jsonDecode(request.body) as Map<String, dynamic>)['diet'] as String? ?? 'all'),
           updateMails: (jsonDecode(request.body) as Map<String, dynamic>)['updateMails'] as bool? ?? false,
         ).toJson()),
+      '/me/inbox' => json(InboxDto(seenAt: now.subtract(const Duration(hours: 1)), items: [
+          InboxItemDto(type: 'friend_visit', id: 'v1', timestamp: now, title: 'Tom hat bei Kebap Haus eingecheckt', placeId: 'p1', userId: 'u2', userName: 'Tom'),
+          InboxItemDto(type: 'news', id: 'n1', timestamp: now.subtract(const Duration(days: 2)), title: 'Neu in der Döner App', body: 'Die Glocke'),
+        ]).toJson()),
       '/updates/current' => json(const UpdateDto(id: 'n1', title: 'Neuigkeiten in der App', features: ['Eine Karte auf Start']).toJson()),
       '/places/new' => json(NewPlacesDto(
           opened: [PlaceDto(placeId: 'p4', name: 'Anatolia Grill', latitude: 48, longitude: 7.86, city: 'Freiburg', openedOn: DateTime(2026, 10, 2))],
@@ -158,6 +166,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Neuigkeiten in der App'), findsNothing);
     expect(server.calls('/updates/n1/dismiss'), hasLength(1));
+  });
+
+  testWidgets('the bell shows what is new, marks it seen and offers less of it', (tester) async {
+    final server = await _pump(tester, StartScreen(onOpenMap: () {}), position: const LatLng(48, 7.85));
+    expect(find.descendant(of: find.byType(InboxButton), matching: find.text('1')), findsOneWidget, reason: 'one since last time');
+
+    await tester.runAsync(() async {
+      await tester.tap(find.byType(InboxButton));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('Tom hat bei Kebap Haus eingecheckt'), findsOneWidget);
+    expect(find.text('Neu in der Döner App'), findsOneWidget);
+    expect(server.calls('/me/inbox/seen'), hasLength(1));
+
+    await tester.tap(find.byTooltip('Weniger davon'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tom stummschalten'), findsOneWidget);
+    expect(find.text('Keine neuen Läden mehr'), findsNothing);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Übernehmen'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(server.calls('/me/mutes/u2'), hasLength(1));
+    expect(find.text('Tom ist stumm. Rückgängig unter Freunde.'), findsOneWidget);
+  });
+
+  testWidgets('quiet hours: days and the summary in the settings', (tester) async {
+    final server = await _pump(tester, const QuietHoursScreen());
+    expect(quietHoursText(const AccountDto(id: 'u1', displayName: 'Robin')), 'Jeden Tag 22–8 Uhr');
+    expect(quietHoursText(const AccountDto(id: 'u1', displayName: 'Robin', quietDays: 31, quietStart: 1350)), 'Mo–Fr 22:30–8:00 Uhr');
+    expect(quietHoursText(const AccountDto(id: 'u1', displayName: 'Robin', quietHours: false)), 'Aus');
+    expect(find.text('22:00 Uhr'), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Sa'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(server.settings.last, {'quietDays': 127 ^ 32});
   });
 
   testWidgets('ranking shows the city, the friends per place and switches dimensions', (tester) async {

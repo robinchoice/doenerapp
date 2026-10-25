@@ -11,6 +11,7 @@ import '../../core/maps.dart';
 import '../../core/reminders.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
+import '../inbox/inbox.dart';
 import '../news/news.dart';
 import '../place/place_detail.dart';
 import '../place/review_sheet.dart';
@@ -206,6 +207,7 @@ class _StartScreenState extends State<StartScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Row(children: [BrandTile(size: 30), SizedBox(width: 10), Text('Döner App')]),
+        actions: const [InboxButton(), SizedBox(width: 8)],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,

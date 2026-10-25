@@ -438,6 +438,8 @@ void main() {
     });
 
     test('push: friends hear about a check-in happening now, at most every 3 hours', () async {
+      // Quiet hours are on by default; this test may run at night.
+      await call('PATCH', '/users/me', body: {'quietHours': false}, token: bob);
       final key = 'k' * 43;
       final token = {'token': 'tok-bob', 'platform': 'android', 'latitude': 48.0, 'longitude': 7.85, 'fetchKey': key};
       expect((await call('PUT', '/me/push-token', body: token, token: bob)).$1, 204);
@@ -514,6 +516,88 @@ void main() {
       expect(pusher.sent.last.data, isEmpty);
       expect((await call('DELETE', '/me/push-tokens/tok-bob', token: bob)).$1, 204);
       expect((await db.execute('SELECT count(*)::int FROM push_tokens')).first.first, 0);
+    });
+
+    test('quiet hours: a window over midnight counts for the day it starts on', () async {
+      Future<bool> quiet(int days, int start, int end, String local) async => (await db.execute(
+            Sql.named('SELECT in_quiet_hours(@d:int4, @s:int4, @e:int4, @l:text::timestamp)'),
+            parameters: {'d': days, 's': start, 'e': end, 'l': local},
+          ))
+              .single
+              .single as bool;
+      // 26.10.2026 is a Monday.
+      expect(await quiet(127, 1320, 480, '2026-10-26 23:30'), isTrue);
+      expect(await quiet(127, 1320, 480, '2026-10-26 07:59'), isTrue);
+      expect(await quiet(127, 1320, 480, '2026-10-26 08:00'), isFalse);
+      expect(await quiet(127, 1320, 480, '2026-10-26 21:59'), isFalse);
+      const weekdays = 31;
+      expect(await quiet(weekdays, 1320, 480, '2026-10-31 23:00'), isFalse, reason: 'Saturday night is free');
+      expect(await quiet(weekdays, 1320, 480, '2026-10-31 07:00'), isTrue, reason: "Friday's night");
+      expect(await quiet(weekdays, 1320, 480, '2026-11-02 07:00'), isFalse, reason: "Sunday's night");
+      expect(await quiet(1, 780, 840, '2026-10-26 13:30'), isTrue);
+      expect(await quiet(1, 780, 840, '2026-10-27 13:30'), isFalse);
+      expect(await quiet(127, 600, 600, '2026-10-26 10:00'), isFalse, reason: 'an empty window');
+    });
+
+    test('push: pause and quiet hours hold check-ins back, friends close together become one notification', () async {
+      final (dora, doraUser) = await signUp('dora@example.org', 'Dora');
+      final key = 'q' * 43;
+      final device = {'token': 'tok-dora-2', 'platform': 'ios', 'fetchKey': key, 'timeZone': 'Asia/Tokyo'};
+      expect((await call('PUT', '/me/push-token', body: device, token: dora)).$1, 204);
+      Future<Object?> zone() async =>
+          (await db.execute(Sql.named('SELECT time_zone FROM users WHERE id = @id:uuid'), parameters: {'id': doraUser.id})).single.single;
+      expect(await zone(), 'Asia/Tokyo');
+      await call('PUT', '/me/push-token', body: {...device, 'timeZone': 'Mars/Olympus'}, token: dora);
+      expect(await zone(), 'Asia/Tokyo', reason: 'unknown zones are ignored');
+      await call('PUT', '/me/push-token', body: {...device, 'timeZone': 'Europe/Berlin'}, token: dora);
+
+      final (emil, emilUser) = await signUp('emil@example.org', 'Emil');
+      final (carl, carlUser) = await signUp('carl@example.org', 'Carl');
+      for (final (token, user) in [(emil, emilUser), (carl, carlUser)]) {
+        await call('POST', '/friends/requests', body: {'userId': doraUser.id}, token: token);
+        await call('POST', '/friends/requests', body: {'userId': user.id}, token: dora);
+      }
+
+      var n = 0;
+      Future<int> checkIn(String token) async {
+        n++;
+        await db.execute('UPDATE users SET check_in_pushed_at = NULL');
+        final before = pusher.sent.length;
+        final visit = {'id': '33333333-3333-4333-8333-${'$n'.padLeft(12, '0')}', 'visitedAt': DateTime.now().toUtc().toIso8601String()};
+        expect((await call('POST', '/places/place-kebap/visits', body: visit, token: token)).$1, 201);
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        return pusher.sent.length - before;
+      }
+
+      final paused = DateTime.now().toUtc().add(const Duration(hours: 1));
+      final (_, me) = await call('PATCH', '/users/me', body: {'pushPausedUntil': paused.toIso8601String()}, token: dora);
+      expect(AccountDto.fromJson(me as Map<String, dynamic>).pushPaused, isTrue);
+      expect(await checkIn(emil), 0, reason: 'paused');
+      final (_, resumed) = await call('PATCH', '/users/me', body: {'pushPausedUntil': DateTime.now().toUtc().toIso8601String()}, token: dora);
+      expect(resumed['pushPausedUntil'], isNull);
+
+      final berlin = await db.execute(
+          "SELECT (extract(hour FROM now() AT TIME ZONE 'Europe/Berlin') * 60 + extract(minute FROM now() AT TIME ZONE 'Europe/Berlin'))::int");
+      final minute = berlin.single.single as int;
+      final window = {'quietHours': true, 'quietDays': 127, 'quietStart': minute, 'quietEnd': (minute + 60) % 1440};
+      final (_, quiet) = await call('PATCH', '/users/me', body: window, token: dora);
+      expect([quiet['quietStart'], quiet['quietEnd']], [window['quietStart'], window['quietEnd']]);
+      expect(await checkIn(emil), 0, reason: 'quiet hours');
+      await call('PATCH', '/users/me', body: {'quietHours': false}, token: dora);
+
+      await db.execute(Sql.named('DELETE FROM push_events WHERE user_id = @id:uuid'), parameters: {'id': doraUser.id});
+      expect(await checkIn(emil), 1);
+      final first = pusher.sent.last.data['id']!;
+      expect(await checkIn(carl), 1);
+      expect(pusher.sent.last.data['id'], first, reason: 'replaces the notification');
+      final details = PushEventDto.fromJson((await pushEvent(first, key)).$2 as Map<String, dynamic>);
+      expect(details.title, 'Emil und Carl essen gerade 🥙');
+      expect(details.body, startsWith('zuletzt Carl bei Kebap Haus'));
+      expect([details.actorId, details.actorName], [emilUser.id, 'Emil'], reason: 'for "Weniger davon"');
+
+      expect((await call('PATCH', '/users/me', body: {'quietDays': 128}, token: dora)).$1, 400);
+      expect((await call('PATCH', '/users/me', body: {'quietStart': 1440}, token: dora)).$1, 400);
+      expect((await call('DELETE', '/me/push-tokens/tok-dora-2', token: dora)).$1, 204);
     });
 
     test('reviews upsert and feed community data', () async {
@@ -629,6 +713,33 @@ void main() {
       expect((await call('DELETE', '/reviews/${review.id}/reaction', token: bob)).$1, 204);
       final (_, cleared) = await call('GET', '/feed', token: bob);
       expect(FeedPage.fromJson(cleared as Map<String, dynamic>).items.firstWhere((i) => i.id == review.id).reactions, isEmpty);
+    });
+
+    test('the bell: what friends did, reactions and requests, seen on every device', () async {
+      final (_, forBob) = await call('GET', '/me/inbox', token: bob);
+      final bobs = InboxDto.fromJson(forBob as Map<String, dynamic>);
+      expect(bobs.items.map((i) => i.title), containsAll(['Anna hat bei Kebap Haus eingecheckt', 'Anna hat Kebap Haus bewertet']));
+      expect(bobs.items.first.placeId, 'place-kebap');
+      expect(bobs.unread, bobs.items.length, reason: 'never opened');
+
+      final (sven, svenUser) = await signUp('sven@example.org', 'Sven');
+      await call('POST', '/friends/requests', body: {'userId': annaUser.id}, token: sven);
+      final (_, forAnna) = await call('GET', '/me/inbox', token: anna);
+      final annas = InboxDto.fromJson(forAnna as Map<String, dynamic>);
+      expect(annas.items.map((i) => i.title), containsAll(['Sven möchte mit dir befreundet sein', 'Bob reagiert 🥙 auf deinen Check-in bei Kebap Haus']));
+      expect(annas.items.where((i) => i.title.startsWith('Anna ')), isEmpty, reason: 'not her own posts');
+      expect(annas.items.firstWhere((i) => i.type == 'reaction').userId, bobUser.id);
+
+      expect((await call('PUT', '/me/blocks/${annaUser.id}', token: sven)).$1, 204);
+      final (_, blocked) = await call('GET', '/me/inbox', token: anna);
+      expect(InboxDto.fromJson(blocked as Map<String, dynamic>).items.where((i) => i.userId == svenUser.id), isEmpty);
+
+      expect((await call('POST', '/me/inbox/seen', token: bob)).$1, 204);
+      final (_, seen) = await call('GET', '/me/inbox', token: bob);
+      final after = InboxDto.fromJson(seen as Map<String, dynamic>);
+      expect(after.seenAt, isNotNull);
+      expect(after.unread, 0);
+      expect((await call('GET', '/me/inbox')).$1, 401);
     });
 
     test('reviews rate more than the Döner and tell about the place', () async {
@@ -1297,16 +1408,44 @@ void main() {
     expect((await call('GET', '/places/place-announced')).$1, 404, reason: 'not open yet');
     final (olga, _) = await signUp('olga@example.org', 'Olga');
     await call('PUT', '/me/push-token', body: {'token': 'tok-olga', 'platform': 'ios', 'latitude': 48.003, 'longitude': 7.853}, token: olga);
+    await call('PATCH', '/users/me', body: {'quietHours': false}, token: olga);
+    final (pia, piaUser) = await signUp('pia@example.org', 'Pia');
+    final piaDevice = {'token': 'tok-pia', 'platform': 'android', 'latitude': 48.003, 'longitude': 7.853, 'fetchKey': 'p' * 43};
+    await call('PUT', '/me/push-token', body: piaDevice, token: pia);
+    final pause = {'quietHours': false, 'pushPausedUntil': DateTime.now().toUtc().add(const Duration(hours: 1)).toIso8601String()};
+    await call('PATCH', '/users/me', body: pause, token: pia);
     final pushes = pusher.sent.length;
 
     await maintainPlaceCache(deps);
     expect(pusher.sent.length, pushes + 1);
-    expect(pusher.sent.last.tokens, ['tok-olga'], reason: 'everyone in the city');
+    expect(pusher.sent.last.tokens, ['tok-olga'], reason: 'everyone in the city who takes pushes now');
     expect(pusher.sent.last.title, 'Döner App', reason: 'no fetch key, neutral');
-    final event = await db.execute("SELECT title, body FROM push_events WHERE type = 'new_place'");
-    expect(event.single, ['Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht']);
+    final event = await db.execute("SELECT title, body, pending FROM push_events WHERE type = 'new_place' ORDER BY pending");
+    expect(event, [
+      ['Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht', false],
+      ['Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht', true],
+    ]);
     await maintainPlaceCache(deps);
     expect(pusher.sent.length, pushes + 1, reason: 'once per opening');
+
+    await pushPending(deps);
+    expect(pusher.sent.length, pushes + 1, reason: 'Pia is still paused');
+    await call('PATCH', '/users/me', body: {'pushPausedUntil': DateTime.now().toUtc().toIso8601String()}, token: pia);
+    await pushPending(deps);
+    expect(pusher.sent.length, pushes + 2, reason: 'after the pause');
+    expect([pusher.sent.last.tokens, pusher.sent.last.data['type']], [['tok-pia'], 'new_place']);
+    await pushPending(deps);
+    expect(pusher.sent.length, pushes + 2, reason: 'once');
+    final (_, bell) = await call('GET', '/me/inbox', token: pia);
+    expect(InboxDto.fromJson(bell as Map<String, dynamic>).items.map((i) => (i.title, i.body)),
+        contains(('Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht')));
+    await call('POST', '/me/inbox/seen', token: pia);
+    await db.execute(
+      Sql.named("UPDATE push_events SET pending = true, created_at = now() - interval '1 minute' WHERE user_id = @id:uuid"),
+      parameters: {'id': piaUser.id},
+    );
+    await pushPending(deps);
+    expect(pusher.sent.length, pushes + 2, reason: 'seen in the bell already');
 
     final after = NewPlacesDto.fromJson((await call('GET', '/places/new?lat=48&lon=7.85')).$2 as Map<String, dynamic>);
     expect(after.opened.single.placeId, 'place-announced');
@@ -1481,7 +1620,10 @@ void main() {
     await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash');
     await db.execute('ALTER TABLE users DROP COLUMN updates_consent_at, DROP COLUMN unsubscribe_token');
     await db.execute('DROP TABLE reactions');
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 3 FROM schema_migrations)');
+    await db.execute('ALTER TABLE users DROP COLUMN push_paused_until, DROP COLUMN quiet_hours, DROP COLUMN quiet_days, '
+        'DROP COLUMN quiet_start, DROP COLUMN quiet_end, DROP COLUMN time_zone, DROP COLUMN inbox_seen_at');
+    await db.execute('DROP FUNCTION in_quiet_hours');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 4 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

@@ -395,6 +395,35 @@ final migrations = <List<String>>[
     'CREATE UNIQUE INDEX reactions_visit ON reactions (visit_id, user_id) WHERE visit_id IS NOT NULL',
     'CREATE UNIQUE INDEX reactions_review ON reactions (review_id, user_id) WHERE review_id IS NOT NULL',
   ],
+  [
+    // Fair notifications (push.dart): pause, quiet hours in the phone's time
+    // zone, and the bell on Start with what was new since it was last opened.
+    'ALTER TABLE users ADD COLUMN push_paused_until timestamptz',
+    'ALTER TABLE users ADD COLUMN quiet_hours boolean NOT NULL DEFAULT true',
+    // Bit 0 is Monday; a window counts for the day it starts on.
+    'ALTER TABLE users ADD COLUMN quiet_days smallint NOT NULL DEFAULT 127 CHECK (quiet_days BETWEEN 0 AND 127)',
+    'ALTER TABLE users ADD COLUMN quiet_start smallint NOT NULL DEFAULT 1320 CHECK (quiet_start BETWEEN 0 AND 1439)',
+    'ALTER TABLE users ADD COLUMN quiet_end smallint NOT NULL DEFAULT 480 CHECK (quiet_end BETWEEN 0 AND 1439)',
+    'ALTER TABLE users ADD COLUMN time_zone text',
+    'ALTER TABLE users ADD COLUMN inbox_seen_at timestamptz',
+    r'''CREATE FUNCTION in_quiet_hours(days int, start_min int, end_min int, local timestamp) RETURNS boolean
+      LANGUAGE sql IMMUTABLE AS $$
+        SELECT CASE
+          WHEN start_min = end_min THEN false
+          WHEN start_min < end_min THEN m >= start_min AND m < end_min AND (days >> (d - 1)) & 1 = 1
+          ELSE (m >= start_min AND (days >> (d - 1)) & 1 = 1) OR (m < end_min AND (days >> ((d + 5) % 7)) & 1 = 1)
+        END
+        FROM (SELECT extract(hour FROM local)::int * 60 + extract(minute FROM local)::int AS m,
+                     extract(isodow FROM local)::int AS d) t
+      $$''',
+    // Who checked in (several friends become one event), and new shops that
+    // wait for the end of the quiet hours.
+    'ALTER TABLE push_events ADD COLUMN actor_id uuid REFERENCES users (id) ON DELETE CASCADE',
+    'ALTER TABLE push_events ADD COLUMN actors int NOT NULL DEFAULT 1',
+    'ALTER TABLE push_events ADD COLUMN pending boolean NOT NULL DEFAULT false',
+    'CREATE INDEX push_events_pending ON push_events (created_at) WHERE pending',
+    'CREATE INDEX push_events_user ON push_events (user_id, created_at)',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

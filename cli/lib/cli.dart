@@ -8,6 +8,7 @@ import 'src/command.dart';
 import 'src/commands/auth.dart';
 import 'src/commands/feed.dart';
 import 'src/commands/friends.dart';
+import 'src/commands/inbox.dart';
 import 'src/commands/nearby.dart';
 import 'src/commands/ranking.dart';
 import 'src/commands/reviews.dart';
@@ -23,6 +24,7 @@ final commands = <String, Command>{
   'nearby': nearby,
   'ranking': ranking,
   'feed': feed,
+  'inbox': inbox,
   ...friends,
   ...reviews,
   ...visits,

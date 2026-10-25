@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:http/http.dart' as http;
 
 import 'push_worker_stub.dart' if (dart.library.js_interop) 'push_worker_web.dart';
@@ -32,8 +33,22 @@ FirebaseOptions get _options => FirebaseOptions(
 
 String get _platform => kIsWeb ? 'web' : defaultTargetPlatform.name;
 
-/// Payload of a notification shown for a push; the rest is the shop's ID.
+/// Payload of a notification shown for a push: `push:<type>:<event ID>:<shop ID>`,
+/// the shop may be empty. Builds before the bell left out type and event.
 const pushPayloadPrefix = 'push:';
+
+/// The type and event of a push payload, null for old ones.
+(String type, String id)? pushEventOf(String payload) {
+  final parts = payload.substring(pushPayloadPrefix.length).split(':');
+  return parts.length < 3 ? null : (parts[0], parts[1]);
+}
+
+/// The shop of a push payload, if it has one.
+String? pushPlaceOf(String payload) {
+  final parts = payload.substring(pushPayloadPrefix.length).split(':');
+  final place = parts.length < 3 ? parts.first : parts[2];
+  return place.isEmpty ? null : place;
+}
 
 /// The device's key for what its pushes are about (`/push-events/<id>`) and
 /// the API it belongs to. Apart from the session and readable after the first
@@ -42,52 +57,47 @@ const _storage = FlutterSecureStorage(iOptions: IOSOptions(accessibility: Keycha
 const _keyName = 'push_fetch_key';
 const _apiName = 'push_api_base';
 
+/// What push [id] is about, fetched with the device's key; null when that
+/// fails (offline, locked out, older than a week).
+Future<PushEventDto?> fetchPushEvent(String id) async {
+  try {
+    final key = await _storage.read(key: _keyName);
+    final api = await _storage.read(key: _apiName);
+    if (key == null || api == null) return null;
+    final response =
+        await http.get(Uri.parse('$api/push-events/$id'), headers: {'authorization': 'Push $key'}).timeout(const Duration(seconds: 10));
+    return response.statusCode == 200 ? PushEventDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Turns a signal (event type and ID) into a notification: the text comes
 /// from the server, and without it the notification only names the type.
+/// The same event again (friends checking in close together) replaces it.
 /// Runs in the background isolate as well, which has to set up the plugin.
 Future<void> showPushSignal(RemoteMessage message, {bool setUp = false}) async {
   final type = message.data['type'] as String?;
   final id = message.data['id'] as String?;
   if (type == null || id == null) return;
-  var (title, body) = neutralPushText(type);
-  String? placeId;
-  try {
-    final key = await _storage.read(key: _keyName);
-    final api = await _storage.read(key: _apiName);
-    if (key != null && api != null) {
-      final response = await http
-          .get(Uri.parse('$api/push-events/$id'), headers: {'authorization': 'Push $key'})
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final event = PushEventDto.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
-        (title, body, placeId) = (event.title, event.body, event.placeId);
-      }
-    }
-  } catch (_) {
-    // Offline or locked out: the neutral text stays.
-  }
+  final event = await fetchPushEvent(id);
+  final (title, body) = event == null ? neutralPushText(type) : (event.title, event.body);
   final plugin = FlutterLocalNotificationsPlugin();
-  if (setUp) {
-    await plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestBadgePermission: false,
-          requestSoundPermission: false,
-        ),
-      ),
-      onDidReceiveNotificationResponse: onNotificationTapped,
-    );
-  }
+  if (setUp) await plugin.initialize(settings: notificationSettings, onDidReceiveNotificationResponse: onNotificationTapped);
   await plugin.show(
     id: id.hashCode & 0x7fffffff,
     title: title,
     body: body,
-    payload: placeId == null ? null : '$pushPayloadPrefix$placeId',
+    payload: '$pushPayloadPrefix$type:$id:${event?.placeId ?? ''}',
     notificationDetails: const NotificationDetails(
-      android: AndroidNotificationDetails('push', 'Freunde und neue Läden', importance: Importance.high, priority: Priority.high),
-      iOS: DarwinNotificationDetails(),
+      android: AndroidNotificationDetails(
+        'push',
+        'Freunde und neue Läden',
+        importance: Importance.high,
+        priority: Priority.high,
+        actions: [AndroidNotificationAction(lessAction, 'Weniger davon', showsUserInterface: true)],
+      ),
+      iOS: DarwinNotificationDetails(categoryIdentifier: 'push'),
     ),
   );
 }
@@ -106,6 +116,10 @@ class Push {
 
   /// The shop of a tapped push, until the home screen opens it.
   final opened = ValueNotifier<String?>(null);
+
+  /// Type and event of a push whose "Weniger davon" was tapped, until the
+  /// home screen asks what to leave out.
+  final less = ValueNotifier<(String type, String id)?>(null);
   String? _token;
   StreamSubscription<String>? _refresh;
 
@@ -120,7 +134,7 @@ class Push {
 
   /// Asks for permission (once; browsers only on a tap, see [ask]) and gives
   /// the server this device's token and fetch key, with the position for the
-  /// user's city.
+  /// user's city and the time zone for the quiet hours.
   Future<void> register(Session session, {double? latitude, double? longitude, bool ask = true}) async {
     final messaging = FirebaseMessaging.instance;
     final settings = ask ? await messaging.requestPermission() : await messaging.getNotificationSettings();
@@ -134,11 +148,18 @@ class Push {
     final token = await messaging.getToken();
     if (token == null) return;
     final key = await _fetchKey(session.apiBase);
+    String? zone;
+    try {
+      zone = (await FlutterTimezone.getLocalTimezone()).identifier;
+    } catch (_) {
+      // The server then counts the quiet hours in German time.
+    }
     Future<void> send(String token) async {
       _token = token;
       await session.api.put(
         '/me/push-token',
-        PushTokenRequest(token: token, platform: _platform, latitude: latitude, longitude: longitude, fetchKey: key).toJson(),
+        PushTokenRequest(token: token, platform: _platform, latitude: latitude, longitude: longitude, fetchKey: key, timeZone: zone)
+            .toJson(),
       );
     }
 

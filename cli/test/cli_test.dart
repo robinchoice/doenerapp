@@ -253,6 +253,12 @@ void main() {
     expect([for (final item in next.json['items']) item['type']], ['visit']);
     expect((await ali.cli(['feed'])).out, 'Noch nichts von deinen Freunden.');
 
+    final bell = await ben.cli(['inbox', '--seen']);
+    expect(bell.out.split('\n'), contains(allOf(startsWith('•'), endsWith('$aliName hat bei Grill Eck eingecheckt'))));
+    expect((await ben.cli(['inbox', '--json'])).json['seenAt'], isNotNull);
+    expect((await ben.cli(['inbox'])).out, allOf(contains('$aliName hat Grill Eck bewertet'), isNot(contains('•'))));
+    expect((await ali.cli(['inbox'])).out, 'Nichts Neues in den letzten 7 Tagen.');
+
     expect((await ben.cli(['friends'])).out, '$aliName · befreundet · ${aliUser['id']}');
     expect((await ben.cli(['friends', '--json'])).json['friends'].single['user']['id'], aliUser['id']);
 

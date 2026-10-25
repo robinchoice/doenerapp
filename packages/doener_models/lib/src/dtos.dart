@@ -159,7 +159,26 @@ class UpdateMeRequest {
   final bool? pushFriends;
   final bool? pushNewPlaces;
   final bool? updateMails;
-  const UpdateMeRequest({this.displayName, this.diet, this.expertMode, this.pushFriends, this.pushNewPlaces, this.updateMails});
+
+  /// Pushes pause until then; a time that has passed resumes them.
+  final DateTime? pushPausedUntil;
+  final bool? quietHours;
+  final int? quietDays;
+  final int? quietStart;
+  final int? quietEnd;
+  const UpdateMeRequest({
+    this.displayName,
+    this.diet,
+    this.expertMode,
+    this.pushFriends,
+    this.pushNewPlaces,
+    this.updateMails,
+    this.pushPausedUntil,
+    this.quietHours,
+    this.quietDays,
+    this.quietStart,
+    this.quietEnd,
+  });
 
   factory UpdateMeRequest.fromJson(Json j) => UpdateMeRequest(
         displayName: j['displayName'] as String?,
@@ -168,6 +187,11 @@ class UpdateMeRequest {
         pushFriends: j['pushFriends'] as bool?,
         pushNewPlaces: j['pushNewPlaces'] as bool?,
         updateMails: j['updateMails'] as bool?,
+        pushPausedUntil: _dateOrNull(j['pushPausedUntil']),
+        quietHours: j['quietHours'] as bool?,
+        quietDays: j['quietDays'] as int?,
+        quietStart: j['quietStart'] as int?,
+        quietEnd: j['quietEnd'] as int?,
       );
   Json toJson() => {
         'displayName': ?displayName,
@@ -176,6 +200,11 @@ class UpdateMeRequest {
         'pushFriends': ?pushFriends,
         'pushNewPlaces': ?pushNewPlaces,
         'updateMails': ?updateMails,
+        'pushPausedUntil': ?pushPausedUntil?.toUtc().toIso8601String(),
+        'quietHours': ?quietHours,
+        'quietDays': ?quietDays,
+        'quietStart': ?quietStart,
+        'quietEnd': ?quietEnd,
       };
 }
 
@@ -220,6 +249,16 @@ class AccountDto extends UserDto {
   /// Opted in to news by mail ("Neuigkeiten per Mail"), off by default.
   final bool updateMails;
 
+  /// No pushes until then; null when they aren't paused.
+  final DateTime? pushPausedUntil;
+
+  /// No pushes from [quietStart] to [quietEnd] (minutes after midnight) on the
+  /// [quietDays] (bit 0 is Monday) a window starts, in the phone's time zone.
+  final bool quietHours;
+  final int quietDays;
+  final int quietStart;
+  final int quietEnd;
+
   const AccountDto({
     required super.id,
     required super.displayName,
@@ -229,7 +268,17 @@ class AccountDto extends UserDto {
     this.pushFriends = true,
     this.pushNewPlaces = true,
     this.updateMails = false,
+    this.pushPausedUntil,
+    this.quietHours = true,
+    this.quietDays = allDays,
+    this.quietStart = 22 * 60,
+    this.quietEnd = 8 * 60,
   });
+
+  /// [quietDays] with every day of the week.
+  static const allDays = 127;
+
+  bool get pushPaused => pushPausedUntil?.isAfter(DateTime.now()) ?? false;
 
   factory AccountDto.fromJson(Json j) => AccountDto(
         id: j['id'] as String,
@@ -240,6 +289,11 @@ class AccountDto extends UserDto {
         pushFriends: j['pushFriends'] as bool? ?? true,
         pushNewPlaces: j['pushNewPlaces'] as bool? ?? true,
         updateMails: j['updateMails'] as bool? ?? false,
+        pushPausedUntil: _dateOrNull(j['pushPausedUntil']),
+        quietHours: j['quietHours'] as bool? ?? true,
+        quietDays: j['quietDays'] as int? ?? allDays,
+        quietStart: j['quietStart'] as int? ?? 22 * 60,
+        quietEnd: j['quietEnd'] as int? ?? 8 * 60,
       );
   @override
   Json toJson() => {
@@ -250,6 +304,11 @@ class AccountDto extends UserDto {
         'pushFriends': pushFriends,
         'pushNewPlaces': pushNewPlaces,
         'updateMails': updateMails,
+        'pushPausedUntil': ?pushPausedUntil?.toUtc().toIso8601String(),
+        'quietHours': quietHours,
+        'quietDays': quietDays,
+        'quietStart': quietStart,
+        'quietEnd': quietEnd,
       };
 }
 
@@ -1227,7 +1286,10 @@ class PushTokenRequest {
   final double? latitude;
   final double? longitude;
   final String? fetchKey;
-  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude, this.fetchKey});
+
+  /// IANA name such as `Europe/Berlin`, for the quiet hours.
+  final String? timeZone;
+  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude, this.fetchKey, this.timeZone});
 
   factory PushTokenRequest.fromJson(Json j) => PushTokenRequest(
         token: j['token'] as String,
@@ -1235,8 +1297,10 @@ class PushTokenRequest {
         latitude: _doubleOrNull(j['latitude']),
         longitude: _doubleOrNull(j['longitude']),
         fetchKey: j['fetchKey'] as String?,
+        timeZone: j['timeZone'] as String?,
       );
-  Json toJson() => {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude, 'fetchKey': ?fetchKey};
+  Json toJson() =>
+      {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude, 'fetchKey': ?fetchKey, 'timeZone': ?timeZone};
 }
 
 /// What a push is about. The push itself carries only its type and event ID.
@@ -1245,15 +1309,88 @@ class PushEventDto {
   final String title;
   final String body;
   final String? placeId;
-  const PushEventDto({required this.type, required this.title, required this.body, this.placeId});
+
+  /// Who checked in, for "Weniger davon"; the first one of several.
+  final String? actorId;
+  final String? actorName;
+  const PushEventDto({required this.type, required this.title, required this.body, this.placeId, this.actorId, this.actorName});
 
   factory PushEventDto.fromJson(Json j) => PushEventDto(
         type: j['type'] as String,
         title: j['title'] as String,
         body: j['body'] as String,
         placeId: j['placeId'] as String?,
+        actorId: j['actorId'] as String?,
+        actorName: j['actorName'] as String?,
       );
-  Json toJson() => {'type': type, 'title': title, 'body': body, 'placeId': ?placeId};
+  Json toJson() =>
+      {'type': type, 'title': title, 'body': body, 'placeId': ?placeId, 'actorId': ?actorId, 'actorName': ?actorName};
+}
+
+/// What happened lately, for the bell on Start: friends' check-ins and
+/// reviews, reactions to the user's posts, friend requests, new shops in the
+/// user's city and news. [type] is one of [InboxItemDto.types].
+class InboxItemDto {
+  static const types = ['friend_visit', 'friend_review', 'reaction', 'friend_request', 'new_place', 'news'];
+
+  final String type;
+  final String id;
+  final DateTime timestamp;
+  final String title;
+  final String? body;
+  final String? placeId;
+
+  /// The friend it is about, for "Weniger davon" and friend requests.
+  final String? userId;
+  final String? userName;
+
+  const InboxItemDto({
+    required this.type,
+    required this.id,
+    required this.timestamp,
+    required this.title,
+    this.body,
+    this.placeId,
+    this.userId,
+    this.userName,
+  });
+
+  factory InboxItemDto.fromJson(Json j) => InboxItemDto(
+        type: j['type'] as String,
+        id: j['id'] as String,
+        timestamp: _date(j['timestamp']),
+        title: j['title'] as String,
+        body: j['body'] as String?,
+        placeId: j['placeId'] as String?,
+        userId: j['userId'] as String?,
+        userName: j['userName'] as String?,
+      );
+  Json toJson() => {
+        'type': type,
+        'id': id,
+        'timestamp': timestamp.toUtc().toIso8601String(),
+        'title': title,
+        'body': ?body,
+        'placeId': ?placeId,
+        'userId': ?userId,
+        'userName': ?userName,
+      };
+}
+
+/// The last 7 days, newest first. Items after [seenAt] are new; it is the
+/// same on every device.
+class InboxDto {
+  final List<InboxItemDto> items;
+  final DateTime? seenAt;
+  const InboxDto({required this.items, this.seenAt});
+
+  int get unread => items.where((i) => seenAt == null || i.timestamp.isAfter(seenAt!)).length;
+
+  factory InboxDto.fromJson(Json j) => InboxDto(
+        items: [for (final i in j['items'] as List) InboxItemDto.fromJson(i as Json)],
+        seenAt: _dateOrNull(j['seenAt']),
+      );
+  Json toJson() => {'items': [for (final i in items) i.toJson()], 'seenAt': ?seenAt?.toUtc().toIso8601String()};
 }
 
 /// What the notification says when the details can't be loaded: the type only.

@@ -21,6 +21,7 @@ import 'core/push.dart';
 import 'core/reminders.dart';
 import 'core/session.dart';
 import 'features/auth/login_screen.dart';
+import 'features/inbox/inbox.dart';
 import 'features/map/map_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/place/check_in_sheet.dart';
@@ -292,10 +293,12 @@ class _HomeShellState extends State<HomeShell> {
     // A reminder, a push or a shop's review link may have started the app.
     _reminders?.opened.addListener(_openReminder);
     _push?.opened.addListener(_openPush);
+    _push?.less.addListener(_openLess);
     _data.reviewRequest.addListener(_openReviewRequest);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openReminder();
       _openPush();
+      _openLess();
       _openReviewRequest();
       _registerPush();
     });
@@ -306,6 +309,7 @@ class _HomeShellState extends State<HomeShell> {
     _location.removeListener(_loadAround);
     _reminders?.opened.removeListener(_openReminder);
     _push?.opened.removeListener(_openPush);
+    _push?.less.removeListener(_openLess);
     _data.reviewRequest.removeListener(_openReviewRequest);
     super.dispose();
   }
@@ -336,6 +340,19 @@ class _HomeShellState extends State<HomeShell> {
     }
   }
 
+  /// "Weniger davon" on a push asks what to leave out.
+  Future<void> _openLess() async {
+    final less = _push?.less.value;
+    if (less == null || !mounted) return;
+    _push!.less.value = null;
+    final event = await fetchPushEvent(less.$2);
+    if (!mounted) return;
+    await showAppSheet(
+      context,
+      (_) => LessSheet(aboutFriend: less.$1 == 'friend_check_in', userId: event?.actorId, userName: event?.actorName),
+    );
+  }
+
   /// A shop's review link opens the review of its place.
   Future<void> _openReviewRequest() async {
     final placeId = await _data.takeReviewRequest();
@@ -351,13 +368,18 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   /// A tapped reminder opens the review of its place. Notifications shown
-  /// for a push come through the same plugin and open their shop.
+  /// for a push come through the same plugin and open their shop, or with
+  /// "Weniger davon" ask what to leave out.
   void _openReminder() {
     final placeId = _reminders?.opened.value;
     if (placeId == null || !mounted) return;
     _reminders!.opened.value = null;
+    if (placeId.startsWith('$lessAction:$pushPayloadPrefix')) {
+      _push?.less.value = pushEventOf(placeId.substring(lessAction.length + 1));
+      return;
+    }
     if (placeId.startsWith(pushPayloadPrefix)) {
-      _push?.opened.value = placeId.substring(pushPayloadPrefix.length);
+      _push?.opened.value = pushPlaceOf(placeId);
       return;
     }
     final place = context.read<AppData>().places[placeId];

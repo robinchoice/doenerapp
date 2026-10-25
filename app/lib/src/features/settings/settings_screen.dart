@@ -17,6 +17,7 @@ import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../social/friends.dart';
 import '../social/moderation.dart';
+import 'quiet_hours.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -65,12 +66,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Switching a push on is a tap, so browsers allow asking for permission here.
-  Future<void> _updatePush({bool? pushFriends, bool? pushNewPlaces}) async {
+  Future<void> _updatePush({bool? pushFriends, bool? pushNewPlaces, DateTime? pushPausedUntil}) async {
     final session = context.read<Session>();
     final push = context.read<Push?>();
     final position = context.read<LocationService>().position;
     try {
-      await session.updateSettings(pushFriends: pushFriends, pushNewPlaces: pushNewPlaces);
+      await session.updateSettings(pushFriends: pushFriends, pushNewPlaces: pushNewPlaces, pushPausedUntil: pushPausedUntil);
       if (pushFriends == true || pushNewPlaces == true) {
         await push?.register(session, latitude: position?.latitude, longitude: position?.longitude);
       }
@@ -196,6 +197,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             header('Benachrichtigungen'),
             if (context.read<Push?>() != null) ...[
+              if (session.user!.pushPausedUntil case final until? when session.user!.pushPaused)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                  decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text('Pausiert ${pausedText(until)}. Pushes kommen erst danach wieder, '
+                            'Neuigkeiten per Mail sind nicht betroffen.'),
+                      ),
+                      TextButton(
+                        onPressed: () => _updatePush(pushPausedUntil: DateTime.now()),
+                        child: const Text('Fortsetzen'),
+                      ),
+                    ],
+                  ),
+                ),
+              ListTile(
+                leading: const Icon(Icons.pause_circle_outline),
+                title: const Text('Pausieren'),
+                subtitle: Text(session.user!.pushPaused ? pausedText(session.user!.pushPausedUntil!) : 'Alle Pushes für eine Weile stumm'),
+                onTap: () async {
+                  final until = await askPause(context);
+                  if (until != null) await _updatePush(pushPausedUntil: until);
+                },
+              ),
               SwitchListTile(
                 title: const Text('Freunde checken ein'),
                 subtitle: const Text('Wo deine Freunde gerade essen, höchstens alle 3 Stunden pro Person. Einzelne stellst du unter Freunde stumm.'),
@@ -207,6 +235,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('Sobald ein angekündigter Döner aufmacht.'),
                 value: session.user!.pushNewPlaces,
                 onChanged: (value) => _updatePush(pushNewPlaces: value),
+              ),
+              ListTile(
+                leading: const Icon(Icons.bedtime_outlined),
+                title: const Text('Ruhezeiten'),
+                subtitle: Text(quietHoursText(session.user!)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const QuietHoursScreen())),
               ),
             ],
             SwitchListTile(

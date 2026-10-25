@@ -77,9 +77,10 @@ Future<void> startServer() async {
   Future<void> runJobs() async {
     try {
       await deleteOldPushEvents(deps);
+      await pushPending(deps);
       await deliverUpdateMails(deps);
     } catch (error, stackTrace) {
-      print('News mails failed: $error');
+      print('Pushes or news mails failed: $error');
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
     try {

@@ -1378,19 +1378,26 @@ class InboxItemDto {
 }
 
 /// The last 7 days, newest first. Items after [seenAt] are new; it is the
-/// same on every device.
+/// same on every device. [loadedAt] is the server's time of the answer,
+/// sent back when the bell was opened.
 class InboxDto {
   final List<InboxItemDto> items;
   final DateTime? seenAt;
-  const InboxDto({required this.items, this.seenAt});
+  final DateTime? loadedAt;
+  const InboxDto({required this.items, this.seenAt, this.loadedAt});
 
   int get unread => items.where((i) => seenAt == null || i.timestamp.isAfter(seenAt!)).length;
 
   factory InboxDto.fromJson(Json j) => InboxDto(
         items: [for (final i in j['items'] as List) InboxItemDto.fromJson(i as Json)],
         seenAt: _dateOrNull(j['seenAt']),
+        loadedAt: _dateOrNull(j['loadedAt']),
       );
-  Json toJson() => {'items': [for (final i in items) i.toJson()], 'seenAt': ?seenAt?.toUtc().toIso8601String()};
+  Json toJson() => {
+        'items': [for (final i in items) i.toJson()],
+        'seenAt': ?seenAt?.toUtc().toIso8601String(),
+        'loadedAt': ?loadedAt?.toUtc().toIso8601String(),
+      };
 }
 
 /// What the notification says when the details can't be loaded: the type only.

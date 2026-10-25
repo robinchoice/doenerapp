@@ -6,10 +6,21 @@ import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../core/app_data.dart';
+import '../../core/location.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
 import '../social/friends.dart';
+
+/// The bell's entries, with new shops of the city where the user is.
+Future<InboxDto> _fetchInbox(BuildContext context) async {
+  final position = context.read<LocationService>().position;
+  final json = await context.read<Session>().api.get('/me/inbox', query: {
+    if (position != null) 'lat': '${position.latitude}',
+    if (position != null) 'lon': '${position.longitude}',
+  });
+  return InboxDto.fromJson(json as Map<String, dynamic>);
+}
 
 /// The bell on Start: what happened since it was last opened, on any device.
 /// Loads again when the app comes back to the front.
@@ -38,11 +49,10 @@ class _InboxButtonState extends State<InboxButton> {
   }
 
   Future<void> _load() async {
-    final session = context.read<Session>();
-    if (!session.isLoggedIn) return;
+    if (!context.read<Session>().isLoggedIn) return;
     try {
-      final json = await session.api.get('/me/inbox');
-      if (mounted) setState(() => _inbox = InboxDto.fromJson(json as Map<String, dynamic>));
+      final inbox = await _fetchInbox(context);
+      if (mounted) setState(() => _inbox = inbox);
     } catch (_) {
       // Offline: the bell shows what it had.
     }
@@ -92,14 +102,16 @@ class _InboxScreenState extends State<InboxScreen> {
   Future<void> _load() async {
     final api = context.read<Session>().api;
     try {
-      final inbox = InboxDto.fromJson(await api.get('/me/inbox') as Map<String, dynamic>);
+      final inbox = await _fetchInbox(context);
       if (mounted) {
         setState(() {
           _inbox = inbox;
           _error = null;
         });
       }
-      await api.post('/me/inbox/seen');
+      // Seen is what was loaded, not what came in since.
+      final until = inbox.loadedAt?.toUtc().toIso8601String();
+      await api.post('/me/inbox/seen${until == null ? '' : '?until=${Uri.encodeQueryComponent(until)}'}');
     } on OfflineException catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } on ApiException catch (e) {

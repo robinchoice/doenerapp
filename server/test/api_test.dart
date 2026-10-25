@@ -734,11 +734,18 @@ void main() {
       final (_, blocked) = await call('GET', '/me/inbox', token: anna);
       expect(InboxDto.fromJson(blocked as Map<String, dynamic>).items.where((i) => i.userId == svenUser.id), isEmpty);
 
-      expect((await call('POST', '/me/inbox/seen', token: bob)).$1, 204);
+      expect((await call('POST', '/me/inbox/seen?until=nope', token: bob)).$1, 400);
+      final loaded = bobs.loadedAt!;
+      expect((await call('POST', '/me/inbox/seen?until=${Uri.encodeQueryComponent(loaded.toIso8601String())}', token: bob)).$1, 204);
       final (_, seen) = await call('GET', '/me/inbox', token: bob);
       final after = InboxDto.fromJson(seen as Map<String, dynamic>);
-      expect(after.seenAt, isNotNull);
+      expect(after.seenAt, loaded, reason: 'what came in after loading stays new');
       expect(after.unread, 0);
+      final future = DateTime.now().toUtc().add(const Duration(days: 1)).toIso8601String();
+      await call('POST', '/me/inbox/seen?until=${Uri.encodeQueryComponent(future)}', token: bob);
+      final (_, capped) = await call('GET', '/me/inbox', token: bob);
+      expect(InboxDto.fromJson(capped as Map<String, dynamic>).seenAt!.isBefore(DateTime.now().add(const Duration(minutes: 1))), isTrue,
+          reason: 'not later than now');
       expect((await call('GET', '/me/inbox')).$1, 401);
     });
 
@@ -1439,6 +1446,11 @@ void main() {
     final (_, bell) = await call('GET', '/me/inbox', token: pia);
     expect(InboxDto.fromJson(bell as Map<String, dynamic>).items.map((i) => (i.title, i.body)),
         contains(('Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht')));
+    final (noPush, _) = await signUp('quentin@example.org', 'Quentin');
+    Future<Iterable<InboxItemDto>> shops(String path) async =>
+        InboxDto.fromJson((await call('GET', path, token: noPush)).$2 as Map<String, dynamic>).items.where((i) => i.type == 'new_place');
+    expect(await shops('/me/inbox'), isEmpty, reason: 'no city known');
+    expect(await shops('/me/inbox?lat=48.003&lon=7.853'), hasLength(1), reason: 'the city where the app is');
     await call('POST', '/me/inbox/seen', token: pia);
     await db.execute(
       Sql.named("UPDATE push_events SET pending = true, created_at = now() - interval '1 minute' WHERE user_id = @id:uuid"),

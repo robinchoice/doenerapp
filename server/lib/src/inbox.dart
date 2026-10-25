@@ -7,17 +7,24 @@ import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
 import 'moderation.dart';
+import 'ranking.dart';
 import 'social.dart';
 
 /// The bell on Start: what happened lately, so nobody depends on a push to
 /// catch up. Built from the activity itself, not from the pushes, so it also
 /// works without push and shows what the quiet hours held back.
 void mountInbox(Router router, Deps deps) {
-  // GET /me/inbox — the last 7 days, newest first, at most 50; open friend
-  // requests regardless of their age. `seenAt` is when the bell was last
-  // opened on any device.
+  // GET /me/inbox[?lat&lon] — the last 7 days, newest first, at most 50; open
+  // friend requests regardless of their age. New shops are those of the city
+  // at the position, else of the city the push token reported. `seenAt` is
+  // when the bell was last opened on any device, `loadedAt` the server's time
+  // of this answer, which the app sends back as seen.
   router.get('/me/inbox', (Request request) async {
     final me = await requireUser(deps, request);
+    final here = request.url.queryParameters.containsKey('lat')
+        ? await nearestCity(deps.db, queryDouble(request, 'lat'), queryDouble(request, 'lon'))
+        : null;
+    final user = await queryOne(deps.db, 'SELECT inbox_seen_at, city, now() AS now FROM users WHERE id = @me:uuid', {'me': me.id});
     final rows = await query(
       deps.db,
       '$friendIdsCte SELECT i.*, a.display_name AS actor_name, p.name AS place_name, p.google_place_id, p.city AS place_city FROM ('
@@ -37,28 +44,36 @@ void mountInbox(Router router, Deps deps) {
       "  FROM friendships f WHERE f.addressee_id = @me:uuid AND f.status = 'pending'"
       '  UNION ALL'
       "  SELECT 'new_place', p.id::text, coalesce(p.opening_pushed_at, p.opened_on::timestamptz), NULL, p.id, NULL, NULL"
-      '  FROM places p JOIN users u ON u.id = @me:uuid AND u.city = p.city'
-      "  WHERE p.opened_on > current_date - 7 AND p.opened_on <= current_date AND p.business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY'"
+      '  FROM places p'
+      "  WHERE p.city = @city:text AND p.opened_on > current_date - 7 AND p.opened_on <= current_date AND p.business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY'"
       '  UNION ALL'
       "  SELECT 'news', n.id::text, n.published_at, NULL, NULL, NULL, n.title"
       "  FROM updates n WHERE n.in_app AND n.published_at > now() - interval '7 days'"
       ') i LEFT JOIN users a ON a.id = i.actor_id LEFT JOIN places p ON p.id = i.place_id'
       ' WHERE i.actor_id IS NULL OR ${notBlocked('i.actor_id')}'
       ' ORDER BY i.ts DESC, i.id LIMIT 50',
-      {'me': me.id},
+      {'me': me.id, 'city': here ?? user!['city']},
     );
-    final seen = await queryOne(deps.db, 'SELECT inbox_seen_at FROM users WHERE id = @me:uuid', {'me': me.id});
     return json(InboxDto(
       items: [for (final r in rows) _item(r)],
-      seenAt: seen?['inbox_seen_at'] as DateTime?,
+      seenAt: user!['inbox_seen_at'] as DateTime?,
+      loadedAt: user['now'] as DateTime,
     ).toJson());
   });
 
-  // POST /me/inbox/seen — the bell was opened: everything so far is seen, on
-  // all devices. Shops held back by the quiet hours then don't push any more.
+  // POST /me/inbox/seen[?until=<loadedAt>] — the bell was opened: everything
+  // up to the time it was loaded is seen, on all devices, not what came in
+  // since. Shops held back by the quiet hours then don't push any more.
   router.post('/me/inbox/seen', (Request request) async {
     final me = await requireUser(deps, request);
-    await deps.db.execute(Sql.named('UPDATE users SET inbox_seen_at = now() WHERE id = @me:uuid'), parameters: {'me': me.id});
+    final until = request.url.queryParameters['until'];
+    final at = until == null ? null : DateTime.tryParse(until);
+    if (until != null && at == null) throw const ApiException.badRequest('Ungültige Zeit');
+    await deps.db.execute(
+      Sql.named('UPDATE users SET inbox_seen_at = greatest(inbox_seen_at, least(coalesce(@at:timestamptz, now()), now())) '
+          'WHERE id = @me:uuid'),
+      parameters: {'me': me.id, 'at': at},
+    );
     return noContent();
   });
 }

@@ -13,7 +13,10 @@ final inbox = Command(
   run: (ctx) async {
     requireLogin(ctx);
     final bell = parse(await ctx.api.get('/me/inbox'), InboxDto.fromJson);
-    if (ctx.args.flag('seen')) await ctx.api.post('/me/inbox/seen');
+    if (ctx.args.flag('seen')) {
+      final until = bell.loadedAt?.toUtc().toIso8601String();
+      await ctx.api.post('/me/inbox/seen${until == null ? '' : '?until=${Uri.encodeQueryComponent(until)}'}');
+    }
     bool isNew(InboxItemDto item) => bell.seenAt == null || item.timestamp.isAfter(bell.seenAt!);
     return (
       data: bell.toJson(),

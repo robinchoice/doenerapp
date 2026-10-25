@@ -23,7 +23,7 @@ final commands = <String, Command>{
   'nearby': nearby,
   'ranking': ranking,
   'feed': feed,
-  'friends': friends,
+  ...friends,
   ...reviews,
   ...visits,
 };

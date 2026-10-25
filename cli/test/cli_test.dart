@@ -205,10 +205,17 @@ void main() {
     final aliUser = (await ali.cli(['login', '--email', freshEmail(), '--json'])).json['user'];
     final benUser = (await ben.cli(['login', '--email', freshEmail(), '--json'])).json['user'];
     final aliName = aliUser['displayName'] as String;
-    await db.execute(
-      Sql.named("INSERT INTO friendships (requester_id, addressee_id, status) VALUES (@a:uuid, @b:uuid, 'accepted')"),
-      parameters: {'a': aliUser['id'], 'b': benUser['id']},
-    );
+    final benName = benUser['displayName'] as String;
+
+    // Ben finds Ali and asks, Ali accepts by asking back
+    final found = await ben.cli(['users', '--search', aliName]);
+    expect(found.out.split('\n'), contains('$aliName · ${aliUser['id']}'));
+    expect((await ben.cli(['befriend', '--user', aliUser['id']])).out, 'Anfrage an $aliName gesendet.');
+    expect((await ben.cli(['friends'])).out, '$aliName · Anfrage gesendet');
+    expect((await ali.cli(['friends'])).out, '$benName · möchte befreundet sein, annehmen: befriend --user ${benUser['id']}');
+    final accepted = await ali.cli(['befriend', '--user', benUser['id'], '--json']);
+    expect(accepted.json['friendship']['status'], 'accepted');
+    expect((await ali.cli(['befriend', '--user', benUser['id']])).out, 'Mit $benName befreundet.');
     expect((await ali.cli(['visits'])).out, 'Noch keine Check-ins.');
     expect((await ali.cli(['reviews'])).out, 'Noch keine Bewertungen.');
 
@@ -263,6 +270,9 @@ void main() {
     expect((await phone.cli(['checkin', '--place', 'cli-rank', '--food', 'kebab'])).code, Exit.usage);
     expect((await phone.cli(['ranking', '--lat', '48'])).code, Exit.usage);
     expect((await phone.cli(['feed', '--lat', '48'])).code, Exit.usage);
+    expect((await phone.cli(['befriend'])).code, Exit.usage);
+    expect((await phone.cli(['users', '--search', 'a', '--json'])).json, {'error': 'Mindestens 2 Zeichen'});
+    expect((await phone.cli(['befriend', '--user', '00000000-0000-4000-8000-000000000000'])).code, Exit.error);
 
     final range = await phone.cli(['review', '--place', 'cli-rank', '--rate', 'sauce=7', '--json']);
     expect(range.code, Exit.error);
@@ -274,7 +284,8 @@ void main() {
     final phone = await device();
     final help = await phone.cli(['--help', '--json']);
     expect(help.code, Exit.ok);
-    expect([for (final row in help.json['commands']) row['usage']], containsAll(['whoami', 'logout', 'friends', 'reviews', 'visits']));
+    expect([for (final row in help.json['commands']) row['usage']],
+        containsAll(['whoami', 'logout', 'friends', 'reviews', 'visits', 'befriend --user <id>']));
     expect(help.json['exitCodes'], {'ok': 0, 'error': 1, 'usage': 2, 'loggedOut': 3});
     expect((await phone.cli([])).out, startsWith('doener – '));
 

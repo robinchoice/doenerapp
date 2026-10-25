@@ -15,7 +15,8 @@ class Client {
 
   Future<Object?> get(String path, [Map<String, String>? query]) => _send('GET', path, query: query);
   Future<Object?> post(String path, [Map<String, Object?>? body]) => _send('POST', path, body: body ?? const {});
-  Future<Object?> put(String path, Map<String, Object?> body) => _send('PUT', path, body: body);
+  Future<Object?> put(String path, [Map<String, Object?>? body]) => _send('PUT', path, body: body ?? const {});
+  Future<Object?> delete(String path) => _send('DELETE', path);
 
   Future<Object?> _send(String method, String path, {Map<String, String>? query, Object? body}) async {
     final request = http.Request(method, Uri.parse('$url/api/v1$path').replace(queryParameters: query));

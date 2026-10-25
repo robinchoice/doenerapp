@@ -211,11 +211,16 @@ void main() {
     final found = await ben.cli(['users', '--search', aliName]);
     expect(found.out.split('\n'), contains('$aliName · ${aliUser['id']}'));
     expect((await ben.cli(['befriend', '--user', aliUser['id']])).out, 'Anfrage an $aliName gesendet.');
-    expect((await ben.cli(['friends'])).out, '$aliName · Anfrage gesendet');
-    expect((await ali.cli(['friends'])).out, '$benName · möchte befreundet sein, annehmen: befriend --user ${benUser['id']}');
+    expect((await ben.cli(['friends'])).out, '$aliName · Anfrage gesendet · ${aliUser['id']}');
+    expect((await ali.cli(['friends'])).out, '$benName · möchte befreundet sein · ${benUser['id']}');
     final accepted = await ali.cli(['befriend', '--user', benUser['id'], '--json']);
     expect(accepted.json['friendship']['status'], 'accepted');
     expect((await ali.cli(['befriend', '--user', benUser['id']])).out, 'Mit $benName befreundet.');
+    expect((await ali.cli(['mute', '--user', benUser['id']])).out, '$benName ist stumm.');
+    expect((await ali.cli(['friends'])).out, '$benName · befreundet · stumm · ${benUser['id']}');
+    final unmuted = await ali.cli(['unmute', '--user', benUser['id'], '--json']);
+    expect(unmuted.json['friendship']['muted'], isFalse);
+    expect((await ali.cli(['friends', '--json'])).json['friends'].single['muted'], isFalse);
     expect((await ali.cli(['visits'])).out, 'Noch keine Check-ins.');
     expect((await ali.cli(['reviews'])).out, 'Noch keine Bewertungen.');
 
@@ -248,7 +253,7 @@ void main() {
     expect([for (final item in next.json['items']) item['type']], ['visit']);
     expect((await ali.cli(['feed'])).out, 'Noch nichts von deinen Freunden.');
 
-    expect((await ben.cli(['friends'])).out, '$aliName · befreundet');
+    expect((await ben.cli(['friends'])).out, '$aliName · befreundet · ${aliUser['id']}');
     expect((await ben.cli(['friends', '--json'])).json['friends'].single['user']['id'], aliUser['id']);
 
     final ranking = await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84']);
@@ -257,6 +262,13 @@ void main() {
     expect(sauce.json['city'], 'Freiburg');
     expect([for (final entry in sauce.json['entries']) entry['place']['placeId']], ['cli-rank']);
     expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--max-price', '5'])).out, 'Freiburg, Gesamt: noch keine Läden.');
+
+    expect((await ben.cli(['unfriend', '--user', aliUser['id']])).out, 'Freundschaft mit $aliName beendet.');
+    expect((await ali.cli(['friends'])).out, 'Noch keine Freunde.');
+    expect((await ben.cli(['feed'])).out, 'Noch nichts von deinen Freunden.');
+    await ben.cli(['befriend', '--user', aliUser['id']]);
+    expect((await ali.cli(['unfriend', '--user', benUser['id']])).out, 'Anfrage von $benName abgelehnt.');
+    expect((await ben.cli(['unfriend', '--user', aliUser['id'], '--json'])).json, {'error': contains('keine Anfrage')});
   });
 
   test('review, check-in and the rest refuse wrong calls and missing logins', () async {
@@ -271,6 +283,8 @@ void main() {
     expect((await phone.cli(['ranking', '--lat', '48'])).code, Exit.usage);
     expect((await phone.cli(['feed', '--lat', '48'])).code, Exit.usage);
     expect((await phone.cli(['befriend'])).code, Exit.usage);
+    expect((await phone.cli(['unfriend'])).code, Exit.usage);
+    expect((await phone.cli(['mute', '--user', '00000000-0000-4000-8000-000000000000'])).code, Exit.error);
     expect((await phone.cli(['users', '--search', 'a', '--json'])).json, {'error': 'Mindestens 2 Zeichen'});
     expect((await phone.cli(['befriend', '--user', '00000000-0000-4000-8000-000000000000'])).code, Exit.error);
 

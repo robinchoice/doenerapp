@@ -7,14 +7,23 @@ String _line(FriendshipDto friendship) {
   final status = switch ((friendship.status, friendship.direction)) {
     (FriendshipStatus.accepted, _) => 'befreundet',
     (FriendshipStatus.pending, FriendshipDirection.outgoing) => 'Anfrage gesendet',
-    (FriendshipStatus.pending, FriendshipDirection.incoming) => 'möchte befreundet sein, annehmen: befriend --user ${friendship.user.id}',
+    (FriendshipStatus.pending, FriendshipDirection.incoming) => 'möchte befreundet sein',
   };
-  return '${friendship.user.displayName} · $status${friendship.muted ? ' · stumm' : ''}';
+  // The id is what befriend, unfriend and mute take
+  return '${friendship.user.displayName} · $status${friendship.muted ? ' · stumm' : ''} · ${friendship.user.id}';
+}
+
+/// The friendship or open request with `--user`.
+Future<FriendshipDto> _with(Context ctx) async {
+  final user = ctx.args.option('user') ?? (throw const Failure('--user <id> fehlt, siehe `doener friends`.', Exit.usage));
+  final friendships = parseList(await ctx.api.get('/friends'), FriendshipDto.fromJson);
+  return friendships.where((f) => f.user.id == user).firstOrNull ??
+      (throw const Failure('Mit dieser Person gibt es keine Freundschaft und keine Anfrage.', Exit.error));
 }
 
 final friends = <String, Command>{
   'friends': Command(
-    help: [('friends', 'Freunde und offene Anfragen')],
+    help: [('friends', 'Freunde und offene Anfragen, mit der ID für die Befehle unten')],
     run: (ctx) async {
       requireLogin(ctx);
       final friendships = parseList(await ctx.api.get('/friends'), FriendshipDto.fromJson);
@@ -52,4 +61,44 @@ final friends = <String, Command>{
       );
     },
   ),
+  'unfriend': Command(
+    help: [('unfriend --user <id>', 'Freundschaft beenden, eine Anfrage zurückziehen oder ablehnen')],
+    options: (parser) => parser..addOption('user'),
+    run: (ctx) async {
+      requireLogin(ctx);
+      final friendship = await _with(ctx);
+      await ctx.api.delete('/friends/${friendship.id}');
+      final name = friendship.user.displayName;
+      return (
+        data: {'ok': true},
+        text: switch ((friendship.status, friendship.direction)) {
+          (FriendshipStatus.accepted, _) => 'Freundschaft mit $name beendet.',
+          (FriendshipStatus.pending, FriendshipDirection.outgoing) => 'Anfrage an $name zurückgezogen.',
+          (FriendshipStatus.pending, FriendshipDirection.incoming) => 'Anfrage von $name abgelehnt.',
+        },
+      );
+    },
+  ),
+  // Muted friends stay friends, only their check-ins send no push.
+  for (final (name, muted) in const [('mute', true), ('unmute', false)])
+    name: Command(
+      help: [('$name --user <id>', muted ? 'Keine Pushes mehr, wenn dieser Freund eincheckt' : 'Wieder Pushes von diesem Freund')],
+      options: (parser) => parser..addOption('user'),
+      run: (ctx) async {
+        requireLogin(ctx);
+        final friendship = await _with(ctx);
+        final path = '/me/mutes/${friendship.user.id}';
+        await (muted ? ctx.api.put(path) : ctx.api.delete(path));
+        final changed = FriendshipDto(
+          id: friendship.id,
+          user: friendship.user,
+          status: friendship.status,
+          direction: friendship.direction,
+          createdAt: friendship.createdAt,
+          muted: muted,
+        );
+        final who = friendship.user.displayName;
+        return (data: {'friendship': changed.toJson()}, text: muted ? '$who ist stumm.' : '$who ist wieder laut.');
+      },
+    ),
 };

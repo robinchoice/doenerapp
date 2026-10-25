@@ -594,6 +594,9 @@ void main() {
       expect(details.title, 'Emil und Carl essen gerade 🥙');
       expect(details.body, startsWith('zuletzt Carl bei Kebap Haus'));
       expect([details.actorId, details.actorName], [emilUser.id, 'Emil'], reason: 'for "Weniger davon"');
+      await call('PUT', '/me/mutes/${emilUser.id}', token: dora);
+      expect(await checkIn(carl), 1);
+      expect(pusher.sent.last.data['id'], isNot(first), reason: "Emil's name would come back");
 
       expect((await call('PATCH', '/users/me', body: {'quietDays': 128}, token: dora)).$1, 400);
       expect((await call('PATCH', '/users/me', body: {'quietStart': 1440}, token: dora)).$1, 400);

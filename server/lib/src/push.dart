@@ -203,28 +203,24 @@ Future<void> _pushCheckIn(Deps deps, AuthUser me, Map<String, dynamic> place, St
 
   // Friends checking in within half an hour become one notification: the
   // event is updated and signalled again under its ID, which replaces the
-  // notification on the device.
+  // notification on the device. One update, so check-ins at the same moment
+  // count each other; not when the first friend is muted, blocked or no
+  // friend any more, their name would come back.
   final recent = await query(
     deps.db,
-    'SELECT DISTINCT ON (e.user_id) e.id::text AS id, e.user_id::text AS user_id, e.actors, a.display_name AS first '
-    "FROM push_events e JOIN users a ON a.id = e.actor_id WHERE e.type = 'friend_check_in' AND e.user_id = ANY(@users:_uuid) "
-    "AND e.actor_id <> @me:uuid AND e.created_at > now() - interval '30 minutes' ORDER BY e.user_id, e.created_at DESC",
-    {'users': users.toList(), 'me': me.id},
+    'UPDATE push_events e SET actors = e.actors + 1, body = @body, place_id = @place, title = a.display_name || CASE '
+    "WHEN e.actors = 1 THEN ' und ' || @name || ' essen gerade 🥙' ELSE ' und ' || e.actors || ' weitere essen gerade 🥙' END "
+    "FROM (SELECT DISTINCT ON (user_id) id FROM push_events WHERE type = 'friend_check_in' AND user_id = ANY(@users:_uuid) "
+    "AND actor_id <> @me:uuid AND created_at > now() - interval '30 minutes' ORDER BY user_id, created_at DESC) latest, users a "
+    'WHERE e.id = latest.id AND a.id = e.actor_id '
+    'AND NOT EXISTS (SELECT 1 FROM friend_mutes m WHERE m.user_id = e.user_id AND m.muted_id = e.actor_id) '
+    'AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = e.user_id AND b.blocked_id = e.actor_id) '
+    'OR (b.blocker_id = e.actor_id AND b.blocked_id = e.user_id)) '
+    "AND EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted' AND ((f.requester_id = e.user_id AND f.addressee_id = e.actor_id) "
+    'OR (f.requester_id = e.actor_id AND f.addressee_id = e.user_id))) '
+    'RETURNING e.id::text AS id, e.user_id::text AS user_id',
+    {'users': users.toList(), 'me': me.id, 'name': me.displayName, 'body': 'zuletzt ${me.displayName} $body', 'place': placeId},
   );
-  for (final event in recent) {
-    final actors = (event['actors'] as int) + 1;
-    final first = event['first'] as String;
-    await deps.db.execute(
-      Sql.named('UPDATE push_events SET actors = @actors:int4, title = @title, body = @body, place_id = @place WHERE id = @id:uuid'),
-      parameters: {
-        'actors': actors,
-        'title': actors == 2 ? '$first und ${me.displayName} essen gerade 🥙' : '$first und ${actors - 1} weitere essen gerade 🥙',
-        'body': 'zuletzt ${me.displayName} $body',
-        'place': placeId,
-        'id': event['id'],
-      },
-    );
-  }
   final merged = {for (final e in recent) e['user_id'] as String};
   final events = [
     ...recent,

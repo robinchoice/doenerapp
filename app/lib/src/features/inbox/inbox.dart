@@ -103,12 +103,12 @@ class _InboxScreenState extends State<InboxScreen> {
     final api = context.read<Session>().api;
     try {
       final inbox = await _fetchInbox(context);
-      if (mounted) {
-        setState(() {
-          _inbox = inbox;
-          _error = null;
-        });
-      }
+      // Left before it loaded: nothing was seen.
+      if (!mounted) return;
+      setState(() {
+        _inbox = inbox;
+        _error = null;
+      });
       // Seen is what was loaded, not what came in since.
       final until = inbox.loadedAt?.toUtc().toIso8601String();
       await api.post('/me/inbox/seen${until == null ? '' : '?until=${Uri.encodeQueryComponent(until)}'}');

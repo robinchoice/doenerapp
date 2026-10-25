@@ -732,9 +732,11 @@ void main() {
             body: {'id': id, 'visitedAt': DateTime.now().toUtc().subtract(Duration(days: daysAgo)).toIso8601String()}, token: bob);
       }
       expect(await bobIsRegular(), isFalse);
-      await db.execute("UPDATE visits SET created_at = now() - interval '1 day' WHERE id = '33333333-2222-4333-8444-555555555556'");
+      // Days back on the Berlin calendar the server counts by, also on the night the clocks change
+      String daysAgo(int days) => "(now() AT TIME ZONE 'Europe/Berlin' - interval '$days days') AT TIME ZONE 'Europe/Berlin'";
+      await db.execute("UPDATE visits SET created_at = ${daysAgo(1)} WHERE id = '33333333-2222-4333-8444-555555555556'");
       expect(await bobIsRegular(), isFalse, reason: 'two days');
-      await db.execute("UPDATE visits SET created_at = now() - interval '2 days' WHERE id = '33333333-2222-4333-8444-555555555557'");
+      await db.execute("UPDATE visits SET created_at = ${daysAgo(2)} WHERE id = '33333333-2222-4333-8444-555555555557'");
       expect(await bobIsRegular(), isTrue, reason: 'check-ins on $regularVisits days make a regular');
       final (_, feedAgain) = await call('GET', '/feed', token: anna);
       expect(FeedPage.fromJson(feedAgain as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review).regular, isTrue);

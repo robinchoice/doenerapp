@@ -6,7 +6,7 @@ import '../session.dart';
 
 /// The logged-in account, for every command that needs one.
 Future<AccountDto> currentUser(Context ctx) async {
-  if (ctx.session == null) throw notLoggedIn;
+  requireLogin(ctx);
   return parse(await ctx.api.get('/auth/me'), AccountDto.fromJson);
 }
 

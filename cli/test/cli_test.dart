@@ -197,11 +197,84 @@ void main() {
     expect((await phone.cli(['nearby', '--lat', '48', '--lon', '7', '--by', 'fleisch'])).code, Exit.usage);
   });
 
+  test('check in and review, then friends see it in the feed and the ranking', () async {
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city) VALUES "
+        "('cli-rank', 'Grill Eck', 47.99, 7.84, 'Freiburg')");
+    final ali = await device();
+    final ben = await device();
+    final aliUser = (await ali.cli(['login', '--email', freshEmail(), '--json'])).json['user'];
+    final benUser = (await ben.cli(['login', '--email', freshEmail(), '--json'])).json['user'];
+    final aliName = aliUser['displayName'] as String;
+    await db.execute(
+      Sql.named("INSERT INTO friendships (requester_id, addressee_id, status) VALUES (@a:uuid, @b:uuid, 'accepted')"),
+      parameters: {'a': aliUser['id'], 'b': benUser['id']},
+    );
+    expect((await ali.cli(['visits'])).out, 'Noch keine Check-ins.');
+    expect((await ali.cli(['reviews'])).out, 'Noch keine Bewertungen.');
+
+    final checkin = await ali.cli(['checkin', '--place', 'cli-rank', '--food', 'falafel', '--json']);
+    expect(checkin.code, Exit.ok);
+    expect(checkin.json['visit']['placeName'], 'Grill Eck');
+    expect((await ali.cli(['visits'])).out, endsWith(' Grill Eck · 🧆 Falafel'));
+
+    final review = await ali.cli(
+        ['review', '--place', 'cli-rank', '--rate', 'sauce=4,5', '--rate', 'fleisch=4', '--price', '7,50', '--text', 'Lecker', '--json']);
+    expect(review.code, Exit.ok);
+    expect(review.json['review']['ratings'], {'sauce': 4.5, 'fleisch': 4.0});
+    expect(review.json['review']['price'], 750);
+    expect((await ali.cli(['reviews'])).out, endsWith(' Grill Eck – 4,5 · 7,50 € · „Lecker“'));
+    // A second call only changes what it names, the meat stays as set in the app
+    await db.execute(Sql.named("UPDATE reviews SET meat = 'kalb' WHERE id = @id:uuid"), parameters: {'id': review.json['review']['id']});
+    final again = await ali.cli(['review', '--place', 'cli-rank', '--rate', 'salat=3', '--json']);
+    expect(again.json['review']['ratings'], {'sauce': 4.5, 'fleisch': 4.0});
+    expect(again.json['review']['newRatings'], {'salat': 3.0});
+    expect([again.json['review']['price'], again.json['review']['text'], again.json['review']['meat']], [750, 'Lecker', 'kalb']);
+
+    final feed = await ben.cli(['feed', '--json']);
+    expect(feed.code, Exit.ok);
+    expect([for (final item in feed.json['items']) item['type']], ['review', 'visit']);
+    final text = (await ben.cli(['feed'])).out.split('\n');
+    expect(text, [endsWith('$aliName hat Grill Eck bewertet: 4,0 · „Lecker“'), endsWith('$aliName hat bei Grill Eck eingecheckt')]);
+    final first = await ben.cli(['feed', '--limit', '1', '--json']);
+    expect(first.json['hasMore'], isTrue);
+    final next = await ben.cli(['feed', '--limit', '1', '--cursor', first.json['cursor'], '--json']);
+    expect([for (final item in next.json['items']) item['type']], ['visit']);
+    expect((await ali.cli(['feed'])).out, 'Noch nichts von deinen Freunden.');
+
+    expect((await ben.cli(['friends'])).out, '$aliName · befreundet');
+    expect((await ben.cli(['friends', '--json'])).json['friends'].single['user']['id'], aliUser['id']);
+
+    final ranking = await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84']);
+    expect(ranking.out, 'Freiburg, Gesamt:\n 1. Grill Eck – 4,0 (1 Bewertung) · 7,50 € · Freunde: $aliName 4,0');
+    final sauce = await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--by', 'sauce', '--json']);
+    expect(sauce.json['city'], 'Freiburg');
+    expect([for (final entry in sauce.json['entries']) entry['place']['placeId']], ['cli-rank']);
+    expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--max-price', '5'])).out, 'Freiburg, Gesamt: noch keine Läden.');
+  });
+
+  test('review, check-in and the rest refuse wrong calls and missing logins', () async {
+    final phone = await device();
+    expect((await phone.cli(['reviews'])).code, Exit.loggedOut);
+    expect((await phone.cli(['checkin', '--place', 'cli-rank'])).code, Exit.loggedOut);
+    await phone.cli(['login', '--email', freshEmail()]);
+
+    expect((await phone.cli(['review', '--rate', 'sauce=4'])).code, Exit.usage);
+    expect((await phone.cli(['review', '--place', 'cli-rank', '--rate', 'soße=4'])).code, Exit.usage);
+    expect((await phone.cli(['checkin', '--place', 'cli-rank', '--food', 'kebab'])).code, Exit.usage);
+    expect((await phone.cli(['ranking', '--lat', '48'])).code, Exit.usage);
+    expect((await phone.cli(['feed', '--lat', '48'])).code, Exit.usage);
+
+    final range = await phone.cli(['review', '--place', 'cli-rank', '--rate', 'sauce=7', '--json']);
+    expect(range.code, Exit.error);
+    expect(range.json, {'error': 'Bewertungen müssen 1–5 in halben Schritten sein'});
+    expect((await phone.cli(['checkin', '--place', 'gibts-nicht'])).code, Exit.error);
+  });
+
   test('help, wrong calls and --json', () async {
     final phone = await device();
     final help = await phone.cli(['--help', '--json']);
     expect(help.code, Exit.ok);
-    expect([for (final row in help.json['commands']) row['usage']], containsAll(['whoami', 'logout']));
+    expect([for (final row in help.json['commands']) row['usage']], containsAll(['whoami', 'logout', 'friends', 'reviews', 'visits']));
     expect(help.json['exitCodes'], {'ok': 0, 'error': 1, 'usage': 2, 'loggedOut': 3});
     expect((await phone.cli([])).out, startsWith('doener – '));
 

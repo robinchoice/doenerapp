@@ -6,14 +6,27 @@ import 'package:http/http.dart' as http;
 import 'src/client.dart';
 import 'src/command.dart';
 import 'src/commands/auth.dart';
+import 'src/commands/feed.dart';
+import 'src/commands/friends.dart';
 import 'src/commands/nearby.dart';
+import 'src/commands/ranking.dart';
+import 'src/commands/reviews.dart';
+import 'src/commands/visits.dart';
 import 'src/session.dart';
 
 export 'src/command.dart' show Exit, Io;
 export 'src/session.dart' show sessionFile;
 
 /// Every command of the CLI. A new one goes in here (README, „CLI“).
-final commands = <String, Command>{...auth, 'nearby': nearby};
+final commands = <String, Command>{
+  ...auth,
+  'nearby': nearby,
+  'ranking': ranking,
+  'feed': feed,
+  'friends': friends,
+  ...reviews,
+  ...visits,
+};
 
 ArgParser _parser(Command? command) {
   final parser = ArgParser()

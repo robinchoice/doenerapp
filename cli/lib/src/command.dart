@@ -59,3 +59,40 @@ class Failure implements Exception {
 }
 
 const notLoggedIn = Failure('Nicht angemeldet, bitte zuerst `doener login`.', Exit.loggedOut);
+
+/// For commands whose API calls need the login.
+void requireLogin(Context ctx) {
+  if (ctx.session == null) throw notLoggedIn;
+}
+
+/// A number option such as `--lat`; null if it's not given and not [required].
+double? numberOption(Context ctx, String name, {bool required = false}) {
+  final raw = ctx.args.option(name);
+  if (raw == null && !required) return null;
+  final value = double.tryParse((raw ?? '').replaceAll(',', '.'));
+  if (value == null || !value.isFinite) throw Failure('--$name <zahl> fehlt oder ist keine Zahl.', Exit.usage);
+  return value;
+}
+
+/// A price in euros (`7,50`) as cents, as the API takes it.
+int? centsOption(Context ctx, String name) {
+  final euros = numberOption(ctx, name);
+  return euros == null ? null : (euros * 100).round();
+}
+
+String decimal(double value) => value.toStringAsFixed(1).replaceAll('.', ',');
+
+String euros(int cents) => '${(cents / 100).toStringAsFixed(2).replaceAll('.', ',')} €';
+
+String reviewCount(int count) => count == 1 ? '1 Bewertung' : '$count Bewertungen';
+
+/// `23.10.2026` in local time.
+String day(DateTime at) {
+  final local = at.toLocal();
+  String two(int n) => '$n'.padLeft(2, '0');
+  return '${two(local.day)}.${two(local.month)}.${local.year}';
+}
+
+/// ` · 🤤 2 🥙 1`, empty without reactions.
+String reactionText(Map<String, int> reactions) =>
+    reactions.isEmpty ? '' : ' · ${[for (final e in reactions.entries) '${e.key} ${e.value}'].join(' ')}';

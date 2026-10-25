@@ -58,6 +58,7 @@ class _MyPlacesScreenState extends State<MyPlacesScreen> {
                     ButtonSegment(value: _Sort.recent, label: Text('Zuletzt')),
                   ],
                   selected: {_sort},
+                  showSelectedIcon: false,
                   onSelectionChanged: (s) => setState(() => _sort = s.first),
                 ),
                 const SizedBox(height: 16),

@@ -105,7 +105,7 @@ class _MapScreenState extends State<MapScreen> {
           onPressed: () => showAppSheet(context, (_) => ReportShopSheet(position: _center)),
         ),
         actions: [
-          IconButton(tooltip: 'Laden suchen', icon: const Icon(Icons.search), onPressed: _search),
+          if (!mapsAvailable) IconButton(tooltip: 'Laden suchen', icon: const Icon(Icons.search), onPressed: _search),
           IconButton(
             tooltip: 'Nur Favoriten',
             icon: Icon(_favoritesOnly ? Icons.favorite : Icons.favorite_border, color: _favoritesOnly ? Colors.pink : null),
@@ -155,14 +155,28 @@ class _MapScreenState extends State<MapScreen> {
                 // open sheet. The browser then cancels the sheet's scrolling.
                 if (kIsWeb && ModalRoute.isCurrentOf(context) == false)
                   Positioned.fill(child: PointerInterceptor(child: const SizedBox.expand())),
+                // Testers missed the search behind the icon in the app bar
                 Positioned(
                   top: 8,
-                  left: 0,
-                  right: 0,
+                  left: 16,
+                  right: 16,
                   child: Center(
-                    child: places.isEmpty
-                        ? const SizedBox.shrink()
-                        : Pill(child: Text('${places.length} Döner in der Nähe', style: const TextStyle(fontWeight: FontWeight.w600))),
+                    child: Pill(
+                      onTap: _search,
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.search, size: 18, color: context.accent),
+                        const SizedBox(width: 8),
+                        const Text('Laden suchen', style: TextStyle(fontWeight: FontWeight.w600)),
+                        if (places.isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              ' · ${places.length} in der Nähe',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                      ]),
+                    ),
                   ),
                 ),
                 Positioned(

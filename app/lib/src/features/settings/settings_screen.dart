@@ -200,15 +200,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (session.user!.pushPausedUntil case final until? when session.user!.pushPaused)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                   decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
-                  child: Row(
+                  // The action sits on the left, clear of the bug button on the right edge.
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text('Pausiert ${pausedText(until)}. Pushes kommen erst danach wieder, '
-                            'Neuigkeiten per Mail sind nicht betroffen.'),
-                      ),
+                      Text('Pausiert ${pausedText(until)}. Pushes kommen erst danach wieder, '
+                          'Neuigkeiten per Mail sind nicht betroffen.'),
                       TextButton(
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
                         onPressed: () => _updatePush(pushPausedUntil: DateTime.now()),
                         child: const Text('Fortsetzen'),
                       ),

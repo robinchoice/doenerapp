@@ -205,7 +205,11 @@ class _RootState extends State<_Root> {
   /// An invite link opened in the app counts like one opened in the browser:
   /// kept until the login, accepted once the account has a name. A shop's
   /// review link (`/b/<placeId>`) opens its review once the app is past that.
+  /// A magic link (`/login?token=…`) logs in right away; the welcome, which
+  /// asks for the location, still comes first on a fresh install.
   Future<void> _openLink(Uri link) async {
+    final token = link.path == '/login' ? link.queryParameters['token'] : null;
+    if (token != null) return completeLinkLogin(context, token, inviteCode: _inviteCode);
     final segments = link.pathSegments;
     if (segments.length != 2) return;
     if (segments.first == 'b') return context.read<AppData>().requestReview(segments.last);

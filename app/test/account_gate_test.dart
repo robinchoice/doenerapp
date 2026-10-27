@@ -194,4 +194,15 @@ void main() {
     expect(find.textContaining('Ina hat dich eingeladen'), findsOneWidget);
     expect(server.requests, isNot(contains('POST /invites/abc/accept')));
   });
+
+  testWidgets('a login link opened in the app logs in there', (tester) async {
+    final links = StreamController<Uri>();
+    final (server, _) = await _pumpApp(tester, name: 'Robin', inviteCode: 'abc', links: links.stream);
+
+    links.add(Uri.parse('https://doener-api.pleasance.org/login?token=xyz'));
+    await tester.pumpAndSettle();
+    expect(server.requests, contains('POST /auth/verify'));
+    expect(server.verifiedWithInvite, 'abc');
+    expect(find.text('Code schicken'), findsNothing);
+  });
 }

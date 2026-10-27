@@ -309,7 +309,7 @@ Future<void> _mailLoginCode(Deps deps, String email,
     subject: invitedBy == null ? 'Dein Login-Code: $code' : '$invitedBy lädt dich in die Döner App ein',
     text: '${invitedBy == null ? '' : '$invitedBy hat dir ein Konto in der Döner App angelegt.\n\n'}'
         'Dein Code für die Döner App: $code\n\n'
-        '${publicUrl == null ? '' : 'Oder direkt im Browser anmelden:\n$publicUrl/login?token=$token\n\n'}'
+        '${publicUrl == null ? '' : 'Oder direkt anmelden:\n$publicUrl/login?token=$token\n\n'}'
         '${testFlight ? 'Die iPhone-App kommt über TestFlight, die Einladung schickt dir Apple in einer eigenen Mail.\n\n' : invitedBy == null || appUrl == null || !appLink ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
         'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '
         '${invitedBy == null ? 'Falls du das nicht angefordert hast, ignoriere diese Mail einfach.' : 'Danach meldest du dich jederzeit mit dieser Adresse an.'}',

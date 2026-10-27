@@ -52,8 +52,19 @@ Json _ratingsToJson(Map<RatingItem, double> ratings) => {
 /// A score in half steps: `score` exact, `rating` rounded for shipped clients.
 double? _scoreFromJson(Json j) => _doubleOrNull(j.containsKey('score') ? j['score'] : j['rating']);
 
-List<Ingredient>? _ingredientsFromJson(Object? v) =>
-    v == null ? null : [for (final name in v as List) Ingredient.values.byName(name as String)];
+/// Null if neither key is there: the reviewer said nothing about ingredients.
+/// In menu order, which the split into two keys would lose.
+List<Ingredient>? _ingredientsFromJson(Json j) => j['ingredients'] == null && j['newIngredients'] == null
+    ? null
+    : ([for (final name in [...?j['ingredients'] as List?, ...?j['newIngredients'] as List?]) Ingredient.values.byName(name as String)]
+        ..sort((a, b) => a.index.compareTo(b.index)));
+
+/// Shipped clients fail on ingredients they don't know, see Ingredient.newIngredients.
+Json _ingredientsToJson(List<Ingredient>? ingredients) => {
+      'ingredients': ingredients == null ? null : [for (final i in ingredients) if (!Ingredient.newIngredients.contains(i)) i.name],
+      if (ingredients?.where(Ingredient.newIngredients.contains) case final news? when news.isNotEmpty)
+        'newIngredients': [for (final i in news) i.name],
+    };
 
 // MARK: - Auth
 
@@ -466,7 +477,7 @@ class PlaceSummaryDto {
         },
         ayranHomemade: j['ayranHomemade'] as bool?,
         price: j['price'] as int?,
-        ingredients: _ingredientsFromJson(j['ingredients']) ?? const [],
+        ingredients: _ingredientsFromJson(j) ?? const [],
         meat: _enumOrNull(Meat.values, j['meat']),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
@@ -480,7 +491,7 @@ class PlaceSummaryDto {
         'newItems': {for (final e in items.entries) if (RatingItem.newItems.contains(e.key)) e.key.name: e.value.toJson()},
         'ayranHomemade': ayranHomemade,
         'price': price,
-        'ingredients': [for (final i in ingredients) i.name],
+        ..._ingredientsToJson(ingredients),
         'meat': meat?.name,
         'skewer': skewer?.name,
         'bread': bread?.name,
@@ -573,7 +584,7 @@ class ReviewDto {
         veganOptions: j['veganOptions'] as bool?,
         ayranHomemade: j['ayranHomemade'] as bool?,
         price: j['price'] as int?,
-        ingredients: _ingredientsFromJson(j['ingredients']),
+        ingredients: _ingredientsFromJson(j),
         meat: _enumOrNull(Meat.values, j['meat']),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
@@ -600,7 +611,7 @@ class ReviewDto {
         'veganOptions': veganOptions,
         'ayranHomemade': ayranHomemade,
         'price': price,
-        'ingredients': ingredients == null ? null : [for (final i in ingredients!) i.name],
+        ..._ingredientsToJson(ingredients),
         'meat': meat?.name,
         'skewer': skewer?.name,
         'bread': bread?.name,
@@ -656,7 +667,7 @@ class UpsertReviewRequest {
         veganOptions: j['veganOptions'] as bool?,
         ayranHomemade: j['ayranHomemade'] as bool?,
         price: j['price'] as int?,
-        ingredients: _ingredientsFromJson(j['ingredients']),
+        ingredients: _ingredientsFromJson(j),
         meat: _enumOrNull(Meat.values, j['meat']),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
@@ -670,7 +681,7 @@ class UpsertReviewRequest {
         'veganOptions': veganOptions,
         'ayranHomemade': ayranHomemade,
         'price': price,
-        'ingredients': ingredients == null ? null : [for (final i in ingredients!) i.name],
+        ..._ingredientsToJson(ingredients),
         'meat': meat?.name,
         'skewer': skewer?.name,
         'bread': bread?.name,

@@ -268,6 +268,7 @@ void main() {
     expect(sauce.json['city'], 'Freiburg');
     expect([for (final entry in sauce.json['entries']) entry['place']['placeId']], ['cli-rank']);
     expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--max-price', '5'])).out, 'Freiburg, Gesamt: noch keine Läden.');
+    expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--ingredient', 'roteZwiebel'])).out, 'Freiburg, Gesamt: noch keine Läden.');
 
     expect((await ben.cli(['unfriend', '--user', aliUser['id']])).out, 'Freundschaft mit $aliName beendet.');
     expect((await ali.cli(['friends'])).out, 'Noch keine Freunde.');

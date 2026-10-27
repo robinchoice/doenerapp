@@ -53,10 +53,12 @@ Future<(int, String)?> cityRank(Session db, Map<String, dynamic> place) async {
 }
 
 void mountRanking(Router router, Deps deps) {
-  // GET /ranking?lat&lon&by[&city][&maxPrice] — the rated places of the city
-  // around lat/lon or of [city] (by their address), best first, with the
-  // friends who rated them. With maxPrice (cents) only places whose Döner
-  // mostly costs that much at most; they keep their order from the full list.
+  // GET /ranking?lat&lon&by[&city][&maxPrice][&ingredient] — the rated places
+  // of the city around lat/lon or of [city] (by their address), best first,
+  // with the friends who rated them. With maxPrice (cents) only places whose
+  // Döner mostly costs that much at most, with ingredient only those where at
+  // least half of the experts got it, as on the place; they keep their order
+  // from the full list.
   router.get('/ranking', (Request request) async {
     final me = await requireUser(deps, request);
     final lat = queryDouble(request, 'lat');
@@ -66,6 +68,9 @@ void mountRanking(Router router, Deps deps) {
     final maxPriceParam = request.url.queryParameters['maxPrice'];
     final maxPrice = maxPriceParam == null ? null : int.tryParse(maxPriceParam);
     if (maxPriceParam != null && maxPrice == null) throw const ApiException.badRequest('Parameter "maxPrice" ist ungültig');
+    final ingredientParam = request.url.queryParameters['ingredient'];
+    final ingredient = ingredientParam == null ? null : Ingredient.values.asNameMap()[ingredientParam];
+    if (ingredientParam != null && ingredient == null) throw const ApiException.badRequest('Parameter "ingredient" ist ungültig');
     final ratings = _ratings(by);
     final itemParam = {if (by.item case final item? when !RatingItem.classicItems.contains(item)) 'item': item.name};
 
@@ -79,8 +84,11 @@ void mountRanking(Router router, Deps deps) {
       ') s ON s.place_id = pv.id LEFT JOIN ('
       '  SELECT place_id, round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::int AS price FROM reviews '
       '  WHERE price IS NOT NULL GROUP BY place_id'
-      ') pr ON pr.place_id = pv.id WHERE pv.city = @city',
-      {'city': city, ...itemParam},
+      ') pr ON pr.place_id = pv.id${ingredient == null ? '' : ' JOIN ('
+          '  SELECT place_id FROM reviews WHERE ingredients IS NOT NULL GROUP BY place_id '
+          '  HAVING 2 * count(*) FILTER (WHERE @ingredient:text = ANY(ingredients)) >= count(*)'
+          ') ing ON ing.place_id = pv.id'} WHERE pv.city = @city',
+      {'city': city, ...itemParam, 'ingredient': ?ingredient?.name},
     )).where((r) => maxPrice == null || (r['price'] is int && r['price'] as int <= maxPrice)).take(_maxEntries).toList();
 
     final friends = <String, List<FriendRatingDto>>{};

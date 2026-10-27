@@ -127,6 +127,7 @@ enum Ingredient {
   tomate('Tomate', IngredientGroup.salad),
   gurke('Gurke', IngredientGroup.salad),
   zwiebel('Zwiebel', IngredientGroup.salad),
+  roteZwiebel('Rote Zwiebel', IngredientGroup.salad),
   rotkohl('Rotkohl', IngredientGroup.salad),
   weisskohl('Weißkohl', IngredientGroup.salad),
   karotte('Karotte', IngredientGroup.salad),
@@ -152,6 +153,10 @@ enum Ingredient {
   final String label;
   final IngredientGroup group;
   const Ingredient(this.label, this.group);
+
+  /// Unknown to clients before 1.1, which fail on ingredient names they don't
+  /// know. The JSON carries these in a key of its own (`newIngredients`).
+  static const newIngredients = [roteZwiebel];
 
   bool get isSpecial => group == IngredientGroup.special;
 }

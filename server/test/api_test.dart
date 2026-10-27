@@ -1094,6 +1094,31 @@ void main() {
       expect((await call('GET', '/ranking?lat=52&lon=8&maxPrice=billig', token: ute)).$1, 400);
     });
 
+    test('ranking by an ingredient most experts got', () async {
+      await place('t-onion', 'Zwiebel Kebap', 52.0, 'Zwiebelstadt');
+      await place('t-plain', 'Ohne Kebap', 52.0, 'Zwiebelstadt');
+      await review(ute, 't-onion', {'sauceRating': 4, 'ingredients': ['tomate'], 'newIngredients': ['roteZwiebel']});
+      await review(vic, 't-onion', {'sauceRating': 3, 'ingredients': ['tomate']});
+      await review(wim, 't-onion', {'sauceRating': 5});
+      await review(ute, 't-plain', {'sauceRating': 5, 'ingredients': ['zwiebel']});
+      await review(vic, 't-plain', {'sauceRating': 5, 'ingredients': ['tomate']});
+      await review(wim, 't-plain', {'sauceRating': 5, 'newIngredients': ['roteZwiebel']});
+
+      final (_, body) = await call('GET', '/places/t-onion/summary');
+      expect(body['ingredients'], ['tomate'], reason: 'shipped apps fail on unknown ingredients');
+      expect(PlaceSummaryDto.fromJson(body as Map<String, dynamic>).ingredients, [Ingredient.tomate, Ingredient.roteZwiebel]);
+
+      Future<List<String>> ranked(String ingredient) async {
+        final (_, ranking) = await call('GET', '/ranking?lat=52&lon=8&city=Zwiebelstadt&ingredient=$ingredient', token: ute);
+        return [for (final e in ranking['entries'] as List) e['place']['placeId'] as String];
+      }
+
+      expect(await ranked('roteZwiebel'), ['t-onion'], reason: 'one of two experts there, one of three at t-plain');
+      expect(await ranked('tomate'), ['t-onion']);
+      expect(await ranked('mais'), isEmpty);
+      expect((await call('GET', '/ranking?lat=52&lon=8&ingredient=lauch', token: ute)).$1, 400);
+    });
+
     test('rankings for vegans and single dishes', () async {
       final (xen, _) = await signUp('xen@example.org', 'Xen');
       await review(xen, 't-meh', {'brotRating': 4, 'items': {'falafel': 5, 'veganSauce': 5}});

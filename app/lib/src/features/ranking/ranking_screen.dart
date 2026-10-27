@@ -36,6 +36,7 @@ class _RankingScreenState extends State<RankingScreen> {
   LatLng? _center;
   String? _visiting;
   int? _maxPrice;
+  Ingredient? _ingredient;
 
   void _load() {
     final location = context.read<LocationService>();
@@ -43,7 +44,16 @@ class _RankingScreenState extends State<RankingScreen> {
     _visiting = location.visiting?.name;
     _ranking = context
         .read<AppData>()
-        .ranking(center.latitude, center.longitude, _by!, city: location.visiting?.name, maxPrice: _maxPrice);
+        .ranking(center.latitude, center.longitude, _by!, city: location.visiting?.name, maxPrice: _maxPrice, ingredient: _ingredient);
+  }
+
+  Future<void> _pickIngredient() async {
+    final picked = await showAppSheet<(Ingredient?,)>(context, (_) => _IngredientPicker(selected: _ingredient));
+    if (picked == null || !mounted) return;
+    setState(() {
+      _ingredient = picked.$1;
+      _load();
+    });
   }
 
   static String _hint(RankBy by) => switch (by) {
@@ -143,13 +153,25 @@ class _RankingScreenState extends State<RankingScreen> {
                     ],
                   ),
                 ),
-                if (_hint(by).isNotEmpty || _maxPrice != null)
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilterChip(
+                    avatar: const Text('🧅'),
+                    label: Text(_ingredient == null ? 'Jede Zutat' : 'Mit ${_ingredient!.label}'),
+                    selected: _ingredient != null,
+                    showCheckmark: false,
+                    onSelected: (_) => _pickIngredient(),
+                  ),
+                ),
+                if (_hint(by).isNotEmpty || _maxPrice != null || _ingredient != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       [
                         if (_hint(by).isNotEmpty) _hint(by),
                         if (_maxPrice != null) 'Nur Läden, deren Döner laut Bewertungen meist höchstens ${formatPrice(_maxPrice!)} kostet',
+                        if (_ingredient case final i?) 'Nur Läden, bei denen die meisten Experten ${i.label} im Döner hatten',
                       ].join(' · '),
                       style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12),
                     ),
@@ -174,6 +196,20 @@ class _RankingScreenState extends State<RankingScreen> {
                       icon: const Icon(Icons.travel_explore),
                       label: const Text('Andere Stadt ansehen'),
                       onPressed: () => showCityPicker(context),
+                    ),
+                  )
+                else if (entries.isEmpty && _ingredient != null)
+                  EmptyState(
+                    icon: Icons.search_off,
+                    title: 'Nichts mit ${_ingredient!.label} gefunden',
+                    message: 'Zutaten kommen von Experten in den Bewertungen. Schalt den Expertenmodus in den Einstellungen ein '
+                        'und trag beim nächsten Döner ein, was drin war.',
+                    action: OutlinedButton(
+                      onPressed: () => setState(() {
+                        _ingredient = null;
+                        _load();
+                      }),
+                      child: const Text('Jede Zutat'),
                     ),
                   )
                 else if (entries.isEmpty && _maxPrice != null)
@@ -223,6 +259,49 @@ class _RankingScreenState extends State<RankingScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Picks the ingredient the ranking filters by; pops `(null,)` for any.
+class _IngredientPicker extends StatelessWidget {
+  final Ingredient? selected;
+  const _IngredientPicker({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget chip(Ingredient? i) => ChoiceChip(
+          label: Text(i?.label ?? 'Jede Zutat'),
+          selected: i == selected,
+          onSelected: (_) => Navigator.pop(context, (i,)),
+        );
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          Text('Mit Zutat 🧅', style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text(
+            'Nur Läden, bei denen die meisten Experten sie im Döner hatten.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          chip(null),
+          for (final group in IngredientGroup.values) ...[
+            const SizedBox(height: 12),
+            Text(group.label, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [for (final i in Ingredient.values.where((i) => i.group == group)) chip(i)],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

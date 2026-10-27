@@ -18,13 +18,15 @@ final ranking = Command(
     ('  [--city <stadt>]', 'Eine andere Stadt als die am Standort'),
     ('  [--by overall|vegetarian|vegan|<punkt>]', 'Wonach, sonst overall, Punkte wie bei review'),
     ('  [--max-price <euro>]', 'Nur Läden, deren Döner meist höchstens so viel kostet'),
+    ('  [--ingredient <zutat>]', 'Nur Läden, bei denen die meisten Experten sie hatten (z. B. roteZwiebel)'),
   ],
   options: (parser) => parser
     ..addOption('lat')
     ..addOption('lon')
     ..addOption('city')
     ..addOption('by', allowed: ['overall', 'vegetarian', 'vegan', for (final item in RatingItem.values) item.name], defaultsTo: 'overall')
-    ..addOption('max-price'),
+    ..addOption('max-price')
+    ..addOption('ingredient', allowed: [for (final i in Ingredient.values) i.name]),
   run: (ctx) async {
     requireLogin(ctx);
     final ranking = parse(
@@ -34,6 +36,7 @@ final ranking = Command(
         'by': ctx.args.option('by')!,
         'city': ?ctx.args.option('city'),
         'maxPrice': ?centsOption(ctx, 'max-price')?.toString(),
+        'ingredient': ?ctx.args.option('ingredient'),
       }),
       RankingDto.fromJson,
     );

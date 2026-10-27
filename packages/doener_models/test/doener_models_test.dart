@@ -181,7 +181,7 @@ void main() {
       rating: 4.5,
       ratings: const {RatingItem.sauce: 4.5, RatingItem.brot: 3, RatingItem.ayran: 5},
       ayranHomemade: true,
-      ingredients: const [Ingredient.granatapfel, Ingredient.mais],
+      ingredients: const [Ingredient.roteZwiebel, Ingredient.mais, Ingredient.granatapfel],
       meat: Meat.kalb,
       createdAt: DateTime.utc(2026, 10, 4),
       updatedAt: DateTime.utc(2026, 10, 4),
@@ -190,6 +190,8 @@ void main() {
     expect(json['sauceRating'], 5, reason: 'older apps read whole numbers');
     expect(json['items'], {'ayran': 5});
     expect(json['rating'], 5);
+    expect(json['ingredients'], ['mais', 'granatapfel'], reason: 'older apps fail on new ingredients');
+    expect(json['newIngredients'], ['roteZwiebel']);
     final back = ReviewDto.fromJson(json);
     expect(back.ratings, review.ratings);
     expect(back.rating, 4.5);
@@ -199,6 +201,7 @@ void main() {
     final legacy = ReviewDto.fromJson({...json}..remove('items')..remove('ratings')..remove('score')..remove('ingredients')..remove('meat'));
     expect(legacy.ratings, {RatingItem.sauce: 5, RatingItem.brot: 3}, reason: 'reviews stored by older builds');
     expect(legacy.rating, 5);
+    expect(legacy.ingredients, [Ingredient.roteZwiebel]);
     expect(() => UpsertReviewRequest.fromJson({'items': {'zwiebel': 3}}), throwsArgumentError);
   });
 

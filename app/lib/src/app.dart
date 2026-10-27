@@ -63,6 +63,13 @@ class DoenerApp extends StatelessWidget {
         locale: const Locale('de'),
         supportedLocales: const [Locale('de')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        // A tap outside a text field closes the keyboard. Flutter does that only on desktop and web.
+        actions: {
+          ...WidgetsApp.defaultActions,
+          EditableTextTapUpOutsideIntent: CallbackAction<EditableTextTapUpOutsideIntent>(
+            onInvoke: (intent) => intent.focusNode.unfocus(),
+          ),
+        },
         builder: (context, child) => _FeedbackButton(child: child!),
         home: _Root(
           onboardingDone: onboardingDone,

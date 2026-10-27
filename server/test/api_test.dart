@@ -159,7 +159,7 @@ void main() {
       publicUrl: config.publicUrl,
       webDir: config.webDir,
       signupAllowlist: {'liste@example.org'},
-      adminEmails: config.adminEmails,
+      adminEmails: {...config.adminEmails, 'chefin@example.org'},
     );
     closedHandler = buildHandler(Deps(db: db, config: closed, mailer: mailer, httpClient: google));
   });
@@ -1221,6 +1221,11 @@ void main() {
 
       expect((await login(' Liste@Example.org ')).$1, 204);
       expect((await verify('liste@example.org')).$2['isNewUser'], isTrue);
+    });
+
+    test('admins sign up without an invite, or nobody could invite', () async {
+      expect((await login('Chefin@example.org')).$1, 204);
+      expect((await verify('chefin@example.org')).$2['isNewUser'], isTrue);
     });
 
     test('the login link for agents opens the test account once, without a mail', () async {

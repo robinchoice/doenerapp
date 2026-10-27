@@ -217,12 +217,13 @@ void mountAuth(Router router, Deps deps) {
 /// 90-day cleanup of `tester_requests` ends this by itself.
 final signupClosedAt = DateTime.utc(2026, 10, 15, 14, 30);
 
-/// Closed until Robin opens it: new accounts only for the allowlist, early
-/// tester requests or an admin's invite ([inviteTester]). A friend's invite
-/// link only makes friends, so testers can't bring in others.
+/// Closed until Robin opens it: new accounts only for the allowlist, the
+/// admins themselves, early tester requests or an admin's invite
+/// ([inviteTester]). A friend's invite link only makes friends, so testers
+/// can't bring in others.
 Future<bool> _maySignUp(Deps deps, String email) async {
   final config = deps.config;
-  if (config.signupOpen || config.signupAllowlist.contains(email)) return true;
+  if (config.signupOpen || config.signupAllowlist.contains(email) || config.adminEmails.contains(email)) return true;
   return await queryOne(
         deps.db,
         'SELECT 1 FROM tester_requests WHERE email = @email AND created_at < @closed '

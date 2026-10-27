@@ -46,7 +46,7 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
           const EmptyState(
             icon: Icons.search_off,
             title: 'Nichts gefunden',
-            message: 'Gesucht wird in allen Läden, die die App schon kennt. Schieb die Karte dorthin, wo du suchst.',
+            message: 'Gesucht wird in allen Läden, die die App schon kennt. Schieb die Karte dorthin, wo du suchst, und zoom nah heran.',
           ),
         for (final p in places.take(30))
           Padding(

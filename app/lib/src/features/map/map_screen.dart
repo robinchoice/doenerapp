@@ -39,6 +39,8 @@ class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _controller;
   LatLng _center = fallbackLocation;
   LatLngBounds? _loadedBounds;
+  LatLngBounds? _visible;
+  bool _zoomIn = false;
   bool _loading = false;
   String? _error;
   bool _favoritesOnly = false;
@@ -56,6 +58,13 @@ class _MapScreenState extends State<MapScreen> {
     if (bounds == null || !mounted) return;
     final (south, west, north, east) =
         (bounds.southwest.latitude, bounds.southwest.longitude, bounds.northeast.latitude, bounds.northeast.longitude);
+    // The server only searches Google for small areas. Bigger ones show known
+    // places and don't count as loaded, so zooming in there searches.
+    final searchable = tilesCovering(minLat: south, minLon: west, maxLat: north, maxLon: east).length <= maxTilesPerRequest;
+    setState(() {
+      _visible = bounds;
+      _zoomIn = !searchable;
+    });
     if (north - south > _maxFetchSpanDeg || east - west > _maxFetchSpanDeg) return;
     final loaded = _loadedBounds;
     if (!force && loaded != null && loaded.contains(bounds.southwest) && loaded.contains(bounds.northeast)) return;
@@ -66,7 +75,7 @@ class _MapScreenState extends State<MapScreen> {
     });
     try {
       await context.read<AppData>().loadArea(south: south, west: west, north: north, east: east);
-      _loadedBounds = bounds;
+      if (searchable) _loadedBounds = bounds;
     } on OfflineException catch (e) {
       _error = e.toString();
     } on ApiException catch (e) {
@@ -95,6 +104,7 @@ class _MapScreenState extends State<MapScreen> {
         .where((p) => !_favoritesOnly || data.favorites.contains(p.placeId))
         .where((p) => diet != Diet.vegan || p.veganOptions != false)
         .toList();
+    final visible = places.where((p) => _visible?.contains(LatLng(p.latitude, p.longitude)) ?? true).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -167,10 +177,10 @@ class _MapScreenState extends State<MapScreen> {
                         Icon(Icons.search, size: 18, color: context.accent),
                         const SizedBox(width: 8),
                         const Text('Laden suchen', style: TextStyle(fontWeight: FontWeight.w600)),
-                        if (places.isNotEmpty)
+                        if (visible > 0)
                           Flexible(
                             child: Text(
-                              ' · ${places.length} in der Nähe',
+                              ' · $visible auf der Karte',
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
@@ -203,7 +213,16 @@ class _MapScreenState extends State<MapScreen> {
                                   Icon(Icons.refresh, size: 18, color: context.accent),
                                 ]),
                               )
-                            : const SizedBox.shrink(),
+                            : _zoomIn
+                                ? Pill(
+                                    onTap: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
+                                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Icon(Icons.zoom_in, size: 18, color: context.accent),
+                                      const SizedBox(width: 6),
+                                      const Flexible(child: Text('Für mehr Läden näher heranzoomen', overflow: TextOverflow.ellipsis)),
+                                    ]),
+                                  )
+                                : const SizedBox.shrink(),
                   ),
                 ),
               ],

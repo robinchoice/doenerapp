@@ -10,6 +10,7 @@ import 'package:sembast/sembast.dart';
 import 'src/app.dart';
 import 'src/core/app_data.dart';
 import 'src/core/db_factory.dart';
+import 'src/core/haptics.dart';
 import 'src/core/location.dart';
 import 'src/core/maps.dart';
 import 'src/core/push.dart';
@@ -39,6 +40,7 @@ Future<void> startApp() async {
   final db = await openLocalDatabase('doener.db');
   final session = Session(db);
   await session.load();
+  await Haptics.load(db);
   final reminders = Reminders.supported ? Reminders(db) : null;
   await reminders?.init();
   Push? push = Push.supported ? Push() : null;

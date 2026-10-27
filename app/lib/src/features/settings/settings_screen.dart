@@ -10,6 +10,7 @@ import 'package:sembast/sembast.dart';
 
 import '../../core/api.dart';
 import '../../core/app_data.dart';
+import '../../core/haptics.dart';
 import '../../core/location.dart';
 import '../../core/push.dart';
 import '../../core/reminders.dart';
@@ -268,6 +269,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   setState(() {});
                 },
               ),
+          ],
+          if (Haptics.supported) ...[
+            header('Vibration'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentedButton<HapticLevel>(
+                segments: [for (final l in HapticLevel.values) ButtonSegment(value: l, label: Text(l.label))],
+                selected: {Haptics.level},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) async {
+                  await Haptics.setLevel(context.read<Database>(), s.first);
+                  setState(() {});
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                'Beim Bewerten, Speichern und wenn ihr Freunde werdet. Ist die Vibration am Handy aus, bleibt es still.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+              ),
+            ),
           ],
           header('Synchronisation'),
           ListTile(

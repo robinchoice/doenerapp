@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_data.dart';
+import '../../core/haptics.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 
@@ -98,7 +99,9 @@ class _ReviewSheetState extends State<ReviewSheet> {
     super.dispose();
   }
 
-  void _rate(RatingItem item, double value) => setState(() {
+  void _rate(RatingItem item, double value) {
+    Haptics.tick();
+    setState(() {
         if (value == 0) {
           _ratings.remove(item);
           return;
@@ -108,6 +111,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
         if (RatingItem.veganItems.contains(item)) _vegan = _Answer.yes;
         if (item == RatingItem.ayran) _ayran = _Answer.yes;
       });
+  }
 
   void _toggleExtra(RatingItem item) => setState(() {
         if (_extras.remove(item)) {
@@ -171,6 +175,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
             removePhoto: _removePhoto && _photo == null,
           ),
         );
+    Haptics.success();
     if (mounted) Navigator.of(context).pop(true);
   }
 

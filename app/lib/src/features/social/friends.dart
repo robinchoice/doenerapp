@@ -4,6 +4,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/haptics.dart';
 import '../../core/push.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
@@ -46,11 +47,13 @@ class Friends extends ChangeNotifier {
   Future<void> request(String userId) => _guard(() async {
         final f = FriendshipDto.fromJson(await _session.api.post('/friends/requests', FriendRequestBody(userId: userId).toJson()) as Map<String, dynamic>);
         all = [f, ...all.where((x) => x.id != f.id)];
+        Haptics.success();
       });
 
   Future<void> accept(String id) => _guard(() async {
         final f = FriendshipDto.fromJson(await _session.api.post('/friends/$id/accept') as Map<String, dynamic>);
         all = [for (final x in all) x.id == id ? f : x];
+        Haptics.success();
       });
 
   /// No pushes about [f]'s check-ins.
@@ -84,6 +87,7 @@ class Friends extends ChangeNotifier {
     final json = await _session.api.post('/invites/${Uri.encodeComponent(code)}/accept');
     final friendship = FriendshipDto.fromJson(json as Map<String, dynamic>);
     all = [friendship, ...all.where((x) => x.id != friendship.id)];
+    Haptics.success();
     notifyListeners();
     return friendship;
   }

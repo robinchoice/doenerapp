@@ -99,8 +99,7 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
                       ],
                     ),
                   ),
-                  if (p.avgRating != null)
-                    ScoreBlock(average: p.avgRating!, count: p.reviewCount, size: 26),
+                  if (p.avgRating != null) ScoreBlock(average: p.avgRating!, count: p.reviewCount, size: 26),
                 ],
               ),
             ),

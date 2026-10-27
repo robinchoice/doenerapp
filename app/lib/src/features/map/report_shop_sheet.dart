@@ -35,15 +35,15 @@ class _ReportShopSheetState extends State<ReportShopSheet> {
     final position = _attachLocation ? widget.position : null;
     try {
       await context.read<Session>().api.post(
-            '/shop-reports',
-            ShopReportRequest(
-              name: _name.text.trim(),
-              hint: Validation.clean(_hint.text),
-              latitude: position?.latitude,
-              longitude: position?.longitude,
-              note: Validation.clean(_note.text),
-            ).toJson(),
-          );
+        '/shop-reports',
+        ShopReportRequest(
+          name: _name.text.trim(),
+          hint: Validation.clean(_hint.text),
+          latitude: position?.latitude,
+          longitude: position?.longitude,
+          note: Validation.clean(_note.text),
+        ).toJson(),
+      );
       if (!mounted) return;
       Navigator.of(context).pop();
       showMessage(context, 'Danke! Wir schauen uns den Laden an.');
@@ -69,7 +69,10 @@ class _ReportShopSheetState extends State<ReportShopSheet> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
-        TextField(controller: _hint, decoration: const InputDecoration(labelText: 'Adresse oder Stadtteil (optional)')),
+        TextField(
+          controller: _hint,
+          decoration: const InputDecoration(labelText: 'Adresse oder Stadtteil (optional)'),
+        ),
         const SizedBox(height: 12),
         TextField(
           controller: _note,

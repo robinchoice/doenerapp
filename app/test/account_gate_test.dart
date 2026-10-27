@@ -106,6 +106,17 @@ void main() {
     expect(find.byIcon(Icons.bug_report_outlined), findsNothing, reason: 'feedback needs an account');
   });
 
+  testWidgets('a tap outside a text field closes the keyboard', (tester) async {
+    await _pumpApp(tester);
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isFalse);
+  });
+
   testWidgets('the bug button sends feedback with a screenshot of the screen', (tester) async {
     PackageInfo.setMockInitialValues(appName: 'Döner App', packageName: 'doener', version: '1.0.0', buildNumber: '42', buildSignature: '');
     final (server, _) = await _pumpApp(tester, loggedIn: true, name: 'Robin');

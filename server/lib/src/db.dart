@@ -424,6 +424,13 @@ final migrations = <List<String>>[
     'CREATE INDEX push_events_pending ON push_events (created_at) WHERE pending',
     'CREATE INDEX push_events_user ON push_events (user_id, created_at)',
   ],
+  [
+    // Opening hours only come with Place Details, at most 30 days old like all details.
+    'ALTER TABLE places ADD COLUMN hours_synced_at timestamptz',
+    'UPDATE places SET hours_synced_at = synced_at WHERE opening_hours IS NOT NULL',
+    // Searches important regions ahead of users (prefetchPlaces).
+    "INSERT INTO schedules (name, next_run_at) VALUES ('place_prefetch', now())",
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

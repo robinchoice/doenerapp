@@ -9,6 +9,7 @@ import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/auth.dart' show hashToken;
 import 'package:doener_server/src/deps.dart' show queryOne;
 import 'package:doener_server/src/google_places.dart' show maxTileSearchesPerDay;
+import 'package:doener_server/src/prefetch.dart' show PrefetchArea;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:postgres/postgres.dart';
@@ -109,16 +110,19 @@ void main() {
             'id': id,
             'displayName': {'text': id == 'place-announced' ? 'Neuer Grill' : 'Kebap Haus'},
             'location': {'latitude': 48.0, 'longitude': 7.85},
+            'regularOpeningHours': {
+              'weekdayDescriptions': ['Montag: 11:00–22:00'],
+            },
             if (id == 'place-announced') 'businessStatus': 'OPERATIONAL',
-            if (id == 'place-announced')
-              'addressComponents': [
-                {'longText': 'Freiburg', 'types': ['locality']},
-              ],
+            'addressComponents': [
+              {'longText': id == 'place-announced' ? 'Freiburg' : 'Berlin', 'types': ['locality']},
+            ],
           }),
           200,
           headers: {'content-type': 'application/json'},
         );
       }
+      expect(request.headers['x-goog-fieldmask'], isNot(contains('regularOpeningHours')), reason: 'keeps searches at Pro');
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       final low = body['locationRestriction']['rectangle']['low'] as Map<String, dynamic>;
       // Only the tile containing Freiburg's centre has shops.
@@ -365,6 +369,29 @@ void main() {
 
       expect((await call('GET', '/places?minLat=10&minLon=10&maxLat=5&maxLon=11', token: anna)).$1, 400);
       expect((await call('GET', '/places/unknown')).$1, 404);
+    });
+
+    test('opening hours come from Place Details when a shop is opened', () async {
+      final (_, before) = await call('GET', '/places/place-kebap');
+      expect(before['openingHours'], isNull, reason: 'the map\'s search leaves them out');
+      final calls = googleCalls;
+
+      final (_, opened) = await call('GET', '/places/place-kebap', token: anna);
+      expect(opened['openingHours'], 'Montag: 11:00–22:00');
+      expect(googleCalls, calls + 1);
+
+      await call('GET', '/places/place-kebap', token: bob);
+      expect(googleCalls, calls + 1, reason: 'asked once per 25 days');
+    });
+
+    test('the shop search finds every known shop by name', () async {
+      final (status, found) = await call('GET', '/places/search?q=KEBAP&lat=48&lon=7.85', token: anna);
+      expect(status, 200);
+      expect((found as List).map((p) => p['placeId']), ['place-kebap']);
+      expect((await call('GET', '/places/search?q=keb')).$1, 401);
+      expect((await call('GET', '/places/search?q=k', token: anna)).$1, 400);
+      final (_, wildcard) = await call('GET', '/places/search?q=%25%25', token: anna);
+      expect(wildcard, isEmpty, reason: '% is a character, not a wildcard');
     });
 
     test('Google searches need a login and are capped per user and day', () async {
@@ -1420,6 +1447,46 @@ void main() {
     expect((await call('GET', '/places/place-unused')).$1, 404, reason: 'unused stale place is dropped');
   });
 
+  test('the prefetch searches areas block by block and splits full blocks', () async {
+    var requests = 0;
+    // Blocks wider than 0.1° are full: three pages and more behind them.
+    final google = MockClient((request) async {
+      requests++;
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final rect = body['locationRestriction']['rectangle'] as Map<String, dynamic>;
+      final (lat, lon) = (rect['low']['latitude'] as num, rect['low']['longitude'] as num);
+      final full = (rect['high']['latitude'] as num) - lat > 0.1;
+      final page = body['pageToken'] as String? ?? '0';
+      return http.Response(
+        jsonEncode({
+          'places': [
+            {
+              'id': 'prefetch-$lat-$lon-${rect['high']['latitude']}-$page',
+              'displayName': {'text': 'Prefetch Döner'},
+              'location': {'latitude': lat + 0.01, 'longitude': lon + 0.01},
+            },
+          ],
+          if (full) 'nextPageToken': '${int.parse(page) + 1}',
+        }),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+    final prefetchDeps = Deps(db: db, config: deps.config, mailer: LogMailer(), httpClient: google);
+    // One block of 8 × 8 tiles far from the other tests.
+    const area = [PrefetchArea('Testsee', 60.01, 30.01, 60.02, 30.02)];
+
+    await prefetchPlaces(prefetchDeps, areas: area);
+    expect(requests, 3 + 4 * 3 + 16, reason: 'block and quarters are full, their quarters are not');
+    final tiles = await queryOne(db, "SELECT count(*)::int AS n FROM search_tiles WHERE tile_key LIKE '10__:200_'");
+    expect(tiles!['n'], 64);
+    final places = await queryOne(db, "SELECT count(*)::int AS n FROM places WHERE name = 'Prefetch Döner'");
+    expect(places!['n'], 3 + 4 * 3 + 16);
+
+    await prefetchPlaces(prefetchDeps, areas: area);
+    expect(requests, 31, reason: 'searched blocks wait 25 days');
+  });
+
   test('a schedule runs once per period, and again an hour after a failed run', () async {
     var runs = 0;
     Future<void> run() => runSchedule(db, 'place_cache', const Duration(hours: 24), () async => runs++);
@@ -1668,7 +1735,9 @@ void main() {
     await db.execute('ALTER TABLE users DROP COLUMN push_paused_until, DROP COLUMN quiet_hours, DROP COLUMN quiet_days, '
         'DROP COLUMN quiet_start, DROP COLUMN quiet_end, DROP COLUMN time_zone, DROP COLUMN inbox_seen_at');
     await db.execute('DROP FUNCTION in_quiet_hours');
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 4 FROM schema_migrations)');
+    await db.execute('ALTER TABLE places DROP COLUMN hours_synced_at');
+    await db.execute("DELETE FROM schedules WHERE name = 'place_prefetch'");
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 5 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

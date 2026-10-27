@@ -7,11 +7,47 @@ import 'package:http/http.dart' as http;
 /// Empty tiles are remembered as well. The TTL stays below Google's 30-day
 /// caching limit for place details.
 const tileTtl = Duration(days: 25);
-const _maxPagesPerTile = 3;
+
+/// A text search returns at most this many pages of 20 places.
+const maxPagesPerSearch = 3;
 
 /// Tiles one user may have searched per day; cached tiles don't count.
 /// Beyond that, the map only shows places that are already known.
 const maxTileSearchesPerDay = 20;
+
+/// A square of [size]×[size] tiles from tile ([x], [y]): the area one text
+/// search covers. A full one gets split into [quarters].
+class TileBlock {
+  final int x;
+  final int y;
+  final int size;
+  const TileBlock(this.x, this.y, [this.size = 1]);
+
+  double get minLat => y * tileSizeDeg;
+  double get maxLat => (y + size) * tileSizeDeg;
+  double get minLon => x * tileSizeDeg;
+  double get maxLon => (x + size) * tileSizeDeg;
+
+  List<Tile> get tiles => [
+        for (var dy = 0; dy < size; dy++)
+          for (var dx = 0; dx < size; dx++) Tile(x + dx, y + dy),
+      ];
+
+  List<TileBlock> get quarters {
+    final half = size ~/ 2;
+    return [
+      TileBlock(x, y, half),
+      TileBlock(x + half, y, half),
+      TileBlock(x, y + half, half),
+      TileBlock(x + half, y + half, half),
+    ];
+  }
+
+  @override
+  bool operator ==(Object other) => other is TileBlock && other.x == x && other.y == y && other.size == size;
+  @override
+  int get hashCode => Object.hash(x, y, size);
+}
 
 class GooglePlace {
   final String id;
@@ -83,18 +119,12 @@ class GooglePlace {
   bool get looksLikeDoener => _namePattern.hasMatch(name) || types.any(_types.contains);
 }
 
-// openingDate is in the same price tier as businessStatus.
-const _placeFields = [
-  'id',
-  'displayName',
-  'location',
-  'types',
-  'businessStatus',
-  'openingDate',
-  'addressComponents',
-  'regularOpeningHours',
-];
-final _fieldMask = [..._placeFields.map((f) => 'places.$f'), 'nextPageToken'].join(',');
+// The fields decide the price: these are all billed as Pro, openingDate
+// included. Opening hours would make every search Enterprise (fewer free
+// requests, higher price), so only Place Details asks for them.
+const _searchFields = ['id', 'displayName', 'location', 'types', 'businessStatus', 'openingDate', 'addressComponents'];
+const _placeFields = [..._searchFields, 'regularOpeningHours'];
+final _fieldMask = [..._searchFields.map((f) => 'places.$f'), 'nextPageToken'].join(',');
 
 /// Place Details (New). Returns null if Google no longer knows the place.
 Future<GooglePlace?> fetchPlace(http.Client client, String apiKey, String placeId) async {
@@ -109,11 +139,18 @@ Future<GooglePlace?> fetchPlace(http.Client client, String apiKey, String placeI
   return GooglePlace.fromJson(jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>);
 }
 
-/// Google Places API (New) text search restricted to [tile].
-Future<List<GooglePlace>> searchTile(http.Client client, String apiKey, Tile tile) async {
+/// Google Places API (New) text search restricted to [block]. Full when
+/// Google had more than [maxPagesPerSearch] pages.
+Future<({List<GooglePlace> places, bool full, int requests})> searchArea(
+  http.Client client,
+  String apiKey,
+  TileBlock block,
+) async {
   final results = <GooglePlace>[];
   String? pageToken;
-  for (var page = 0; page < _maxPagesPerTile; page++) {
+  var requests = 0;
+  for (var page = 0; page < maxPagesPerSearch; page++) {
+    requests++;
     final response = await client.post(
       Uri.parse('https://places.googleapis.com/v1/places:searchText'),
       headers: {
@@ -129,8 +166,8 @@ Future<List<GooglePlace>> searchTile(http.Client client, String apiKey, Tile til
         'pageSize': 20,
         'locationRestriction': {
           'rectangle': {
-            'low': {'latitude': tile.minLat, 'longitude': tile.minLon},
-            'high': {'latitude': tile.maxLat, 'longitude': tile.maxLon},
+            'low': {'latitude': block.minLat, 'longitude': block.minLon},
+            'high': {'latitude': block.maxLat, 'longitude': block.maxLon},
           },
         },
         'pageToken': ?pageToken,
@@ -144,5 +181,5 @@ Future<List<GooglePlace>> searchTile(http.Client client, String apiKey, Tile til
     pageToken = body['nextPageToken'] as String?;
     if (pageToken == null) break;
   }
-  return results;
+  return (places: results, full: pageToken != null, requests: requests);
 }

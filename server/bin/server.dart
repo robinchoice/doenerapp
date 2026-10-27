@@ -90,6 +90,12 @@ Future<void> startServer() async {
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
     try {
+      await runSchedule(db, 'place_prefetch', const Duration(hours: 24), () => prefetchPlaces(deps));
+    } catch (error, stackTrace) {
+      print('Place prefetch failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
+    try {
       await runSchedule(db, 'best_of', const Duration(hours: 24), () => computeDueBestOf(db));
     } catch (error, stackTrace) {
       print('Best-of lists failed: $error');

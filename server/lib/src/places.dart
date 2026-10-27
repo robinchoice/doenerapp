@@ -259,13 +259,41 @@ void mountPlaces(Router router, Deps deps) {
     return json(rows.map((r) => placeFromRow(r).toJson()).toList());
   });
 
+  // GET /places/search?q[&lat&lon] — known shops by name, nearest first.
+  // Searches every shop any map has loaded, not only the device's.
+  router.get('/places/search', (Request request) async {
+    await requireUser(deps, request);
+    final q = (request.url.queryParameters['q'] ?? '').trim();
+    if (q.length < 2 || q.length > 100) throw const ApiException.badRequest('Suche mit 2 bis 100 Zeichen');
+    final near = request.url.queryParameters.containsKey('lat');
+    final rows = await query(
+      deps.db,
+      'SELECT * FROM active_place_view p WHERE p.name ILIKE @pattern '
+      'ORDER BY ${near ? distanceSql('p') : 'p.review_count DESC'}, p.name LIMIT 30',
+      {
+        'pattern': '%${q.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%',
+        if (near) 'lat': queryDouble(request, 'lat'),
+        if (near) 'lon': queryDouble(request, 'lon'),
+      },
+    );
+    return json(rows.map((r) => placeFromRow(r).toJson()).toList());
+  });
+
   // A shop dropped from the cache after 30 days comes back for a signed-in
   // user, e.g. via the review link on a poster in the shop (/b/<placeId>).
+  // A known one gets its opening hours here, the map's search leaves them out.
   router.get('/places/<placeId>', (Request request, String placeId) async {
     var row = await queryOne(deps.db, 'SELECT * FROM place_view WHERE google_place_id = @id', {'id': placeId});
-    if (row == null && request.headers.containsKey('authorization')) {
-      await requireUser(deps, request);
-      if (await _fetchShop(deps, placeId)) row = await _requirePlace(deps, placeId);
+    final apiKey = deps.config.googlePlacesApiKey;
+    if (request.headers.containsKey('authorization')) {
+      if (row == null) {
+        await requireUser(deps, request);
+        if (await _fetchShop(deps, placeId)) row = await _requirePlace(deps, placeId);
+      } else if (apiKey != null && await _hoursDue(deps, placeId)) {
+        await requireUser(deps, request);
+        await _fetchHours(deps, apiKey, placeId);
+        row = await _requirePlace(deps, placeId);
+      }
     }
     if (row == null) throw const ApiException.notFound('Laden unbekannt');
     return json(placeFromRow(row).toJson());
@@ -541,10 +569,8 @@ Future<void> _syncTile(Deps deps, String apiKey, Tile tile, String userId) async
   }
 
   try {
-    final places = await searchTile(deps.httpClient, apiKey, tile);
-    for (final p in places.where((p) => p.isOpenBusiness && p.looksLikeDoener)) {
-      await _upsertPlace(deps, p);
-    }
+    final (:places, full: _, requests: _) = await searchArea(deps.httpClient, apiKey, TileBlock(tile.x, tile.y));
+    await storeFoundPlaces(deps, places);
   } catch (e) {
     print('Tile ${tile.key} sync failed: $e');
     await deps.db.execute(Sql.named('DELETE FROM search_tiles WHERE tile_key = @key'), parameters: {'key': tile.key});
@@ -558,7 +584,7 @@ Future<bool> _fetchShop(Deps deps, String placeId) async {
   try {
     final place = await fetchPlace(deps.httpClient, apiKey, placeId);
     if (place == null || !place.isOpenBusiness || !place.looksLikeDoener) return false;
-    await _upsertPlace(deps, place);
+    await _upsertPlace(deps, place, withHours: true);
     return true;
   } catch (e) {
     print('Fetching place $placeId failed: $e');
@@ -566,13 +592,54 @@ Future<bool> _fetchShop(Deps deps, String placeId) async {
   }
 }
 
-Future<void> _upsertPlace(Deps deps, GooglePlace p) => deps.db.execute(
+/// Döner shops from a text search go into the cache, the rest is dropped.
+Future<void> storeFoundPlaces(Deps deps, List<GooglePlace> places) async {
+  for (final p in places.where((p) => p.isOpenBusiness && p.looksLikeDoener)) {
+    await _upsertPlace(deps, p);
+  }
+}
+
+/// Only Place Details bring opening hours ([withHours]); a text search keeps
+/// the ones already known.
+/// Closed and announced shops need no opening hours.
+const _hoursDueSql = "coalesce(business_status, '') NOT IN ('CLOSED_PERMANENTLY', 'FUTURE_OPENING') "
+    "AND (hours_synced_at IS NULL OR hours_synced_at < now() - interval '25 days')";
+
+Future<bool> _hoursDue(Deps deps, String placeId) async =>
+    await queryOne(
+      deps.db,
+      'SELECT 1 FROM places WHERE google_place_id = @id AND $_hoursDueSql',
+      {'id': placeId},
+    ) !=
+    null;
+
+/// Opening hours of a known shop. Asked once per 25 days, even if Google has none.
+Future<void> _fetchHours(Deps deps, String apiKey, String placeId) async {
+  try {
+    final place = await fetchPlace(deps.httpClient, apiKey, placeId);
+    if (place != null) {
+      await _upsertPlace(deps, place, withHours: true);
+    } else {
+      await deps.db.execute(
+        Sql.named('UPDATE places SET hours_synced_at = now() WHERE google_place_id = @id'),
+        parameters: {'id': placeId},
+      );
+    }
+  } catch (e) {
+    print('Fetching opening hours of $placeId failed: $e');
+  }
+}
+
+Future<void> _upsertPlace(Deps deps, GooglePlace p, {bool withHours = false}) => deps.db.execute(
       Sql.named(
         'INSERT INTO places (google_place_id, name, latitude, longitude, address, postal_code, city, opening_hours, '
-        'business_status, opening_date) VALUES (@id, @name, @lat, @lon, @address, @postal, @city, @hours, @status, @opening) '
+        'hours_synced_at, business_status, opening_date) VALUES (@id, @name, @lat, @lon, @address, @postal, @city, @hours, '
+        'CASE WHEN @withHours:boolean THEN now() END, @status, @opening) '
         'ON CONFLICT (google_place_id) DO UPDATE SET name = EXCLUDED.name, latitude = EXCLUDED.latitude, '
         'longitude = EXCLUDED.longitude, address = EXCLUDED.address, postal_code = EXCLUDED.postal_code, '
-        'city = EXCLUDED.city, opening_hours = EXCLUDED.opening_hours, business_status = EXCLUDED.business_status, '
+        'city = EXCLUDED.city, business_status = EXCLUDED.business_status, '
+        'opening_hours = CASE WHEN @withHours:boolean THEN EXCLUDED.opening_hours ELSE places.opening_hours END, '
+        'hours_synced_at = CASE WHEN @withHours:boolean THEN now() ELSE places.hours_synced_at END, '
         'opening_date = EXCLUDED.opening_date, synced_at = now(), '
         // An announced shop that is open now — that's the news.
         "opened_on = CASE WHEN places.business_status = 'FUTURE_OPENING' AND EXCLUDED.business_status = 'OPERATIONAL' "
@@ -587,6 +654,7 @@ Future<void> _upsertPlace(Deps deps, GooglePlace p) => deps.db.execute(
         'postal': p.postalCode,
         'city': p.city,
         'hours': p.openingHours,
+        'withHours': withHours,
         'status': p.businessStatus,
         'opening': p.openingDate,
       },
@@ -594,20 +662,22 @@ Future<void> _upsertPlace(Deps deps, GooglePlace p) => deps.db.execute(
 
 /// Keeps the place cache within Google's terms: details may be stored for at
 /// most 30 days (only the place ID indefinitely). Places with user activity
-/// are refreshed before that; untouched ones are dropped and come back when
-/// someone looks at the area again. Runs daily.
+/// are refreshed before that, with their opening hours; untouched ones are
+/// dropped and come back when someone looks at the area again or the
+/// prefetch searches it. Runs daily.
 Future<void> maintainPlaceCache(Deps deps) async {
-  const activity = 'EXISTS (SELECT 1 FROM reviews r WHERE r.place_id = p.id) '
+  const used = 'EXISTS (SELECT 1 FROM reviews r WHERE r.place_id = p.id) '
       'OR EXISTS (SELECT 1 FROM visits v WHERE v.place_id = p.id) '
-      'OR EXISTS (SELECT 1 FROM users u WHERE u.live_place_id = p.id) '
-      // Announced openings stay until they open.
-      "OR p.business_status IS NOT DISTINCT FROM 'FUTURE_OPENING'";
+      'OR EXISTS (SELECT 1 FROM users u WHERE u.live_place_id = p.id)';
+  // Announced openings stay until they open.
+  const activity = "$used OR p.business_status IS NOT DISTINCT FROM 'FUTURE_OPENING'";
 
   final apiKey = deps.config.googlePlacesApiKey;
   if (apiKey != null) {
     final stale = await query(
       deps.db,
       "SELECT google_place_id FROM places p WHERE (synced_at < now() - interval '25 days' AND ($activity)) "
+      'OR (($used) AND $_hoursDueSql) '
       // From the announced day on (daily without one): has it opened?
       "OR (business_status = 'FUTURE_OPENING' AND (opening_date IS NULL OR opening_date <= to_char(current_date, 'YYYY-MM-DD')))",
     );
@@ -616,7 +686,7 @@ Future<void> maintainPlaceCache(Deps deps) async {
       try {
         final place = await fetchPlace(deps.httpClient, apiKey, id);
         if (place != null) {
-          await _upsertPlace(deps, place);
+          await _upsertPlace(deps, place, withHours: true);
         } else {
           // An announcement Google withdrew.
           await deps.db.execute(
@@ -630,6 +700,9 @@ Future<void> maintainPlaceCache(Deps deps) async {
     }
   }
 
+  await deps.db.execute(
+    "UPDATE places SET opening_hours = NULL WHERE opening_hours IS NOT NULL AND hours_synced_at < now() - interval '30 days'",
+  );
   final deleted = await query(
     deps.db,
     "DELETE FROM places p WHERE synced_at < now() - interval '30 days' AND NOT ($activity) RETURNING id",

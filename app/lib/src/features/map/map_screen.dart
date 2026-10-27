@@ -14,11 +14,15 @@ import '../../core/maps.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../place/place_detail.dart';
+import 'map_pins.dart';
 import 'place_search_sheet.dart';
 import 'report_shop_sheet.dart';
 
 /// Above this span the viewport would be dot-soup; we don't load places.
 const _maxFetchSpanDeg = 0.5;
+
+/// Names of rated places from this zoom on, further out they'd overlap.
+const _namesFromZoom = 15.0;
 
 /// Whether people found food for [diet] at [place]. Unknown places stay on
 /// the map, faded — most places aren't rated that far yet.
@@ -45,6 +49,23 @@ class _MapScreenState extends State<MapScreen> {
   String? _error;
   bool _favoritesOnly = false;
   bool _centeredOnUser = false;
+  bool _showNames = false;
+  final _pins = <String, MapPin>{};
+  final _drawing = <String>{};
+  // Last pin per place, shown while its new look is being drawn
+  final _shown = <String, MapPin>{};
+
+  /// Draws the pins missing in [specs] off the build and shows them together.
+  Future<void> _drawPins(Map<String, Future<MapPin> Function()> specs) async {
+    _drawing.addAll(specs.keys);
+    final pins = await Future.wait(specs.values.map((draw) => draw()));
+    if (!mounted) return;
+    setState(() {
+      for (final (i, key) in specs.keys.indexed) {
+        _pins[key] = pins[i];
+      }
+    });
+  }
 
   Future<void> _search() async {
     final place = await showAppSheet<PlaceDto>(context, (_) => const PlaceSearchSheet());
@@ -104,6 +125,43 @@ class _MapScreenState extends State<MapScreen> {
         .where((p) => !_favoritesOnly || data.favorites.contains(p.placeId))
         .where((p) => diet != Diet.vegan || p.veganOptions != false)
         .toList();
+    final brightness = Theme.of(context).brightness;
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final missing = <String, Future<MapPin> Function()>{};
+    MapPin? pinFor(PlaceDto place) {
+      final color = data.favorites.contains(place.placeId)
+          ? favoritePinColor
+          : (visitCounts[place.placeId] ?? 0) > 0
+              ? visitedPinColor
+              : placePinColor;
+      final average = place.score(diet).average;
+      final score = average == null ? null : formatRating(average);
+      final name = score != null && _showNames ? place.name : null;
+      final key = '${color.toARGB32()}|$brightness|$score|$name';
+      final pin = _pins[key];
+      if (pin == null && !_drawing.contains(key)) {
+        missing[key] = () => drawPin(color: color, brightness: brightness, pixelRatio: pixelRatio, score: score, name: name);
+      }
+      return pin;
+    }
+
+    final markers = <Marker>{};
+    for (final place in places) {
+      final pin = pinFor(place) ?? _shown[place.placeId];
+      if (pin == null) continue;
+      _shown[place.placeId] = pin;
+      markers.add(Marker(
+        markerId: MarkerId(place.placeId),
+        position: LatLng(place.latitude, place.longitude),
+        icon: pin.icon,
+        anchor: pin.anchor,
+        // Better places and favourites on top where pins overlap
+        zIndexInt: (data.favorites.contains(place.placeId) ? 100 : 0) + ((place.score(diet).average ?? 0) * 10).round(),
+        alpha: _knownToFit(place, diet) ? 1 : 0.4,
+        onTap: () => showPlaceDetail(context, place),
+      ));
+    }
+    if (missing.isNotEmpty) _drawPins(missing);
     final visible = places.where((p) => _visible?.contains(LatLng(p.latitude, p.longitude)) ?? true).length;
 
     return Scaffold(
@@ -142,24 +200,13 @@ class _MapScreenState extends State<MapScreen> {
                     _controller = controller;
                     _load();
                   },
-                  onCameraMove: (position) => _center = position.target,
-                  onCameraIdle: _load,
-                  markers: {
-                    for (final place in places)
-                      Marker(
-                        markerId: MarkerId(place.placeId),
-                        position: LatLng(place.latitude, place.longitude),
-                        icon: BitmapDescriptor.defaultMarkerWithHue(
-                          data.favorites.contains(place.placeId)
-                              ? BitmapDescriptor.hueRose
-                              : (visitCounts[place.placeId] ?? 0) > 0
-                                  ? BitmapDescriptor.hueGreen
-                                  : pinHue,
-                        ),
-                        alpha: _knownToFit(place, diet) ? 1 : 0.4,
-                        onTap: () => showPlaceDetail(context, place),
-                      ),
+                  onCameraMove: (position) {
+                    _center = position.target;
+                    final showNames = position.zoom >= _namesFromZoom;
+                    if (showNames != _showNames) setState(() => _showNames = showNames);
                   },
+                  onCameraIdle: _load,
+                  markers: markers,
                 ),
                 // On the web the map is a DOM element that still takes the touches under an
                 // open sheet. The browser then cancels the sheet's scrolling.

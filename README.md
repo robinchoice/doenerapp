@@ -32,7 +32,7 @@ Die Karte lädt Dönerläden für den sichtbaren Ausschnitt (nur bis 0,5° Span)
 
 Google erlaubt, Laden-Details höchstens 30 Tage zu speichern (nur die Place ID unbegrenzt) und Places-Daten nur auf Google-Karten zu zeigen. Deshalb: Karte von Google Maps, ein täglicher Job auf dem Server frischt Läden mit Besuchen oder Bewertungen auf und löscht ungenutzte nach 30 Tagen, die App verwirft ihren lokalen Cache ebenso. Listen ohne Karte tragen den Hinweis „Ortsdaten: Google Maps“.
 
-- Pins im Produktton, besuchte Läden grün, Favoriten pink; im Dunkelmodus ist die Karte dunkel; fremde Geschäfts-POIs sind ausgeblendet
+- Bewertete Läden zeigen ihre Note (je nach Ernährung) als Pin, ab Zoom 15 mit Namen daneben wie bei Google Maps; unbewertete sind kleine Punkte. Pins im Produktton, besuchte Läden grün, Favoriten pink, bessere Läden und Favoriten liegen oben; im Dunkelmodus ist die Karte dunkel; fremde Geschäfts-POIs sind ausgeblendet
 - Lupe oben rechts: Suche in allen Läden, die die App schon kennt; daneben der Favoriten-Filter per Herz
 - „Laden fehlt?“ oben links schickt eine Meldung samt Kartenposition an den Server
 - Mit Ernährung „Vegan“ verschwinden Läden, in denen die Mehrheit nichts Veganes gefunden hat. Bei Vegetarisch und Vegan sind Läden blass, von denen noch niemand Passendes bewertet hat

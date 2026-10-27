@@ -12,6 +12,7 @@ import 'src/commands/inbox.dart';
 import 'src/commands/nearby.dart';
 import 'src/commands/ranking.dart';
 import 'src/commands/reviews.dart';
+import 'src/commands/search.dart';
 import 'src/commands/visits.dart';
 import 'src/session.dart';
 
@@ -22,6 +23,7 @@ export 'src/session.dart' show sessionFile;
 final commands = <String, Command>{
   ...auth,
   'nearby': nearby,
+  'search': search,
   'ranking': ranking,
   'feed': feed,
   'inbox': inbox,

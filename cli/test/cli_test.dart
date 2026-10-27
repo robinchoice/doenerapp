@@ -197,6 +197,23 @@ void main() {
     expect((await phone.cli(['nearby', '--lat', '48', '--lon', '7', '--by', 'fleisch'])).code, Exit.usage);
   });
 
+  test('search finds known shops by name, nearest first', () async {
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city) VALUES "
+        "('cli-izmir-near', 'Izmir Grill', 48.0, 7.85, 'Freiburg'), ('cli-izmir-far', 'Izmir Kebap', 52.5, 13.4, 'Berlin')");
+    final phone = await device();
+    expect((await phone.cli(['search', '--name', 'izmir'])).code, isNot(Exit.ok), reason: 'needs a login');
+    await phone.cli(['login', '--email', freshEmail()]);
+
+    final json = await phone.cli(['search', '--name', 'izmir', '--lat', '52.5', '--lon', '13.4', '--json']);
+    expect(json.code, Exit.ok);
+    expect([for (final place in json.json['places']) place['placeId']], ['cli-izmir-far', 'cli-izmir-near']);
+
+    expect((await phone.cli(['search', '--name', 'Izmir G'])).out, 'Izmir Grill, Freiburg');
+    expect((await phone.cli(['search', '--name', 'Gibtsnicht'])).out, 'Kein Laden mit diesem Namen bekannt.');
+    expect((await phone.cli(['search'])).code, Exit.usage);
+    expect((await phone.cli(['search', '--name', 'izmir', '--lat', '48'])).code, Exit.usage);
+  });
+
   test('check in and review, then friends see it in the feed and the ranking', () async {
     await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city) VALUES "
         "('cli-rank', 'Grill Eck', 47.99, 7.84, 'Freiburg')");

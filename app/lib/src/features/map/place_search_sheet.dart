@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/api.dart';
 import '../../core/app_data.dart';
+import '../../core/location.dart';
 import '../../core/maps.dart';
 import '../../ui/widgets.dart';
 
-/// Searches all places the app knows. Pops the chosen place.
+/// Searches the shops on the device and every shop the server knows, nearest
+/// first. Pops the chosen place.
 class PlaceSearchSheet extends StatefulWidget {
   const PlaceSearchSheet({super.key});
 
@@ -16,20 +22,47 @@ class PlaceSearchSheet extends StatefulWidget {
 
 class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
   final _search = TextEditingController();
+  Timer? _debounce;
+  bool _searching = false;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _search.dispose();
     super.dispose();
+  }
+
+  void _changed() {
+    setState(() {});
+    _debounce?.cancel();
+    final query = _search.text.trim();
+    if (query.length < 2) return;
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      setState(() => _searching = true);
+      final position = context.read<LocationService>().position;
+      try {
+        // The results land in the app's places, the list below shows them.
+        await context.read<AppData>().searchPlaces(query, lat: position?.latitude, lon: position?.longitude);
+      } on OfflineException {
+        // The shops on the device are still found.
+      } on ApiException {
+        // Same.
+      } finally {
+        if (mounted) setState(() => _searching = false);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final query = _search.text.trim().toLowerCase();
+    final position = context.watch<LocationService>().position;
+    double distance(PlaceDto p) =>
+        Geolocator.distanceBetween(position!.latitude, position.longitude, p.latitude, p.longitude);
     final places = query.isEmpty
         ? <PlaceDto>[]
         : (context.watch<AppData>().activePlaces.where((p) => p.name.toLowerCase().contains(query)).toList()
-          ..sort((a, b) => a.name.compareTo(b.name)));
+          ..sort(position == null ? (a, b) => a.name.compareTo(b.name) : (a, b) => distance(a).compareTo(distance(b))));
 
     return ListView(
       shrinkWrap: true,
@@ -38,16 +71,18 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
         TextField(
           controller: _search,
           autofocus: true,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => _changed(),
           decoration: const InputDecoration(hintText: 'Döner-Laden suchen…', prefixIcon: Icon(Icons.search)),
         ),
         const SizedBox(height: 12),
         if (query.isNotEmpty && places.isEmpty)
-          const EmptyState(
-            icon: Icons.search_off,
-            title: 'Nichts gefunden',
-            message: 'Gesucht wird in allen Läden, die die App schon kennt. Schieb die Karte dorthin, wo du suchst, und zoom nah heran.',
-          ),
+          _searching
+              ? const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+              : const EmptyState(
+                  icon: Icons.search_off,
+                  title: 'Nichts gefunden',
+                  message: 'Kein Döner-Laden mit diesem Namen bekannt. Schieb die Karte dorthin, wo du suchst, und zoom nah heran.',
+                ),
         for (final p in places.take(30))
           Padding(
             padding: const EdgeInsets.only(bottom: 10),

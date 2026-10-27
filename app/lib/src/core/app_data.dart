@@ -155,7 +155,12 @@ class AppData extends ChangeNotifier {
     return ranking;
   }
 
-  /// Fresh community rating after the user reviewed a place.
+  /// Every shop the server knows by name, nearest to [lat]/[lon] first.
+  Future<List<PlaceDto>> searchPlaces(String query, {double? lat, double? lon}) async =>
+      _cachePlaces(await _api.get('/places/search', query: {'q': query, 'lat': ?lat?.toString(), 'lon': ?lon?.toString()}) as List);
+
+  /// Fresh community rating after the user reviewed a place, or its opening
+  /// hours, which the server fetches when someone first opens it.
   Future<void> refreshPlace(String placeId) async =>
       _cachePlaces([await _api.get('/places/${Uri.encodeComponent(placeId)}')]);
 

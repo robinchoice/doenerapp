@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:doener_app/src/core/app_data.dart';
+import 'package:doener_app/src/core/location.dart';
 import 'package:doener_app/src/core/session.dart';
 import 'package:doener_app/src/features/map/place_search_sheet.dart';
 import 'package:doener_models/doener_models.dart';
@@ -22,6 +23,7 @@ class FakeServer {
   final requests = <String>[];
   Map<String, dynamic>? lastBody;
   List<PlaceDto> areaPlaces = [];
+  List<PlaceDto> searchPlaces = [];
 
   http.Response _json(Object body, [int status = 200]) =>
       http.Response(jsonEncode(body), status, headers: {'content-type': 'application/json'});
@@ -31,6 +33,7 @@ class FakeServer {
     requests.add('${request.method} $path');
     if (path == '/auth/verify') return _json(AuthResponse(token: 't', user: _user, isNewUser: false).toJson());
     if (path.startsWith('/me/')) return _json([]);
+    if (path == '/places/search') return _json([for (final p in searchPlaces) p.toJson()]);
     if (path == '/places') {
       return _json([
         for (final p in areaPlaces)
@@ -85,6 +88,14 @@ void main() {
     await session.verify(const VerifyRequest(email: 'r@example.org', code: '123456'));
     await data.onSignedIn(_user.id);
   });
+
+  Future<void> pumpSearch(WidgetTester tester) => tester.pumpWidget(MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: data),
+          ChangeNotifierProvider(create: (_) => LocationService()),
+        ],
+        child: const MaterialApp(home: Scaffold(body: PlaceSearchSheet())),
+      ));
 
   test('offline check-ins wait in the queue and sync later', () async {
     server.mode = 'offline';
@@ -213,14 +224,26 @@ void main() {
       'p1': _place,
       'p2': const PlaceDto(placeId: 'p2', name: 'Kebap Closed', latitude: 48, longitude: 7.85, isClosed: true),
     });
-    await tester.pumpWidget(ChangeNotifierProvider.value(
-      value: data,
-      child: const MaterialApp(home: Scaffold(body: PlaceSearchSheet())),
-    ));
+    await pumpSearch(tester);
     await tester.enterText(find.byType(TextField), 'Kebap');
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     expect(find.text('Kebap Haus'), findsOneWidget);
     expect(find.text('Kebap Closed'), findsNothing);
+  });
+
+  testWidgets('search finds shops only the server knows', (tester) async {
+    server.searchPlaces = [const PlaceDto(placeId: 'p3', name: 'Izmir Grill', latitude: 52.5, longitude: 13.4, city: 'Berlin')];
+    await pumpSearch(tester);
+    await tester.enterText(find.byType(TextField), 'izmir');
+    await tester.pump();
+    expect(find.text('Izmir Grill'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(server.requests, contains('GET /places/search'));
+    expect(find.text('Izmir Grill'), findsOneWidget);
+    expect(data.places['p3']?.city, 'Berlin', reason: 'cached like any other place');
   });
 
   test('logging in as someone else clears the previous account data', () async {

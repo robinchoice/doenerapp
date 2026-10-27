@@ -49,6 +49,10 @@ class _PlaceDetailState extends State<PlaceDetail> {
   void initState() {
     super.initState();
     _loadCommunity();
+    final data = context.read<AppData>();
+    if ((data.places[widget.placeId] ?? widget.fallback).openingHours == null) {
+      data.refreshPlace(widget.placeId).catchError((_) {});
+    }
   }
 
   Future<void> _loadCommunity() async {

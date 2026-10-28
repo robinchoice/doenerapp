@@ -464,6 +464,20 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 - Kenner des Monats 👑 (meiste Upvotes in der Stadt)
 - Favoriten werden zur Merkliste „Will ich probieren“
 
+### Phase 3 – Läden
+
+Langfristige Richtung (Robin, 28.10.2026), gebaut wird erst nach Phase 2. Vorbild für den Ladenbereich ist doener.app („Für Ladenbesitzer“, Teardown im Savor-Dokument „Teardowns: Döner“).
+
+- **Laden beanspruchen:** Antrag mit Gewerbenachweis, Robin prüft von Hand. Danach pflegt der Inhaber Karte und Preise, Öffnungszeiten und Angebote, antwortet auf Bewertungen und sieht Statistiken (Aufrufe, Check-ins, Bewertungen). Nachweise und Inhaberdaten erst erheben, wenn das gebaut wird.
+- **Gutscheine:** Jeder Laden entwirft eigene Gutscheine wie bei McDonald's oder Burger King und löst sie selbst ein, z. B. per QR-Code an der Kasse.
+- **Bezahlte Plätze:** klar als „Anzeige“ markiert und neben dem Ranking, z. B. oben in Suche oder Karte, ein hervorgehobener Pin oder ein Angebot auf Start. Gezielt wird nur nach Ort, nicht nach Nutzerdaten. Dazu eventuell ein Abo für Inhaber.
+- **Zahlungen annehmen:** Der Laden kassiert per Smartphone (Tap to Pay) über die Döner-App statt über SumUp, wir verdienen an jeder Zahlung. Lightning ist dabei.
+
+Grenzen und Offenes:
+- Ranking, Bestenliste und Siegel sind nicht käuflich. Bezahlte Platzierung im Ranking müsste nach § 5b UWG offengelegt werden und würde den Kern der App entwerten.
+- Bezahlte Plätze lohnen sich erst mit genug Nutzern pro Stadt, also nach dem Öffnen der Registrierung.
+- Kartenzahlung geht nur über einen lizenzierten Partner (Acquirer bzw. Zahlungsdienst mit Tap-to-Pay-SDK), selbst brauchten wir eine BaFin-Erlaubnis nach ZAG. Gebühren und Marge gegen SumUp rechnen, bevor gebaut wird. Lightning geht ohne Partner und ist für Läden am günstigsten.
+
 ### Messen
 
 Skript über die Datenbank, Ziele nach 4 Wochen:

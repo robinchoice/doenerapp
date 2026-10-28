@@ -137,6 +137,14 @@ void main() {
     expect(find.text('Ausgezeichnet'), findsOneWidget); // (4,5 + 4) / 2 = 4,25, shown as 4,5
   });
 
+  testWidgets('the close button leaves the review sheet', (tester) async {
+    await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin'));
+    expect(find.byType(ReviewSheet), findsOneWidget);
+    await tester.tap(find.byTooltip('Schließen'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReviewSheet), findsNothing);
+  });
+
   testWidgets('vegans rate vegan food, without meat or ayran', (tester) async {
     final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin', diet: Diet.vegan));
     expect(find.text('🌱 Vegan'), findsOneWidget);

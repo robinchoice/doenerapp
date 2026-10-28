@@ -470,6 +470,7 @@ Langfristige Richtung (Robin, 28.10.2026), gebaut wird erst nach Phase 2. Vorbil
 
 - **Laden beanspruchen:** Antrag mit Gewerbenachweis, Robin prüft von Hand. Danach pflegt der Inhaber Karte und Preise, Öffnungszeiten und Angebote, antwortet auf Bewertungen und sieht Statistiken (Aufrufe, Check-ins, Bewertungen). Nachweise und Inhaberdaten erst erheben, wenn das gebaut wird.
 - **Gutscheine:** Jeder Laden entwirft eigene Gutscheine wie bei McDonald's oder Burger King und löst sie selbst ein, z. B. per QR-Code an der Kasse.
+- **Stempelkarte:** Der Laden legt seine Regel fest (z. B. jeder 10. Döner gratis). Den Stempel gibt der Laden an der Kasse per QR-Code, nicht der Check-in, denn der lässt sich ohne Kauf auslösen.
 - **Bezahlte Plätze:** klar als „Anzeige“ markiert und neben dem Ranking, z. B. oben in Suche oder Karte, ein hervorgehobener Pin oder ein Angebot auf Start. Gezielt wird nur nach Ort, nicht nach Nutzerdaten. Dazu eventuell ein Abo für Inhaber.
 - **Zahlungen annehmen:** Der Laden kassiert per Smartphone (Tap to Pay) über die Döner-App statt über SumUp, wir verdienen an jeder Zahlung. Lightning ist dabei.
 

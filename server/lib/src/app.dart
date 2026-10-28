@@ -20,7 +20,7 @@ import 'shop_pages.dart';
 import 'social.dart';
 import 'updates.dart';
 
-/// Lets iOS open invite and review links in the installed app instead of the browser (Universal Links).
+/// Lets iOS open login, invite and review links in the installed app instead of the browser (Universal Links).
 const _appSiteAssociation = {
   'applinks': {
     'details': [
@@ -29,6 +29,7 @@ const _appSiteAssociation = {
         'components': [
           {'/': '/i/*'},
           {'/': '/b/*'},
+          {'/': '/login'},
         ],
       },
     ],

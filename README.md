@@ -291,7 +291,7 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/tester-requests/:id/invite` | Anfrage freischalten: Konto, Login-Mail, bei iOS TestFlight (Admins) |
 | DELETE | `/tester-requests/:id` | Anfrage ablehnen (Admins) |
 
-Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/b/:placeId` die Bewertungsseite eines Ladens, unter `/aushang/:placeId` dessen Aushang mit QR-Code, unter `/siegel/:placeId` seine Siegel zum Drucken, unter `/bestenliste/:stadt/:jahr` die Bestenliste und unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS Einladungs- und Bewertungslinks in der App öffnet.
+Außerhalb von `/api/v1` liefert der Server unter `/i/:code` die Einladungsseite aus, unter `/b/:placeId` die Bewertungsseite eines Ladens, unter `/aushang/:placeId` dessen Aushang mit QR-Code, unter `/siegel/:placeId` seine Siegel zum Drucken, unter `/bestenliste/:stadt/:jahr` die Bestenliste und unter `/.well-known/apple-app-site-association` die Freigabe, mit der iOS Anmelde-, Einladungs- und Bewertungslinks in der App öffnet.
 
 ---
 
@@ -451,10 +451,6 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 - **Push nur für Freunde und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar, dazu Pause und Ruhezeiten. Was man verpasst hat, steht in der Glocke auf Start.
 - **Belohnung:** Ab Phase 2 zählen die Upvotes zur Stufe.
 - **Texte:** Einladung „Welcher Döner ist der beste in [Stadt]? Die Döner-App weiß es, und du siehst, wo ich gerade esse: [Link]“, App-Store-Untertitel „Der beste Döner deiner Stadt“.
-
-### Phase 1 – Bester Döner der Stadt
-
-- Universal Links auch für den Magic-Link (bis dahin: Code eintippen)
 
 ### Phase 2 – Community
 

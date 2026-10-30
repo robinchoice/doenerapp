@@ -160,9 +160,13 @@ void mountPlaces(Router router, Deps deps) {
     }
 
     final apiKey = deps.config.googlePlacesApiKey;
+    var limitReached = false;
     if (apiKey != null && maxLat - minLat <= _maxSyncSpanDeg && maxLon - minLon <= _maxSyncSpanDeg) {
       final tiles = tilesCovering(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon);
-      if (tiles.length <= maxTilesPerRequest) await Future.wait(tiles.map((t) => _syncTile(deps, apiKey, t, user.id)));
+      if (tiles.length <= maxTilesPerRequest) {
+        final synced = await Future.wait(tiles.map((t) => _syncTile(deps, apiKey, t, user.id)));
+        limitReached = synced.contains(false);
+      }
     }
 
     const bounds = 'latitude BETWEEN @minLat AND @maxLat AND longitude BETWEEN @minLon AND @maxLon';
@@ -182,7 +186,9 @@ void mountPlaces(Router router, Deps deps) {
         area,
       ));
     }
-    return json(rows.map((r) => placeFromRow(r).toJson()).toList());
+    final response = json(rows.map((r) => placeFromRow(r).toJson()).toList());
+    // Older apps only read the list; newer ones tell the user why nothing new shows up.
+    return limitReached ? response.change(headers: {searchLimitHeader: 'reached'}) : response;
   });
 
   // GET /places/top?lat&lon[&by] — best around by weighted rating, for the
@@ -543,7 +549,8 @@ void mountPlaces(Router router, Deps deps) {
   });
 }
 
-Future<void> _syncTile(Deps deps, String apiKey, Tile tile, String userId) async {
+/// False if the user's daily searches didn't suffice, so the tile stays open.
+Future<bool> _syncTile(Deps deps, String apiKey, Tile tile, String userId) async {
   // Atomically claim the tile so concurrent requests don't both pay Google.
   final claimed = await queryOne(
     deps.db,
@@ -552,29 +559,47 @@ Future<void> _syncTile(Deps deps, String apiKey, Tile tile, String userId) async
     'WHERE search_tiles.searched_at < now() - make_interval(days => @ttl:int4) RETURNING tile_key',
     {'key': tile.key, 'ttl': tileTtl.inDays},
   );
-  if (claimed == null) return;
+  if (claimed == null) return true;
+  // Hands the tile back for the next search.
+  Future<void> release() => deps.db.execute(Sql.named('DELETE FROM search_tiles WHERE tile_key = @key'), parameters: {'key': tile.key});
 
-  // Counted atomically as well — parallel tiles and requests can't overshoot the limit.
-  final counted = await queryOne(
-    deps.db,
-    'INSERT INTO daily_searches (user_id, day, count) VALUES (@user:uuid, current_date, 1) '
-    'ON CONFLICT (user_id, day) DO UPDATE SET count = daily_searches.count + 1 '
-    'WHERE daily_searches.count < @max:int4 RETURNING count',
-    {'user': userId, 'max': maxTileSearchesPerDay},
-  );
-  if (counted == null) {
-    // Limit reached: hand the tile back for the next user.
-    await deps.db.execute(Sql.named('DELETE FROM search_tiles WHERE tile_key = @key'), parameters: {'key': tile.key});
-    return;
+  if (!await _countSearches(deps, userId, 1)) {
+    await release();
+    return false;
   }
-
   try {
-    final (:places, full: _, requests: _) = await searchArea(deps.httpClient, apiKey, TileBlock(tile.x, tile.y));
-    await storeFoundPlaces(deps, places);
+    final rect = SearchRect.tile(tile);
+    final result = await searchArea(deps.httpClient, apiKey, rect);
+    await storeFoundPlaces(deps, result.places);
+    // A full tile holds more shops than one search returns, so its quarters
+    // are searched too, each search counted. Short of searches, the tile
+    // stays open and is searched again in full later.
+    if (result.full &&
+        !await searchQuarters(deps.httpClient, apiKey, rect,
+            splits: maxTileSplits,
+            maySplit: () => _countSearches(deps, userId, 4),
+            found: (r) => storeFoundPlaces(deps, r.places))) {
+      await release();
+      return false;
+    }
   } catch (e) {
     print('Tile ${tile.key} sync failed: $e');
-    await deps.db.execute(Sql.named('DELETE FROM search_tiles WHERE tile_key = @key'), parameters: {'key': tile.key});
+    await release();
   }
+  return true;
+}
+
+/// Counts [n] Google searches for the user today, atomically, so parallel
+/// tiles and requests can't overshoot the limit. False if they don't fit.
+Future<bool> _countSearches(Deps deps, String userId, int n) async {
+  final counted = await queryOne(
+    deps.db,
+    'INSERT INTO daily_searches (user_id, day, count) SELECT @user:uuid, current_date, @n:int4 WHERE @n:int4 <= @max:int4 '
+    'ON CONFLICT (user_id, day) DO UPDATE SET count = daily_searches.count + @n:int4 '
+    'WHERE daily_searches.count + @n:int4 <= @max:int4 RETURNING count',
+    {'user': userId, 'n': n, 'max': maxTileSearchesPerDay},
+  );
+  return counted != null;
 }
 
 /// Loads one shop from Google into the cache; false if it is unknown, closed or no Döner shop.

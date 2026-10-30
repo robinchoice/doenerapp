@@ -8,6 +8,7 @@ import 'package:doener_server/src/places.dart';
 import 'package:doener_server/src/privacy.dart';
 import 'package:doener_server/src/social.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
@@ -75,6 +76,43 @@ void main() {
       expect(t.maxLat, greaterThan(47.99));
     }
     expect(tiles.map((t) => t.key).toSet(), hasLength(4));
+  });
+
+  test('a full tile is split into quarters until they hold all shops', () async {
+    const tile = Tile(1600, 247);
+    final rect = SearchRect.tile(tile);
+    final quarters = rect.quarters;
+    expect(quarters.map((q) => (q.minLat, q.minLon)).toSet(), hasLength(4));
+    expect([quarters.first.minLat, quarters.first.minLon, quarters.last.maxLat, quarters.last.maxLon],
+        [tile.minLat, tile.minLon, tile.maxLat, tile.maxLon]);
+    expect(quarters.first.maxLat, quarters.last.minLat);
+
+    // Searches around the hotspot are full down to 0.015° and complete below.
+    final hotspot = (tile.minLat + 0.001, tile.minLon + 0.001);
+    var requests = 0;
+    final google = MockClient((request) async {
+      requests++;
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final r = body['locationRestriction']['rectangle'] as Map<String, dynamic>;
+      final (low, high) = (r['low'] as Map<String, dynamic>, r['high'] as Map<String, dynamic>);
+      final full = (low['latitude'] as num) <= hotspot.$1 && hotspot.$1 < (high['latitude'] as num) &&
+          (low['longitude'] as num) <= hotspot.$2 && hotspot.$2 < (high['longitude'] as num) &&
+          (high['latitude'] as num) - (low['latitude'] as num) > 0.01;
+      final page = body['pageToken'] as String? ?? '0';
+      return http.Response(jsonEncode({'places': [], if (full) 'nextPageToken': '${int.parse(page) + 1}'}), 200);
+    });
+    Future<(bool, int, int)> split({required int splits, int allowed = 99}) async {
+      requests = 0;
+      var asked = 0;
+      final complete = await searchQuarters(google, 'key', rect,
+          splits: splits, maySplit: () async => ++asked <= allowed, found: (_) async {});
+      return (complete, requests, asked);
+    }
+
+    expect(await split(splits: 2), (true, 3 + 3 + 4, 2), reason: 'one full quarter, its quarters are not');
+    expect(await split(splits: 1), (true, 3 + 3, 1), reason: 'no deeper than allowed');
+    expect(await split(splits: 2, allowed: 1), (false, 3 + 3, 2), reason: 'a refused split leaves shops out');
+    expect(await split(splits: 2, allowed: 0), (false, 0, 1));
   });
 
   test('Google place parsing and döner filter', () {

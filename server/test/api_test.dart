@@ -415,6 +415,71 @@ void main() {
       expect(googleCalls - before, 32);
     });
 
+    test('full map tiles are searched in quarters, and the app hears of the daily limit', () async {
+      final (erik, erikUser) = await signUp('erik@example.org', 'Erik');
+      final (fiona, _) = await signUp('fiona@example.org', 'Fiona');
+      const tiles = [Tile(1333, 1000), Tile(1335, 1000)];
+      // Searches around each hotspot are full down to 0.015° and complete below.
+      final hotspots = [for (final t in tiles) (t.minLat + 0.001, t.minLon + 0.001)];
+      var requests = 0;
+      final google = MockClient((request) async {
+        requests++;
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final r = body['locationRestriction']['rectangle'] as Map<String, dynamic>;
+        final (s, w, n, e) = (r['low']['latitude'] as num, r['low']['longitude'] as num, r['high']['latitude'] as num, r['high']['longitude'] as num);
+        final full = n - s > 0.01 && hotspots.any((h) => s <= h.$1 && h.$1 < n && w <= h.$2 && h.$2 < e);
+        final page = int.parse(body['pageToken'] as String? ?? '0');
+        return http.Response(
+          jsonEncode({
+            'places': [
+              {
+                'id': 'split-$s-$w-$n-$page',
+                'displayName': {'text': 'Split Döner'},
+                'location': {'latitude': (s + n) / 2 + page * 0.00001, 'longitude': (w + e) / 2},
+              },
+            ],
+            if (full) 'nextPageToken': '${page + 1}',
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final splitHandler = buildHandler(Deps(db: db, config: deps.config, mailer: LogMailer(), httpClient: google));
+      Future<(List<dynamic>, String?)> load(Tile t, String token) async {
+        final response = await splitHandler(Request(
+          'GET',
+          Uri.parse('http://localhost/api/v1/places?minLat=${t.minLat + 0.0005}&minLon=${t.minLon + 0.0005}'
+              '&maxLat=${t.maxLat - 0.0005}&maxLon=${t.maxLon - 0.0005}'),
+          headers: {'authorization': 'Bearer $token', 'x-forwarded-for': '203.0.113.1, client-${calls++}'},
+        ));
+        expect(response.statusCode, 200);
+        return (jsonDecode(await response.readAsString()) as List, response.headers[searchLimitHeader]);
+      }
+
+      Future<int> searchesOf(String userId) async =>
+          (await queryOne(db, 'SELECT count FROM daily_searches WHERE user_id = @u:uuid AND day = current_date', {'u': userId}))!['count'] as int;
+
+      final (found, limit) = await load(tiles.first, erik);
+      expect(requests, 3 + (3 + 3) + 4, reason: 'the tile and one quarter are full, the quarter\'s quarters are not');
+      expect(found, hasLength(3 + (3 + 3) + 4));
+      expect(limit, isNull);
+      expect(await searchesOf(erikUser.id), 1 + 4 + 4);
+
+      // Five searches short: the second tile's split doesn't fit any more.
+      await db.execute(Sql.named('UPDATE daily_searches SET count = @n:int4 WHERE user_id = @u:uuid'),
+          parameters: {'n': maxTileSearchesPerDay - 4, 'u': erikUser.id});
+      final (partial, reached) = await load(tiles.last, erik);
+      expect((partial.length, reached), (3, 'reached'), reason: 'the tile\'s own search is kept');
+      expect(await searchesOf(erikUser.id), maxTileSearchesPerDay - 3);
+      final open = await queryOne(db, 'SELECT count(*)::int AS n FROM search_tiles WHERE tile_key = @k', {'k': tiles.last.key});
+      expect(open!['n'], 0, reason: 'the tile stays open');
+
+      requests = 0;
+      final (all, _) = await load(tiles.last, fiona);
+      expect((requests, all.length), (13, 13), reason: 'someone with searches left completes it');
+      expect((await load(tiles.last, erik)).$2, isNull, reason: 'searched tiles don\'t count');
+    });
+
     test('visits are idempotent and only fresh ones go live', () async {
       const id = '11111111-2222-4333-8444-555555555555';
       final visit = {'id': id, 'visitedAt': DateTime.now().toUtc().toIso8601String(), 'foodType': 'yufka'};
@@ -1494,6 +1559,31 @@ void main() {
 
     await prefetchPlaces(prefetchDeps, areas: area);
     expect(requests, 31, reason: 'searched blocks wait 25 days');
+  });
+
+  test('the prefetch splits a full tile further', () async {
+    var requests = 0;
+    // Everything around the hotspot is full down to 0.015°.
+    const hotspot = (61.015, 31.015);
+    final google = MockClient((request) async {
+      requests++;
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final r = body['locationRestriction']['rectangle'] as Map<String, dynamic>;
+      final (s, w, n, e) = (r['low']['latitude'] as num, r['low']['longitude'] as num, r['high']['latitude'] as num, r['high']['longitude'] as num);
+      final full = n - s > 0.01 && s <= hotspot.$1 && hotspot.$1 < n && w <= hotspot.$2 && hotspot.$2 < e;
+      final page = body['pageToken'] as String? ?? '0';
+      return http.Response(jsonEncode({'places': [], if (full) 'nextPageToken': '${int.parse(page) + 1}'}), 200,
+          headers: {'content-type': 'application/json'});
+    });
+    final prefetchDeps = Deps(db: db, config: deps.config, mailer: LogMailer(), httpClient: google);
+    const area = [PrefetchArea('Testfjord', 61.01, 31.01, 61.02, 31.02)];
+
+    // The blocks of 8, 4, 2 and 1 tiles and the tile's quarter around it are
+    // full, each next to three that aren't.
+    await prefetchPlaces(prefetchDeps, areas: area);
+    expect(requests, 3 + 4 * (3 + 3) + 4, reason: 'the full quarter\'s quarters hold everything');
+    final tiles = await queryOne(db, "SELECT count(*)::int AS n FROM search_tiles WHERE tile_key LIKE '103_:203_'");
+    expect(tiles!['n'], 64);
   });
 
   test('a schedule runs once per period, and again an hour after a failed run', () async {

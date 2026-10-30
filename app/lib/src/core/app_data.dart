@@ -97,8 +97,9 @@ class AppData extends ChangeNotifier {
 
   // MARK: - Places
 
-  Future<void> loadArea({required double south, required double west, required double north, required double east}) async {
-    final json = await _api.get('/places', query: {
+  /// False if the user's daily searches ran out, so new shops may be missing.
+  Future<bool> loadArea({required double south, required double west, required double north, required double east}) async {
+    final (json, headers) = await _api.getWithHeaders('/places', query: {
       'minLat': '$south',
       'minLon': '$west',
       'maxLat': '$north',
@@ -106,6 +107,7 @@ class AppData extends ChangeNotifier {
       'includeClosed': 'true',
     });
     await _cachePlaces(json as List);
+    return headers[searchLimitHeader] == null;
   }
 
   /// Shops around a position — enough to tell whether the user is at one.

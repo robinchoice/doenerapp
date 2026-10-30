@@ -11,12 +11,45 @@ const tileTtl = Duration(days: 25);
 /// A text search returns at most this many pages of 20 places.
 const maxPagesPerSearch = 3;
 
-/// Tiles one user may have searched per day; cached tiles don't count.
-/// Beyond that, the map only shows places that are already known.
+/// Searches one user may start per day: one per tile, four per split of a
+/// full one; cached tiles don't count. Beyond that, the map only shows places
+/// that are already known and the response carries [searchLimitHeader].
 const maxTileSearchesPerDay = 20;
 
-/// A square of [size]×[size] tiles from tile ([x], [y]): the area one text
-/// search covers. A full one gets split into [quarters].
+/// How often a full tile is split into quarters: twice gives searches of
+/// about 0.8 × 0.5 km, each again with up to 60 places.
+const maxTileSplits = 2;
+
+/// The rectangle one text search covers. A full one gets split into [quarters].
+class SearchRect {
+  final double minLat;
+  final double minLon;
+  final double maxLat;
+  final double maxLon;
+  const SearchRect(this.minLat, this.minLon, this.maxLat, this.maxLon);
+
+  SearchRect.tile(Tile t) : this(t.minLat, t.minLon, t.maxLat, t.maxLon);
+
+  List<SearchRect> get quarters {
+    final lat = (minLat + maxLat) / 2;
+    final lon = (minLon + maxLon) / 2;
+    return [
+      SearchRect(minLat, minLon, lat, lon),
+      SearchRect(minLat, lon, lat, maxLon),
+      SearchRect(lat, minLon, maxLat, lon),
+      SearchRect(lat, lon, maxLat, maxLon),
+    ];
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SearchRect && other.minLat == minLat && other.minLon == minLon && other.maxLat == maxLat && other.maxLon == maxLon;
+  @override
+  int get hashCode => Object.hash(minLat, minLon, maxLat, maxLon);
+}
+
+/// A square of [size]×[size] tiles from tile ([x], [y]). The prefetch splits
+/// a full one into [quarters] down to single tiles.
 class TileBlock {
   final int x;
   final int y;
@@ -27,6 +60,7 @@ class TileBlock {
   double get maxLat => (y + size) * tileSizeDeg;
   double get minLon => x * tileSizeDeg;
   double get maxLon => (x + size) * tileSizeDeg;
+  SearchRect get rect => SearchRect(minLat, minLon, maxLat, maxLon);
 
   List<Tile> get tiles => [
         for (var dy = 0; dy < size; dy++)
@@ -139,13 +173,11 @@ Future<GooglePlace?> fetchPlace(http.Client client, String apiKey, String placeI
   return GooglePlace.fromJson(jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>);
 }
 
-/// Google Places API (New) text search restricted to [block]. Full when
+typedef SearchResult = ({List<GooglePlace> places, bool full, int requests});
+
+/// Google Places API (New) text search restricted to [rect]. Full when
 /// Google had more than [maxPagesPerSearch] pages.
-Future<({List<GooglePlace> places, bool full, int requests})> searchArea(
-  http.Client client,
-  String apiKey,
-  TileBlock block,
-) async {
+Future<SearchResult> searchArea(http.Client client, String apiKey, SearchRect rect) async {
   final results = <GooglePlace>[];
   String? pageToken;
   var requests = 0;
@@ -166,8 +198,8 @@ Future<({List<GooglePlace> places, bool full, int requests})> searchArea(
         'pageSize': 20,
         'locationRestriction': {
           'rectangle': {
-            'low': {'latitude': block.minLat, 'longitude': block.minLon},
-            'high': {'latitude': block.maxLat, 'longitude': block.maxLon},
+            'low': {'latitude': rect.minLat, 'longitude': rect.minLon},
+            'high': {'latitude': rect.maxLat, 'longitude': rect.maxLon},
           },
         },
         'pageToken': ?pageToken,
@@ -182,4 +214,27 @@ Future<({List<GooglePlace> places, bool full, int requests})> searchArea(
     if (pageToken == null) break;
   }
   return (places: results, full: pageToken != null, requests: requests);
+}
+
+/// Searches the quarters of [rect], whose own search came back full, and
+/// splits full quarters again, [splits] levels deep. [maySplit] is asked
+/// before each split for its four searches. False if it refused one, so
+/// places may be missing.
+Future<bool> searchQuarters(
+  http.Client client,
+  String apiKey,
+  SearchRect rect, {
+  required int splits,
+  required Future<bool> Function() maySplit,
+  required Future<void> Function(SearchResult result) found,
+}) async {
+  if (splits == 0) return true;
+  if (!await maySplit()) return false;
+  // In parallel, so the map doesn't wait for one search after the other.
+  final complete = await Future.wait(rect.quarters.map((quarter) async {
+    final result = await searchArea(client, apiKey, quarter);
+    await found(result);
+    return !result.full || await searchQuarters(client, apiKey, quarter, splits: splits - 1, maySplit: maySplit, found: found);
+  }));
+  return !complete.contains(false);
 }

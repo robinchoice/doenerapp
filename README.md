@@ -29,9 +29,9 @@ Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der S
 
 ### Karte
 
-Die Karte lädt Dönerläden für den sichtbaren Ausschnitt (nur bis 0,5° Span). Der Server fragt Google pro Kachel (0,03°) höchstens alle 25 Tage ab, auch leere Kacheln werden gemerkt. Das hält die Google-Kosten klein.
+Die Karte lädt Dönerläden für den sichtbaren Ausschnitt (nur bis 0,5° Span). Der Server fragt Google pro Kachel (0,03°) höchstens alle 25 Tage ab, auch leere Kacheln werden gemerkt. Das hält die Google-Kosten klein. Liefert eine Kachel mehr Läden, als eine Suche zurückgibt (60), sucht er ihre Viertel und volle Viertel noch einmal geviertelt (`maxTileSplits`). Jedes Konto hat 20 Suchen am Tag (`maxTileSearchesPerDay`), eine pro Kachel und vier pro Viertelung. Reichen sie nicht, bleibt die Kachel offen, die Antwort trägt `x-search-limit: reached`, und die Karte zeigt „Tageslimit erreicht“.
 
-Wichtige Gebiete sucht der Server vorab, ohne dass jemand dort war: die Städte über 100.000 Einwohner, das Saarland und Baden-Württemberg (`server/lib/src/prefetch.dart`). Ein täglicher Job sucht sie in Blöcken von 8 × 8 Kacheln, mit höchstens 110 Anfragen pro Lauf. Liefert ein Block mehr Läden, als eine Suche zurückgibt (60), sucht er dessen Viertel einzeln. Gesuchte Blöcke zählen wie Kacheln 25 Tage, danach beginnt die Runde von vorn.
+Wichtige Gebiete sucht der Server vorab, ohne dass jemand dort war: die Städte über 100.000 Einwohner, das Saarland und Baden-Württemberg (`server/lib/src/prefetch.dart`). Ein täglicher Job sucht sie in Blöcken von 8 × 8 Kacheln, mit höchstens 110 Anfragen pro Lauf. Liefert ein Block mehr Läden, als eine Suche zurückgibt (60), sucht er dessen Viertel einzeln, bis hinunter zu Vierteln von Kacheln wie bei der Karte. Gesuchte Blöcke zählen wie Kacheln 25 Tage, danach beginnt die Runde von vorn.
 
 Google-Kosten: Die Suchen fragen keine Öffnungszeiten ab, damit bleiben sie in der Stufe „Text Search Pro“ (5.000 Anfragen im Monat frei statt 1.000). Öffnungszeiten holt `GET /places/:placeId` per Place Details, wenn jemand einen Laden öffnet, höchstens alle 25 Tage. Die Tagesquoten im Google-Projekt begrenzen beides hart (infra.md). Erkannt werden Läden über den Namen (Döner, Kebap, Dürüm, Yufka …) oder den Google-Typ (z. B. türkisches Restaurant).
 

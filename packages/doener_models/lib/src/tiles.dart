@@ -3,6 +3,10 @@
 const tileSizeDeg = 0.03;
 const maxTilesPerRequest = 16;
 
+/// Set on a `/places` response when the user's daily Google searches ran out,
+/// so tiles of the area weren't searched.
+const searchLimitHeader = 'x-search-limit';
+
 class Tile {
   final int x;
   final int y;

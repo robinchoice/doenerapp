@@ -134,16 +134,27 @@ Future<void> prefetchPlaces(Deps deps, {List<PrefetchArea>? areas, int budget = 
 
   Future<void> search(TileBlock block) async {
     if (left < maxPagesPerSearch || !await _due(deps, block)) return;
-    final result = await searchArea(deps.httpClient, apiKey, block);
-    left -= result.requests;
-    await storeFoundPlaces(deps, result.places);
+    Future<void> found(SearchResult result) async {
+      left -= result.requests;
+      await storeFoundPlaces(deps, result.places);
+    }
+
+    final result = await searchArea(deps.httpClient, apiKey, block.rect);
+    await found(result);
     if (result.full && block.size > 1) {
       for (final quarter in block.quarters) {
         await search(quarter);
       }
-    } else {
-      await _markSearched(deps, block);
+      return;
     }
+    // A full single tile is split further. Without the budget for that it
+    // stays due, and the next run searches it again.
+    if (result.full &&
+        !await searchQuarters(deps.httpClient, apiKey, block.rect,
+            splits: maxTileSplits, maySplit: () async => left >= 4 * maxPagesPerSearch, found: found)) {
+      return;
+    }
+    await _markSearched(deps, block);
   }
 
   try {

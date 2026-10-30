@@ -45,6 +45,7 @@ class _MapScreenState extends State<MapScreen> {
   LatLngBounds? _loadedBounds;
   LatLngBounds? _visible;
   bool _zoomIn = false;
+  bool _limitReached = false;
   bool _loading = false;
   String? _error;
   bool _favoritesOnly = false;
@@ -95,8 +96,10 @@ class _MapScreenState extends State<MapScreen> {
       _error = null;
     });
     try {
-      await context.read<AppData>().loadArea(south: south, west: west, north: north, east: east);
-      if (searchable) _loadedBounds = bounds;
+      final complete = await context.read<AppData>().loadArea(south: south, west: west, north: north, east: east);
+      _limitReached = !complete;
+      // Stays unloaded while the daily searches are used up.
+      if (searchable && complete) _loadedBounds = bounds;
     } on OfflineException catch (e) {
       _error = e.toString();
     } on ApiException catch (e) {
@@ -269,7 +272,17 @@ class _MapScreenState extends State<MapScreen> {
                                       const Flexible(child: Text('Für mehr Läden näher heranzoomen', overflow: TextOverflow.ellipsis)),
                                     ]),
                                   )
-                                : const SizedBox.shrink(),
+                                : _limitReached
+                                    ? Pill(
+                                        onTap: () => showMessage(context,
+                                            'Neue Läden holt die Karte von Google, das geht pro Tag nur begrenzt oft. Bekannte Läden siehst du weiter, morgen kommen neue dazu.'),
+                                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                          Icon(Icons.hourglass_bottom, size: 18, color: context.accent),
+                                          const SizedBox(width: 6),
+                                          const Flexible(child: Text('Tageslimit erreicht, neue Läden erst morgen', overflow: TextOverflow.ellipsis)),
+                                        ]),
+                                      )
+                                    : const SizedBox.shrink(),
                   ),
                 ),
               ],

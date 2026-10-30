@@ -43,12 +43,22 @@ class ApiClient {
   ApiClient({required this.baseUrl, required this.token, http.Client? client}) : _client = client ?? http.Client();
 
   Future<dynamic> get(String path, {Map<String, String>? query}) => send('GET', path, query: query);
+
+  /// Like [get], with the response headers.
+  Future<(dynamic, Map<String, String>)> getWithHeaders(String path, {Map<String, String>? query}) async {
+    final response = await _send('GET', path, query: query);
+    return (_decode(response), response.headers);
+  }
+
   Future<dynamic> post(String path, [Object? body]) => send('POST', path, body: body);
   Future<dynamic> put(String path, Object? body) => send('PUT', path, body: body);
   Future<dynamic> patch(String path, Object? body) => send('PATCH', path, body: body);
   Future<dynamic> delete(String path) => send('DELETE', path);
 
-  Future<dynamic> send(String method, String path, {Object? body, Map<String, String>? query}) async {
+  Future<dynamic> send(String method, String path, {Object? body, Map<String, String>? query}) async =>
+      _decode(await _send(method, path, body: body, query: query));
+
+  Future<http.Response> _send(String method, String path, {Object? body, Map<String, String>? query}) async {
     final uri = Uri.parse('${baseUrl()}$path').replace(queryParameters: query);
     final auth = token();
     final request = http.Request(method, uri)
@@ -64,10 +74,13 @@ class ApiClient {
       debugPrint('API $method $path failed: $e');
       throw const OfflineException();
     }
+    if (response.statusCode == 401 && auth != null) onUnauthorized?.call();
+    return response;
+  }
 
+  dynamic _decode(http.Response response) {
     final text = utf8.decode(response.bodyBytes);
     if (response.statusCode >= 400) {
-      if (response.statusCode == 401 && auth != null) onUnauthorized?.call();
       String message;
       try {
         message = (jsonDecode(text) as Map<String, dynamic>)['error'] as String;

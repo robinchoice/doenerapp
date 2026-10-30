@@ -1,7 +1,7 @@
 name: Mobile
 
-# Android → AAB als Artefakt und in den internen Play-Test, dazu eine signierte APK
-# zum direkten Verschicken an Tester; iOS → TestFlight.
+# Android → AAB als Artefakt und in den internen Play-Test, dazu eine signierte APK,
+# die Release-Tags und Läufe von Hand als öffentlichen Download veröffentlichen; iOS → TestFlight.
 # Beides bei jedem Push auf main, der die App ändert (öffentliches Repo, Minuten frei),
 # dazu bei Tags `v*` und per workflow_dispatch.
 # `gh workflow run Mobile -f platform=android` baut nur Android.
@@ -142,6 +142,8 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       # Repo variable PLAY_UPLOAD=true once the first bundle was uploaded by hand in the Play Console.
@@ -194,6 +196,20 @@ jobs:
         with:
           name: doener-android-apk
           path: app/build/app/outputs/flutter-apk/app-release.apk
+
+      # The public download behind /android. Like TestFlight's external group it only
+      # gets release tags (and runs by hand); the app compares its build with version.json.
+      - name: APK veröffentlichen
+        if: env.HAS_KEYSTORE == 'true' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/doener.apk"
+          echo "{\"build\": $((GITHUB_RUN_NUMBER + 10))}" > "$RUNNER_TEMP/version.json"
+          gh release view android-latest > /dev/null 2>&1 ||
+            gh release create android-latest --prerelease --target "$GITHUB_SHA" --title "Döner App für Android" \
+              --notes "Die aktuelle Testversion. Download über https://doener-api.pleasance.org/android"
+          gh release upload android-latest "$RUNNER_TEMP/doener.apk" "$RUNNER_TEMP/version.json" --clobber
 
       # aab/ and apk/ are separate builds with their own symbols.
       - uses: actions/upload-artifact@v4

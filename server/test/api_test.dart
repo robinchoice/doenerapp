@@ -101,6 +101,7 @@ void main() {
     await migrate(db); // idempotent
 
     final google = MockClient((request) async {
+      if (request.url.host == 'github.com') return http.Response(jsonEncode({'build': 42}), 200);
       googleCalls++;
       if (request.method == 'GET') {
         // Place Details refresh; the announced grill has opened by now.
@@ -1200,6 +1201,13 @@ void main() {
     expect(await page('/en'), contains('The best döner'));
   });
 
+  test('Android gets the latest APK', () async {
+    final download = await handler(Request('GET', Uri.parse('http://localhost/android')));
+    expect((download.statusCode, download.headers['location']),
+        (302, 'https://github.com/robinchoice/doenerapp/releases/download/android-latest/doener.apk'));
+    expect((await call('GET', '/android')).$2, {'build': 42, 'url': 'https://doener.test/android'});
+  });
+
   test('tester requests mail Robin once per address and platform', () async {
     expect((await call('POST', '/tester-requests', body: {'email': 'no-mail', 'platform': 'ios'})).$1, 400);
     expect((await call('POST', '/tester-requests', body: {'email': 'tim@example.org', 'platform': 'windows'})).$1, 400);
@@ -1323,6 +1331,7 @@ void main() {
       final (status, result) = await call('POST', '/tester-requests/${neu.id}/invite', token: robin);
       expect((status, result['testFlight']), (200, null));
       expect(mailer.sent.last.to, 'neu@example.org');
+      expect(mailer.sent.last.text, contains('https://doener.test/android'), reason: 'Android gets the APK');
       expect((await login('neu@example.org')).$1, 204, reason: 'the account exists now');
       final (_, friends) = await call('GET', '/friends', token: gast);
       expect((friends as List).map((f) => f['status']), contains('accepted'), reason: 'friends with whoever brought them');

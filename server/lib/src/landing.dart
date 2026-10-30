@@ -105,7 +105,7 @@ Future<void> _mailTesterRequest(Deps deps, String to, String email, String platf
       subject: 'Testanfrage ${ios ? 'iOS' : 'Android'}: $email',
       text: '$email möchte die ${ios ? 'iOS' : 'Android'}-App testen${friend == null ? '' : ', gekommen über den Link von $friend'}.\n\n'
           'Freischalten in der App unter Profil → Tester. Das legt das Konto an und schickt die Login-Mail, '
-          '${ios ? 'Apple schickt die TestFlight-Einladung.' : 'die APK bzw. den Link zum Play-Test schickst du mit einer Antwort auf diese Mail.'}',
+          '${ios ? 'Apple schickt die TestFlight-Einladung.' : 'mit dem Link zur APK.'}',
       replyTo: email,
     );
   } catch (e) {
@@ -130,7 +130,7 @@ PublicPage landingPublicPage(String base, {required bool english}) {
       t.lead,
       for (final (_, title, text) in t.features) '## $title\n\n$text',
       '## ${t.testH2}\n\n${t.testLead} ${t.formLead}\n\n${t.stores}',
-      '- [${t.ctaTest}]($page#test)\n- [${t.ctaBrowser}]($base/app)\n- [${t.privacy}]($base/datenschutz)',
+      '- [${t.ctaTest}]($page#test)\n- [${t.download}]($base/android)\n- [${t.ctaBrowser}]($base/app)\n- [${t.privacy}]($base/datenschutz)',
     ].join('\n\n'),
   );
 }
@@ -148,7 +148,7 @@ final _de = _Texts(
       'Und du siehst, wo deine Freunde gerade sitzen.',
   ctaTest: 'Für den Test anmelden',
   ctaBrowser: 'Im Browser öffnen',
-  stores: 'iPhone über TestFlight · Android über den Play-Test · kostenlos',
+  stores: 'iPhone über TestFlight · Android zum Herunterladen · kostenlos',
   ranking: 'Ranking Freiburg',
   chips: ['Gesamt', 'Soße', 'Fleisch', 'Brot'],
   reviews: 'Bew.',
@@ -179,17 +179,19 @@ final _de = _Texts(
   formH3: 'Für den Test anmelden',
   formLead: 'Dauert 20 Sekunden. Wir nutzen die Adresse nur für die Einladung.',
   testFlight: 'TestFlight',
-  playTest: 'Play-Test',
+  apk: 'Download',
   ios: (
     label: 'E-Mail deiner Apple-ID',
     hint: 'Dorthin schickt Apple die TestFlight-Einladung. Du brauchst die App „TestFlight“ aus dem App Store.',
     done: 'Sobald wir dich freigeschaltet haben, kommt die TestFlight-Einladung von Apple an diese Adresse.',
   ),
   android: (
-    label: 'E-Mail deines Google-Kontos',
-    hint: 'Die Adresse, mit der du im Play Store angemeldet bist. Nur so lässt dich Google in den Test.',
-    done: 'Sobald wir dich freigeschaltet haben, bekommst du von uns den Link zum Test im Play Store.',
+    label: 'Deine E-Mail-Adresse',
+    hint: 'Damit meldest du dich in der App an, sobald wir dich freigeschaltet haben.',
+    done: 'Sobald wir dich freigeschaltet haben, kommt dein Login per Mail. Die App kannst du schon laden.',
   ),
+  download: 'App für Android laden',
+  downloadHint: 'Beim Installieren fragt Android, ob dein Browser Apps installieren darf. Einmal erlauben, fertig.',
   emailPlaceholder: 'du@beispiel.de',
   submit: 'Einladung anfragen',
   doneH3: 'Du bist auf der Liste!',
@@ -215,7 +217,7 @@ final _en = _Texts(
       'Rated by sauce, meat, salad and bread – by people who eat in your area. And you see where your friends are eating right now.',
   ctaTest: 'Join the beta',
   ctaBrowser: 'Open in browser',
-  stores: 'iPhone via TestFlight · Android via Google Play testing · free',
+  stores: 'iPhone via TestFlight · Android as a download · free',
   ranking: 'Freiburg ranking',
   chips: ['Overall', 'Sauce', 'Meat', 'Bread'],
   reviews: 'ratings',
@@ -241,17 +243,19 @@ final _en = _Texts(
   formH3: 'Join the beta',
   formLead: 'Takes 20 seconds. We only use the address for the invite.',
   testFlight: 'TestFlight',
-  playTest: 'Play testing',
+  apk: 'Download',
   ios: (
     label: 'Your Apple ID email',
     hint: 'Apple sends the TestFlight invite there. You need the “TestFlight” app from the App Store.',
     done: 'Once we’ve let you in, Apple sends the TestFlight invite to this address.',
   ),
   android: (
-    label: 'Your Google account email',
-    hint: 'The account you’re signed in with on Google Play – Google only admits testers that way.',
-    done: 'Once we’ve let you in, we’ll send you the link to the test in the Play Store.',
+    label: 'Your email',
+    hint: 'You sign in to the app with it once we’ve let you in.',
+    done: 'Once we’ve let you in, your login comes by email. You can get the app already.',
   ),
+  download: 'Get the Android app',
+  downloadHint: 'When installing, Android asks whether your browser may install apps. Allow it once and you’re done.',
   emailPlaceholder: 'you@example.com',
   submit: 'Request invite',
   doneH3: 'You’re on the list!',
@@ -277,13 +281,14 @@ class _Texts {
       formH3,
       formLead,
       testFlight,
-      playTest,
+      apk,
       emailPlaceholder,
       submit,
       doneH3,
       error;
   final String invalidEmail, tooMany;
   final _PlatformTexts ios, android;
+  final String download, downloadHint;
   final String sender, privacy, imprint, otherLang, otherLangPath;
 
   const _Texts({
@@ -311,9 +316,11 @@ class _Texts {
     required this.formH3,
     required this.formLead,
     required this.testFlight,
-    required this.playTest,
+    required this.apk,
     required this.ios,
     required this.android,
+    required this.download,
+    required this.downloadHint,
     required this.emailPlaceholder,
     required this.submit,
     required this.doneH3,
@@ -450,6 +457,8 @@ a { color: inherit; }
 .done { text-align: center; padding: 24px 0 8px; }
 .done .big { font-size: 56px; }
 .done .btn { margin-top: 18px; }
+.apk { margin-top: 16px; text-align: center; }
+.apk .btn { width: 100%; }
 .foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 32px 0 40px; flex-wrap: wrap; border-top: 1px solid var(--line); color: var(--muted); }
 .sender { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .sender span { font-family: Bricolage, "Arial Narrow", sans-serif; font-weight: 650; font-stretch: 80%; font-size: 14px; }
@@ -515,13 +524,14 @@ $features
       <form>
         <h3 class="display">${t.formH3}</h3>
         <p>${t.formLead}</p>
-        <div class="seg"><button type="button" aria-pressed="false" data-p="ios">iPhone<small>${t.testFlight}</small></button><button type="button" aria-pressed="false" data-p="android">Android<small>${t.playTest}</small></button></div>
+        <div class="seg"><button type="button" aria-pressed="false" data-p="ios">iPhone<small>${t.testFlight}</small></button><button type="button" aria-pressed="false" data-p="android">Android<small>${t.apk}</small></button></div>
         <label for="email"></label><input id="email" type="email" required autocomplete="email" placeholder="${t.emailPlaceholder}" aria-describedby="hint">
         <p class="hint" id="hint"></p>
         <p class="error" role="alert" hidden></p>
         <button class="btn btn-main">${t.submit}</button>
       </form>
       <div class="done" hidden><div class="big">🥙</div><h3 class="display" tabindex="-1">${t.doneH3}</h3><p></p></div>
+      <div class="apk" hidden><a class="btn btn-ghost" href="/android">${t.download}</a><p class="hint">${t.downloadHint}</p></div>
     </div>
   </section>
 
@@ -544,6 +554,7 @@ $features
     form.querySelector('label').textContent = texts[p][0];
     form.querySelector('.hint').textContent = texts[p][1];
     done.querySelector('p').textContent = texts[p][2];
+    box.querySelector('.apk').hidden = p !== 'android';
   };
   form.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => choose(b.dataset.p)));
   choose(/android/i.test(navigator.userAgent) ? 'android' : 'ios');

@@ -1,8 +1,11 @@
 import 'package:doener_models/doener_models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api.dart';
 import '../../core/app_data.dart';
@@ -59,10 +62,29 @@ class _StartScreenState extends State<StartScreen> {
   /// A pull to refresh loads the news card anew as well.
   Key _newsKey = UniqueKey();
 
+  /// Where a newer APK waits, for Android outside Play.
+  String? _apkUrl;
+
   Future<void> _refresh() async {
     setState(() => _newsKey = UniqueKey());
     _center = context.read<LocationService>().center;
-    await Future.wait([_loadArea(), _loadLive(), _reloadFeed()]);
+    await Future.wait([_loadArea(), _loadLive(), _reloadFeed(), _loadApk()]);
+  }
+
+  Future<void> _loadApk() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    final api = context.read<Session>().api;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      // Installs from Play get their updates there.
+      if (info.installerStore == 'com.android.vending') return;
+      final json = await api.get('/android') as Map<String, dynamic>;
+      final build = json['build'] as int?;
+      final installed = int.tryParse(info.buildNumber);
+      if (mounted && build != null && installed != null && build > installed) setState(() => _apkUrl = json['url'] as String);
+    } catch (_) {
+      // Checked again on the next refresh.
+    }
   }
 
   Future<void> _loadArea() async {
@@ -175,6 +197,13 @@ class _StartScreenState extends State<StartScreen> {
 
     // Check-ins without a review since, from every device of the account.
     final tasks = [
+      if (_apkUrl case final url?)
+        _Task(
+          icon: Icons.system_update,
+          title: 'Neue Version der App',
+          message: 'Laden und installieren, deine Daten bleiben.',
+          onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        ),
       if (visiting != null)
         _Task(
           icon: Icons.travel_explore,

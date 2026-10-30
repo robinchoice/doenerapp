@@ -5,6 +5,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
 import 'agents.dart';
+import 'android.dart';
 import 'auth.dart';
 import 'best_of.dart';
 import 'deps.dart';
@@ -37,7 +38,7 @@ const _appSiteAssociation = {
 };
 
 /// Lets Android open invite and review links in the installed app (App Links).
-/// The fingerprint is the upload key, which signs the APK sent to testers by hand.
+/// The fingerprint is the upload key, which signs the public APK (`/android`).
 /// Once the app is on Play, add the app signing key from the Play Console.
 const _assetLinks = [
   {
@@ -75,6 +76,7 @@ Handler buildHandler(Deps deps) {
   mountInbox(api, deps);
   mountUpdates(api, deps);
   mountTesterRequests(api, deps);
+  mountAndroid(api, deps);
 
   final root = Router()..mount('/api/v1/', api.call);
   mountAgents(root, deps);
@@ -87,6 +89,7 @@ Handler buildHandler(Deps deps) {
     ..get('/aushang/<placeId>', (Request request, String placeId) => posterPage(deps, request, placeId))
     ..get('/siegel/<placeId>', (Request request, String placeId) => sealPage(deps, request, placeId))
     ..get('/bestenliste/<city>/<year>', (Request request, String city, String year) => bestOfPage(deps, request, city, year))
+    ..get('/android', apkDownload)
     ..get('/datenschutz', privacyPage)
     ..get('/abmelden', (Request request) => unsubscribePage(deps, request))
     ..post('/abmelden', (Request request) => unsubscribePage(deps, request))

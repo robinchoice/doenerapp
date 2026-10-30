@@ -19,7 +19,8 @@ Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der S
 - Läden: Google Places API (New), serverseitig abgefragt und gecacht
 - Login: E-Mail-Code bzw. Magic-Link, kein Passwort; Pflicht, samt eigenem Anzeigenamen statt „Döner-Fan-1234“
 - Registrierung geschlossen wie in starter („Registrierung öffnen“): Bestehende Konten melden sich an, neue nur über `SIGNUP_ALLOWLIST`, eine Einladung von Robin (Profil → Tester, für `ADMIN_EMAILS`) oder als Admin selbst, sonst könnte niemand einladen. Der Einladungslink eines Freundes verbindet nur bestehende Konten, so können Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026). Wer kein Konto hat, bewirbt sich auf der Landingpage. Dorthin führen die Einladungsseite, die Bewertungsseite `/b/` und die Meldung beim Login; die Bewerbung merkt sich, über wessen Link sie kam. Wer vor der Schließung (15.10.2026, 16:30) über die Landingpage um einen Test gebeten hat, kommt ebenfalls herein, bis die Anfrage nach 90 Tagen gelöscht ist. Fremde bekommen eine Meldung auf Deutsch und Englisch, es geht keine Mail raus. Geöffnet wird mit `SIGNUP_OPEN=true`, das entscheidet Robin.
-- Freischalten: Unter Profil → Tester sieht Robin die Bewerbungen. „Freischalten“ legt das Konto an, schickt die Login-Mail und bei iPhones die TestFlight-Einladung in die externe Gruppe „Erste Tester“ (App Store Connect API, `ASC_*`). Wer über den Link eines Freundes kam, ist danach mit ihm befreundet. Ablehnen löscht die Anfrage ohne Mail. Android-Tester bekommen die APK bzw. später den Play-Test-Link per Antwort auf die Anfrage-Mail
+- Freischalten: Unter Profil → Tester sieht Robin die Bewerbungen. „Freischalten“ legt das Konto an, schickt die Login-Mail und bei iPhones die TestFlight-Einladung in die externe Gruppe „Erste Tester“ (App Store Connect API, `ASC_*`). Wer über den Link eines Freundes kam, ist danach mit ihm befreundet. Ablehnen löscht die Anfrage ohne Mail. Android-Tester bekommen in der Login-Mail den Link zur APK (`/android`)
+- Android ohne Play: `/android` leitet auf die APK im GitHub-Release `android-latest`, die Landingpage verlinkt sie bei Android. `mobile.yml` aktualisiert sie wie bei TestFlight nur bei Release-Tags `v*` und Läufen von Hand, dazu `version.json` mit der Build-Nummer. `GET /api/v1/android` liefert sie (10 Minuten gecacht), die App zeigt auf Start „Neue Version der App“, wenn ihre Build-Nummer kleiner ist. Aus Play installierte Apps fragen nicht. Beim Anlegen der App in der Play Console den eigenen Signaturschlüssel (Upload-Key) als App-Signaturschlüssel wählen, sonst lässt sich die Play-Version nicht über die APK installieren.
 - Neue iOS-Builds: Nur Release-Tags `v*` gehen an die externen Tester, weil jede Zuordnung allen eine Mail schickt. Der Job `testflight-release` in `mobile.yml` wartet, bis Apple den Build verarbeitet hat, gibt ihn an „Erste Tester“ und reicht ihn zur Beta-Prüfung ein (`server/tool/testflight_release.dart`). Weitere Builds einer freigegebenen Version lässt Apple sofort durch, TestFlight aktualisiert bei den Testern von selbst.
 
 ---
@@ -189,7 +190,7 @@ Für die Testphase liegt ein Käfer-Knopf über allen Screens, auch über Sheets
 
 `/` (Deutsch) und `/en` (Englisch) zeigen eine statische Seite vom Server (`server/lib/src/landing.dart`), die Web-App läuft unter `/app`. Wer im Browser schon angemeldet ist oder mit Parametern kommt (`?invite=…`), wird sofort nach `/app` weitergeleitet. Die Rangliste im Handy auf der Seite ist ein Beispiel, keine echten Daten.
 
-Über das Formular fragt man den Test an: iPhone (TestFlight) oder Android (Play-Test) und eine E-Mail. Der Server speichert die Anfrage 90 Tage, einmal pro Adresse und Plattform, und mailt sie an `FEEDBACK_EMAIL`. Freigeschaltet wird von Hand: iOS in App Store Connect unter TestFlight, Android in der Play Console unter Interner Test, dazu den Link per Antwort auf die Mail schicken.
+Über das Formular fragt man den Test an: iPhone (TestFlight) oder Android (Download) und eine E-Mail. Bei Android steht darunter der Download der APK (`/android`), die Registrierung bleibt trotzdem zu: Anmelden geht erst nach der Freischaltung. Der Server speichert die Anfrage 90 Tage, einmal pro Adresse und Plattform, und mailt sie an `FEEDBACK_EMAIL`. Freigeschaltet wird unter Profil → Tester (siehe „Überblick“).
 
 ### Für Agenten
 
@@ -395,7 +396,7 @@ cd app && flutter test
 |---|---|---|
 | `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres), CLI und App, dazu ein Probe-Build der CLI |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
-| `mobile.yml` | Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test |
+| `mobile.yml` | Push auf `main` (`app/`, `packages/`), Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test, bei Tags und von Hand die APK ins Release `android-latest` |
 | `secrets.yml` | Jeder Push auf jedem Branch, PRs aus Forks | Secret-Scan mit gitleaks, siehe unten |
 
 Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, die Landingpage unter `/` und `/en`, alles andere ist die Web-App (`/app`).

@@ -205,4 +205,19 @@ void main() {
     expect(review.meat, Meat.kalb);
     expect(review.skewer, Skewer.homemade);
   });
+
+  testWidgets('experts pick several sauces', (tester) async {
+    final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin', expertMode: true));
+    // scrollUntilVisible stops at chips built below the viewport; at the end of the sheet the sauces are on screen.
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -3000));
+    await tester.pumpAndSettle();
+    expect(find.text('Soßen · mehrere möglich'), findsOneWidget);
+
+    for (final sauce in ['Knoblauch', 'Scharf', 'Tzatziki']) {
+      await _tapInSheet(tester, find.widgetWithText(FilterChip, sauce));
+    }
+    await _tapInSheet(tester, find.text('Speichern'));
+
+    expect(data.reviews['p1']!.dto.ingredients, [Ingredient.knoblauch, Ingredient.scharf, Ingredient.tzatziki]);
+  });
 }

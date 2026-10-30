@@ -258,7 +258,11 @@ class _ReviewSheetState extends State<ReviewSheet> {
           Text('🔎 Mit allem heißt hier …', style: theme.textTheme.titleSmall),
           Text(hint, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
           for (final group in IngredientGroup.values) ...[
-            label(group == IngredientGroup.special ? '${group.label} ✨' : group.label),
+            label(switch (group) {
+              IngredientGroup.special => '${group.label} ✨',
+              IngredientGroup.sauce => '${group.label} · mehrere möglich',
+              IngredientGroup.salad => group.label,
+            }),
             Wrap(
               spacing: 8,
               runSpacing: 4,

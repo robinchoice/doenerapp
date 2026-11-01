@@ -53,9 +53,9 @@ class _MyPlacesScreenState extends State<MyPlacesScreen> {
               children: [
                 SegmentedButton<_Sort>(
                   segments: const [
-                    ButtonSegment(value: _Sort.rating, label: Text('Bewertung')),
-                    ButtonSegment(value: _Sort.visits, label: Text('Besuche')),
-                    ButtonSegment(value: _Sort.recent, label: Text('Zuletzt')),
+                    ButtonSegment(value: _Sort.rating, label: FittedBox(fit: BoxFit.scaleDown, child: Text('Bewertung'))),
+                    ButtonSegment(value: _Sort.visits, label: FittedBox(fit: BoxFit.scaleDown, child: Text('Besuche'))),
+                    ButtonSegment(value: _Sort.recent, label: FittedBox(fit: BoxFit.scaleDown, child: Text('Zuletzt'))),
                   ],
                   selected: {_sort},
                   showSelectedIcon: false,

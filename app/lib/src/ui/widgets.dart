@@ -91,6 +91,14 @@ ThemeData buildTheme(Brightness brightness) {
       selectedLabelTextStyle: TextStyle(fontSize: 12, color: text, fontWeight: FontWeight.w600),
       unselectedLabelTextStyle: TextStyle(fontSize: 12, color: quiet),
     ),
+    // Selected segments are filled with the text colour like chips, so the label stays readable.
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(
+        backgroundColor: selectedChip,
+        foregroundColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? ground : text),
+        side: WidgetStatePropertyAll(BorderSide(color: line)),
+      ),
+    ),
     chipTheme: ChipThemeData(
       color: selectedChip,
       checkmarkColor: ground,

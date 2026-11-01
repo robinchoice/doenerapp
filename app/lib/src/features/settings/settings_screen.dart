@@ -179,7 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SegmentedButton<Diet>(
-                segments: [for (final d in Diet.values) ButtonSegment(value: d, label: Text(d.label))],
+                segments: [for (final d in Diet.values) ButtonSegment(value: d, label: FittedBox(fit: BoxFit.scaleDown, child: Text(d.label)))],
                 selected: {session.diet},
                 showSelectedIcon: false,
                 onSelectionChanged: (s) => _updateSettings(diet: s.first),
@@ -275,7 +275,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SegmentedButton<HapticLevel>(
-                segments: [for (final l in HapticLevel.values) ButtonSegment(value: l, label: Text(l.label))],
+                segments: [for (final l in HapticLevel.values) ButtonSegment(value: l, label: FittedBox(fit: BoxFit.scaleDown, child: Text(l.label)))],
                 selected: {Haptics.level},
                 showSelectedIcon: false,
                 onSelectionChanged: (s) async {

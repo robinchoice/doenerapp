@@ -507,17 +507,20 @@ class _HomeShellState extends State<HomeShell> {
       body: body,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
-        child: NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: select,
-          destinations: [
-            for (final (i, d) in destinations.indexed)
-              NavigationDestination(
-                icon: d.icon,
-                selectedIcon: i == _checkInTab ? d.selected : ActiveTabMark(icon: d.selected),
-                label: d.label,
-              ),
-          ],
+        // Larger system text would wrap "Einchecken", so the labels keep their size like an iOS tab bar.
+        child: MediaQuery.withNoTextScaling(
+          child: NavigationBar(
+            selectedIndex: _tab,
+            onDestinationSelected: select,
+            destinations: [
+              for (final (i, d) in destinations.indexed)
+                NavigationDestination(
+                  icon: d.icon,
+                  selectedIcon: i == _checkInTab ? d.selected : ActiveTabMark(icon: d.selected),
+                  label: d.label,
+                ),
+            ],
+          ),
         ),
       ),
     );

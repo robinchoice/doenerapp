@@ -206,12 +206,12 @@ class _InboxTile extends StatelessWidget {
         [?item.body, relativeTime(item.timestamp)].join(' · '),
         style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
       ),
-      trailing: aboutFriend || item.type == 'new_place'
+      trailing: aboutFriend || {'new_place', 'friend_request', 'reaction'}.contains(item.type)
           ? IconButton(
               tooltip: 'Weniger davon',
               icon: const Icon(Icons.more_horiz),
               onPressed: () =>
-                  showAppSheet(context, (_) => LessSheet(aboutFriend: aboutFriend, userId: item.userId, userName: item.userName)),
+                  showAppSheet(context, (_) => LessSheet(type: aboutFriend ? 'friend_check_in' : item.type, userId: item.userId, userName: item.userName)),
             )
           : null,
     );
@@ -221,23 +221,27 @@ class _InboxTile extends StatelessWidget {
 /// "Weniger davon" on a push or in the bell: mute the friend or switch the
 /// kind of push off. The bell keeps showing it either way.
 class LessSheet extends StatefulWidget {
-  final bool aboutFriend;
+  final String type;
+  bool get aboutFriend => type == 'friend_check_in';
   final String? userId;
   final String? userName;
-  const LessSheet({super.key, required this.aboutFriend, this.userId, this.userName});
+  const LessSheet({super.key, required this.type, this.userId, this.userName});
 
   @override
   State<LessSheet> createState() => _LessSheetState();
 }
 
-enum _Less { mute, friends, places }
+enum _Less { mute, friends, places, requests, reactions }
 
 class _LessSheetState extends State<LessSheet> {
-  late _Less _choice = !widget.aboutFriend
-      ? _Less.places
-      : widget.userId != null
+  late _Less _choice = switch (widget.type) {
+    'friend_request' => _Less.requests,
+    'reaction' => _Less.reactions,
+    'friend_check_in' => widget.userId != null
           ? _Less.mute
-          : _Less.friends;
+          : _Less.friends,
+    _ => _Less.places,
+  };
 
   Future<void> _apply() async {
     final session = context.read<Session>();
@@ -252,6 +256,12 @@ class _LessSheetState extends State<LessSheet> {
         case _Less.friends:
           await session.updateSettings(pushFriends: false);
           message = 'Keine Pushes mehr, wenn Freunde einchecken.';
+        case _Less.requests:
+          await session.updateSettings(pushFriendRequests: false);
+          message = 'Keine Pushes mehr zu Freundschaftsanfragen.';
+        case _Less.reactions:
+          await session.updateSettings(pushReactions: false);
+          message = 'Keine Pushes mehr zu Reaktionen.';
         case _Less.places:
           await session.updateSettings(pushNewPlaces: false);
           message = 'Keine Pushes mehr zu neuen Läden.';
@@ -272,7 +282,10 @@ class _LessSheetState extends State<LessSheet> {
       if (widget.aboutFriend && widget.userId != null)
         (_Less.mute, '${widget.userName} stummschalten', 'Keine Pushes mehr, wenn ${widget.userName} eincheckt. Die anderen schon.'),
       if (widget.aboutFriend) (_Less.friends, 'Keine Check-ins von Freunden mehr', 'Schaltet „Freunde checken ein“ aus.'),
-      if (!widget.aboutFriend) (_Less.places, 'Keine neuen Läden mehr', 'Schaltet „Neue Läden in deiner Stadt“ aus.'),
+      if (widget.type == 'friend_request')
+        (_Less.requests, 'Keine Freundschaftsanfragen mehr', 'Schaltet Pushes zu Freundschaftsanfragen aus.'),
+      if (widget.type == 'reaction') (_Less.reactions, 'Keine Reaktionen mehr', 'Schaltet Pushes zu Reaktionen auf deine Posts aus.'),
+      if (widget.type == 'new_place') (_Less.places, 'Keine neuen Läden mehr', 'Schaltet „Neue Läden in deiner Stadt“ aus.'),
     ];
     return SafeArea(
       child: Padding(

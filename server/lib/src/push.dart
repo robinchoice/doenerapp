@@ -263,6 +263,54 @@ Future<void> pushOpenings(Deps deps) async {
   }
 }
 
+Future<void> pushSocial(
+  Deps deps,
+  AuthUser actor, {
+  required String recipient,
+  required String type,
+  required String sourceId,
+  required String title,
+  required String body,
+  String? placeId,
+}) async {
+  try {
+    final preference = type == 'friend_request' ? 'push_friend_requests' : 'push_reactions';
+    final rows = await query(
+      deps.db,
+      'SELECT $_recipientColumns, $pushableNow AS now FROM push_tokens t JOIN users u ON u.id = t.user_id '
+      'WHERE u.id = @user:uuid AND u.$preference',
+      {'user': recipient},
+    );
+    if (rows.isEmpty) return;
+    final pending = !(rows.first['now'] as bool);
+    final events = await query(
+      deps.db,
+      'INSERT INTO push_events (user_id, type, source_id, title, body, place_id, actor_id, pending) '
+      'VALUES (@user:uuid, @type, @source:uuid, @title, @body, @place:text, @actor:uuid, @pending:boolean) '
+      'ON CONFLICT (user_id, type, source_id) DO UPDATE SET '
+      "title = CASE WHEN push_events.created_at > now() - interval '30 minutes' AND EXCLUDED.type = 'reaction' "
+      "THEN 'Neue Reaktionen auf deinen Post' ELSE EXCLUDED.title END, "
+      'body = EXCLUDED.body, actor_id = EXCLUDED.actor_id, pending = EXCLUDED.pending, '
+      'created_at = now() '
+      'RETURNING id::text AS id, user_id::text AS user_id',
+      {
+        'user': recipient,
+        'type': type,
+        'source': sourceId,
+        'title': title,
+        'body': body,
+        'place': placeId,
+        'actor': actor.id,
+        'pending': pending,
+      },
+    );
+    if (!pending) await _deliver(deps, rows, type, events);
+  } catch (e, st) {
+    print('Social push failed: $e');
+    unawaited(Sentry.captureException(e, stackTrace: st));
+  }
+}
+
 /// Runs once a minute: what waited for the end of someone's quiet hours or
 /// pause goes out, unless they saw it in the bell already. After a day it is
 /// no news any more. The update claims each event once, also with several
@@ -273,7 +321,15 @@ Future<void> pushPending(Deps deps) async {
     'UPDATE push_events e SET pending = false FROM users u WHERE e.pending AND u.id = e.user_id '
     "AND ($pushableNow OR e.created_at < now() - interval '1 day') "
     'RETURNING e.id::text AS id, e.user_id::text AS user_id, e.type, '
-    "u.push_new_places AND e.created_at >= now() - interval '1 day' "
+    "CASE e.type WHEN 'new_place' THEN u.push_new_places "
+    "WHEN 'friend_request' THEN u.push_friend_requests AND EXISTS (SELECT 1 FROM friendships f "
+    "WHERE f.id = e.source_id AND f.status = 'pending' AND f.requester_id = e.actor_id AND f.addressee_id = e.user_id) "
+    "WHEN 'reaction' THEN u.push_reactions AND EXISTS (SELECT 1 FROM reactions r "
+    'WHERE r.user_id = e.actor_id AND (r.visit_id = e.source_id OR r.review_id = e.source_id)) '
+    "AND EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted' AND "
+    '((f.requester_id = e.actor_id AND f.addressee_id = e.user_id) OR '
+    '(f.addressee_id = e.actor_id AND f.requester_id = e.user_id))) ELSE false END '
+    "AND e.created_at >= now() - interval '1 day' "
     'AND (u.inbox_seen_at IS NULL OR u.inbox_seen_at < e.created_at) AS send',
   );
   final events = [for (final e in due) if (e['send'] as bool) e];

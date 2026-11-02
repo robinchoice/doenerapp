@@ -169,6 +169,8 @@ class UpdateMeRequest {
   final bool? expertMode;
   final bool? pushFriends;
   final bool? pushNewPlaces;
+  final bool? pushFriendRequests;
+  final bool? pushReactions;
   final bool? updateMails;
 
   /// Pushes pause until then; a time that has passed resumes them.
@@ -183,6 +185,8 @@ class UpdateMeRequest {
     this.expertMode,
     this.pushFriends,
     this.pushNewPlaces,
+    this.pushFriendRequests,
+    this.pushReactions,
     this.updateMails,
     this.pushPausedUntil,
     this.quietHours,
@@ -197,6 +201,8 @@ class UpdateMeRequest {
         expertMode: j['expertMode'] as bool?,
         pushFriends: j['pushFriends'] as bool?,
         pushNewPlaces: j['pushNewPlaces'] as bool?,
+        pushFriendRequests: j['pushFriendRequests'] as bool?,
+        pushReactions: j['pushReactions'] as bool?,
         updateMails: j['updateMails'] as bool?,
         pushPausedUntil: _dateOrNull(j['pushPausedUntil']),
         quietHours: j['quietHours'] as bool?,
@@ -210,6 +216,8 @@ class UpdateMeRequest {
         'expertMode': ?expertMode,
         'pushFriends': ?pushFriends,
         'pushNewPlaces': ?pushNewPlaces,
+        'pushFriendRequests': ?pushFriendRequests,
+        'pushReactions': ?pushReactions,
         'updateMails': ?updateMails,
         'pushPausedUntil': ?pushPausedUntil?.toUtc().toIso8601String(),
         'quietHours': ?quietHours,
@@ -253,9 +261,11 @@ class AccountDto extends UserDto {
   /// May invite testers while sign-up is closed (`ADMIN_EMAILS` on the server).
   final bool admin;
 
-  /// Push when friends check in, and when a shop opens in the user's city.
+  /// Push preferences for check-ins, shops and direct social activity.
   final bool pushFriends;
   final bool pushNewPlaces;
+  final bool pushFriendRequests;
+  final bool pushReactions;
 
   /// Opted in to news by mail ("Neuigkeiten per Mail"), off by default.
   final bool updateMails;
@@ -278,6 +288,8 @@ class AccountDto extends UserDto {
     this.admin = false,
     this.pushFriends = true,
     this.pushNewPlaces = true,
+    this.pushFriendRequests = true,
+    this.pushReactions = true,
     this.updateMails = false,
     this.pushPausedUntil,
     this.quietHours = true,
@@ -299,6 +311,8 @@ class AccountDto extends UserDto {
         admin: j['admin'] as bool? ?? false,
         pushFriends: j['pushFriends'] as bool? ?? true,
         pushNewPlaces: j['pushNewPlaces'] as bool? ?? true,
+        pushFriendRequests: j['pushFriendRequests'] as bool? ?? true,
+        pushReactions: j['pushReactions'] as bool? ?? true,
         updateMails: j['updateMails'] as bool? ?? false,
         pushPausedUntil: _dateOrNull(j['pushPausedUntil']),
         quietHours: j['quietHours'] as bool? ?? true,
@@ -314,6 +328,8 @@ class AccountDto extends UserDto {
         'admin': admin,
         'pushFriends': pushFriends,
         'pushNewPlaces': pushNewPlaces,
+        'pushFriendRequests': pushFriendRequests,
+        'pushReactions': pushReactions,
         'updateMails': updateMails,
         'pushPausedUntil': ?pushPausedUntil?.toUtc().toIso8601String(),
         'quietHours': quietHours,
@@ -1414,6 +1430,8 @@ class InboxDto {
 /// What the notification says when the details can't be loaded: the type only.
 (String, String) neutralPushText(String? type) => switch (type) {
       'friend_check_in' => ('Döner App', 'Ein Freund ist gerade beim Döner. Öffne die App für Details.'),
+      'friend_request' => ('Döner App', 'Du hast eine Freundschaftsanfrage. Öffne die App für Details.'),
+      'reaction' => ('Döner App', 'Jemand hat auf deinen Post reagiert. Öffne die App für Details.'),
       'new_place' => ('Döner App', 'Ein neuer Döner hat aufgemacht. Öffne die App für Details.'),
       _ => ('Döner App', 'Es gibt Neues in der Döner App.'),
     };

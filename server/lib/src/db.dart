@@ -431,6 +431,12 @@ final migrations = <List<String>>[
     // Searches important regions ahead of users (prefetchPlaces).
     "INSERT INTO schedules (name, next_run_at) VALUES ('place_prefetch', now())",
   ],
+  [
+    'ALTER TABLE users ADD COLUMN push_friend_requests boolean NOT NULL DEFAULT true',
+    'ALTER TABLE users ADD COLUMN push_reactions boolean NOT NULL DEFAULT true',
+    'ALTER TABLE push_events ADD COLUMN source_id uuid',
+    'CREATE UNIQUE INDEX push_events_source ON push_events (user_id, type, source_id)',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

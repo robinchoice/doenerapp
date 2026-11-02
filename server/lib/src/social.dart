@@ -14,6 +14,7 @@ import 'deps.dart';
 import 'http.dart';
 import 'moderation.dart';
 import 'places.dart';
+import 'push.dart';
 
 const friendIdsCte = 'WITH friends AS ('
     ' SELECT CASE WHEN requester_id = @me:uuid THEN addressee_id ELSE requester_id END AS id'
@@ -117,15 +118,33 @@ void mountSocial(Router router, Deps deps) {
       final body = await readBody(request, ReactionRequest.fromJson);
       if (!reactionEmojis.contains(body.emoji)) throw const ApiException.badRequest('Unbekannte Reaktion');
       final params = {'me': me.id, 'id': requireUuid(id)};
-      if (await queryOne(deps.db, '$friendIdsCte SELECT 1 FROM $table WHERE id = @id:uuid AND user_id IN (SELECT id FROM friends)', params) ==
-          null) {
+      final post = await queryOne(
+        deps.db,
+        '$friendIdsCte SELECT p.user_id::text AS user_id, s.google_place_id FROM $table p '
+        'JOIN places s ON s.id = p.place_id WHERE p.id = @id:uuid AND p.user_id IN (SELECT id FROM friends)',
+        params,
+      );
+      if (post == null) {
         throw const ApiException.notFound('Nicht gefunden');
       }
-      await deps.db.execute(
+      final changed = await deps.db.execute(
         Sql.named('INSERT INTO reactions (user_id, $column, emoji) VALUES (@me:uuid, @id:uuid, @emoji) '
-            'ON CONFLICT ($column, user_id) WHERE $column IS NOT NULL DO UPDATE SET emoji = EXCLUDED.emoji, created_at = now()'),
+            'ON CONFLICT ($column, user_id) WHERE $column IS NOT NULL DO UPDATE SET emoji = EXCLUDED.emoji, created_at = now() RETURNING (xmax = 0) AS added',
+        ),
         parameters: {...params, 'emoji': body.emoji},
       );
+      if (changed.single.single as bool) {
+        await pushSocial(
+          deps,
+          me,
+          recipient: post['user_id'] as String,
+          type: 'reaction',
+          sourceId: id,
+          title: '${me.displayName} hat auf ${table == 'visits' ? 'deinen Check-in' : 'deine Bewertung'} reagiert',
+          body: '${body.emoji} bei deinem Post',
+          placeId: post['google_place_id'] as String,
+        );
+      }
       return noContent();
     });
 
@@ -206,11 +225,23 @@ void mountSocial(Router router, Deps deps) {
       throw const ApiException.notFound('Nutzer nicht gefunden');
     }
 
-    await deps.db.execute(
+    final inserted = await deps.db.execute(
       Sql.named('INSERT INTO friendships (requester_id, addressee_id, status) VALUES (@me:uuid, @other:uuid, \'pending\') '
-          'ON CONFLICT (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id)) DO NOTHING'),
+          'ON CONFLICT (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id)) DO NOTHING RETURNING id::text',
+      ),
       parameters: {'me': me.id, 'other': other},
     );
+    if (inserted.isNotEmpty) {
+      await pushSocial(
+        deps,
+        me,
+        recipient: other,
+        type: 'friend_request',
+        sourceId: inserted.single.single as String,
+        title: '${me.displayName} möchte mit dir befreundet sein',
+        body: 'Öffne die Freundschaftsanfragen in der App.',
+      );
+    }
     // If they already asked me, asking back means accepting.
     await deps.db.execute(
       Sql.named('UPDATE friendships SET status = \'accepted\' '

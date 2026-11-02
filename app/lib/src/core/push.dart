@@ -107,14 +107,14 @@ Future<void> showPushSignal(RemoteMessage message, {bool setUp = false}) async {
 @pragma('vm:entry-point')
 Future<void> pushBackgroundHandler(RemoteMessage message) => showPushSignal(message, setUp: true);
 
-/// Pushes through Firebase Cloud Messaging: friends' check-ins and new shops.
+/// Pushes through Firebase Cloud Messaging.
 /// The server decides who gets what and sends only signals; the app fetches
 /// the text and shows the notification itself (on the web the service worker,
 /// `web/firebase-messaging-sw.js`).
 class Push {
   static bool get supported => _apiKey.isNotEmpty;
 
-  /// The shop of a tapped push, until the home screen opens it.
+  /// The shop of a tapped push, or `inbox` for direct social activity.
   final opened = ValueNotifier<String?>(null);
 
   /// Type and event of a push whose "Weniger davon" was tapped, until the

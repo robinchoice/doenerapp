@@ -346,6 +346,10 @@ class _HomeShellState extends State<HomeShell> {
     final placeId = _push?.opened.value;
     if (placeId == null || !mounted) return;
     _push!.opened.value = null;
+    if (placeId == 'inbox') {
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const InboxScreen()));
+      return;
+    }
     try {
       final place = await _data.place(placeId);
       if (mounted) await showPlaceDetail(context, place);
@@ -365,7 +369,7 @@ class _HomeShellState extends State<HomeShell> {
     if (!mounted) return;
     await showAppSheet(
       context,
-      (_) => LessSheet(aboutFriend: less.$1 == 'friend_check_in', userId: event?.actorId, userName: event?.actorName),
+      (_) => LessSheet(type: less.$1, userId: event?.actorId, userName: event?.actorName),
     );
   }
 
@@ -395,7 +399,8 @@ class _HomeShellState extends State<HomeShell> {
       return;
     }
     if (placeId.startsWith(pushPayloadPrefix)) {
-      _push?.opened.value = pushPlaceOf(placeId);
+      final type = pushEventOf(placeId)?.$1;
+      _push?.opened.value = type == 'friend_request' || type == 'reaction' ? 'inbox' : pushPlaceOf(placeId);
       return;
     }
     final place = context.read<AppData>().places[placeId];

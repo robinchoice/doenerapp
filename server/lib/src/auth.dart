@@ -41,7 +41,7 @@ const signupClosed = ApiException.forbidden(
 );
 
 const _accountColumns =
-    'id, email, display_name, diet, expert_mode, push_friends, push_new_places, updates_consent_at IS NOT NULL AS update_mails, '
+    'id, email, display_name, diet, expert_mode, push_friends, push_new_places, push_friend_requests, push_reactions, updates_consent_at IS NOT NULL AS update_mails, '
     'CASE WHEN push_paused_until > now() THEN push_paused_until END AS push_paused_until, '
     'quiet_hours, quiet_days, quiet_start, quiet_end';
 
@@ -53,6 +53,8 @@ AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       admin: deps.config.adminEmails.contains(row['email']),
       pushFriends: row['push_friends'] as bool,
       pushNewPlaces: row['push_new_places'] as bool,
+      pushFriendRequests: row['push_friend_requests'] as bool,
+      pushReactions: row['push_reactions'] as bool,
       updateMails: row['update_mails'] as bool,
       pushPausedUntil: row['push_paused_until'] as DateTime?,
       quietHours: row['quiet_hours'] as bool,
@@ -76,7 +78,7 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   final tokenHash = hashToken(header.substring(7).trim());
   final row = await queryOne(
     deps.db,
-    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places, '
+    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places, u.push_friend_requests, u.push_reactions, '
     'u.updates_consent_at IS NOT NULL AS update_mails, '
     'CASE WHEN u.push_paused_until > now() THEN u.push_paused_until END AS push_paused_until, '
     'u.quiet_hours, u.quiet_days, u.quiet_start, u.quiet_end, '
@@ -177,7 +179,9 @@ void mountAuth(Router router, Deps deps) {
         deps.db,
         'UPDATE users SET display_name = coalesce(@name:text, display_name), diet = coalesce(@diet:text, diet), '
         'expert_mode = coalesce(@expert:boolean, expert_mode), push_friends = coalesce(@friends:boolean, push_friends), '
-        'push_new_places = coalesce(@places:boolean, push_new_places), updates_consent_at = CASE '
+        'push_new_places = coalesce(@places:boolean, push_new_places), '
+        'push_friend_requests = coalesce(@requests:boolean, push_friend_requests), '
+        'push_reactions = coalesce(@reactions:boolean, push_reactions), updates_consent_at = CASE '
         'WHEN @mails:boolean IS NULL THEN updates_consent_at WHEN @mails:boolean THEN coalesce(updates_consent_at, now()) END, '
         'push_paused_until = coalesce(@paused:timestamptz, push_paused_until), quiet_hours = coalesce(@quiet:boolean, quiet_hours), '
         'quiet_days = coalesce(@days:int2, quiet_days), quiet_start = coalesce(@start:int2, quiet_start), '
@@ -190,6 +194,8 @@ void mountAuth(Router router, Deps deps) {
           'expert': body.expertMode,
           'friends': body.pushFriends,
           'places': body.pushNewPlaces,
+          'requests': body.pushFriendRequests,
+          'reactions': body.pushReactions,
           'mails': body.updateMails,
           'paused': body.pushPausedUntil,
           'quiet': body.quietHours,

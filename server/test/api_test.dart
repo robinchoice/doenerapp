@@ -530,6 +530,77 @@ void main() {
       expect(live.single['foodType'], 'yufka');
     });
 
+    test('social pushes: private signals, deduplication, grouping and delivery preferences', () async {
+      final (owner, ownerUser) = await signUp('push-owner@example.org', 'PushOwner');
+      final (actor, actorUser) = await signUp('push-actor@example.org', 'PushActor');
+      final (third, thirdUser) = await signUp('push-third@example.org', 'PushThird');
+      final key = 's' * 43;
+      await call('PATCH', '/users/me', body: {'quietHours': false, 'pushNewPlaces': false}, token: owner);
+      await call('PUT', '/me/push-token', body: {'token': 'tok-social', 'platform': 'android', 'fetchKey': key}, token: owner);
+      final before = pusher.sent.length;
+      final (_, request) = await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: actor);
+      expect(pusher.sent.length, before + 1);
+      final invitation = pusher.sent.last;
+      expect(invitation.tokens, ['tok-social']);
+      expect((invitation.title, invitation.body), (null, null));
+      expect(invitation.data.keys, unorderedEquals(['type', 'id']));
+      expect(invitation.data['type'], 'friend_request');
+      final details = (await pushEvent(invitation.data['id']!, key)).$2;
+      expect(details['title'], contains('PushActor'));
+      await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: actor);
+      await call('POST', '/friends/${request['id']}/accept', token: owner);
+      await call('POST', '/friends/requests', body: {'userId': actorUser.id}, token: owner);
+      expect(pusher.sent.length, before + 1, reason: 'no duplicate or acceptance push');
+
+      await call('GET', '/places?minLat=47.99&minLon=7.84&maxLat=48.01&maxLon=7.86', token: owner);
+      final (_, review) = await call('PUT', '/places/place-kebap/review', body: {'sauceRating': 4}, token: owner);
+      final reviewId = review['id'];
+      expect((await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🤤'}, token: actor)).$1, 204);
+      expect(pusher.sent.length, before + 2);
+      final reaction = pusher.sent.last;
+      expect(reaction.data['type'], 'reaction');
+      expect((reaction.title, reaction.body), (null, null));
+      expect((await pushEvent(reaction.data['id']!, key)).$2['placeId'], 'place-kebap');
+      await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🥙'}, token: actor);
+      expect(pusher.sent.length, before + 2, reason: 'changing an emoji does not notify again');
+
+      await call('POST', '/friends/requests', body: {'userId': thirdUser.id}, token: owner);
+      await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: third);
+      await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🙋'}, token: third);
+      expect(pusher.sent.last.data['id'], reaction.data['id'], reason: 'same post replaces the notification');
+      expect((await pushEvent(reaction.data['id']!, key)).$2['title'], 'Neue Reaktionen auf deinen Post');
+
+      final (_, settings) = await call('PATCH', '/users/me', body: {'pushFriendRequests': false, 'pushReactions': false}, token: owner);
+      expect(settings['pushFriendRequests'], isFalse);
+      expect(settings['pushReactions'], isFalse);
+      final muted = pusher.sent.length;
+      await call('DELETE', '/reviews/$reviewId/reaction', token: actor);
+      await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🤤'}, token: actor);
+      final (fourth, _) = await signUp('push-fourth@example.org', 'PushFourth');
+      await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: fourth);
+      expect(pusher.sent.length, muted);
+
+      await call('PATCH', '/users/me', body: {'pushFriendRequests': true, 'pushReactions': true,
+        'pushPausedUntil': DateTime.now().toUtc().add(const Duration(hours: 1)).toIso8601String()}, token: owner);
+      final (fifth, _) = await signUp('push-fifth@example.org', 'PushFifth');
+      final (_, pendingRequest) = await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: fifth);
+      await call('DELETE', '/reviews/$reviewId/reaction', token: actor);
+      await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🤤'}, token: actor);
+      await pushPending(deps);
+      expect(pusher.sent.length, muted, reason: 'paused');
+      await call('POST', '/me/inbox/seen', token: owner);
+      await call('DELETE', '/reviews/$reviewId/reaction', token: third);
+      await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🥙'}, token: third);
+      await call('DELETE', '/friends/${pendingRequest['id']}', token: fifth);
+      await call('PATCH', '/users/me', body: {'pushPausedUntil': '2020-01-01T00:00:00Z'}, token: owner);
+      await pushPending(deps);
+      expect(pusher.sent.length, muted + 1, reason: 'only the new reaction survives');
+      expect(pusher.sent.last.data['type'], 'reaction');
+      await pushPending(deps);
+      expect(pusher.sent.length, muted + 1, reason: 'delivered once');
+      await call('DELETE', '/users/me', token: owner);
+    });
+
     test('push: friends hear about a check-in happening now, at most every 3 hours', () async {
       // Quiet hours are on by default; this test may run at night.
       await call('PATCH', '/users/me', body: {'quietHours': false}, token: bob);
@@ -540,7 +611,8 @@ void main() {
       expect(city.first.first, 'Berlin', reason: 'the city of the nearest shop');
 
       var n = 0;
-      Future<void> checkIn({Duration ago = Duration.zero}) async {
+      Future<void> checkIn({Duration ago = Duration.zero, bool waitForPush = false}) async {
+        final sentBefore = pusher.sent.length;
         n++;
         final visit = {
           'id': '22222222-2222-4222-8222-${'$n'.padLeft(12, '0')}',
@@ -549,12 +621,15 @@ void main() {
         };
         expect((await call('POST', '/places/place-kebap/visits', body: visit, token: anna)).$1, 201);
         await Future<void>.delayed(const Duration(milliseconds: 300));
+        for (var attempt = 0; waitForPush && pusher.sent.length == sentBefore && attempt < 50; attempt++) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
       }
 
       final before = pusher.sent.length;
       await checkIn(ago: const Duration(hours: 2));
       expect(pusher.sent.length, before, reason: 'a check-in synced late is no news');
-      await checkIn();
+      await checkIn(waitForPush: true);
       expect(pusher.sent.length, before + 1);
       final push = pusher.sent.last;
       expect(push.tokens, ['tok-bob']);
@@ -594,7 +669,7 @@ void main() {
       await call('PATCH', '/users/me', body: {'pushFriends': true}, token: bob);
 
       pusher.gone.add('tok-bob');
-      await checkIn();
+      await checkIn(waitForPush: true);
       expect(pusher.sent.length, before + 2);
       final tokens = await db.execute('SELECT count(*)::int FROM push_tokens');
       expect(tokens.first.first, 0, reason: 'a token FCM no longer knows is dropped');
@@ -603,7 +678,7 @@ void main() {
       // Shipped clients have no fetch key: a neutral notification, no details.
       await call('PUT', '/me/push-token', body: {...token}..remove('fetchKey'), token: bob);
       await resetLimit();
-      await checkIn();
+      await checkIn(waitForPush: true);
       expect(pusher.sent.last.title, 'Döner App');
       expect(pusher.sent.last.body, neutralPushText('friend_check_in').$2);
       expect(pusher.sent.last.data, isEmpty);
@@ -652,13 +727,16 @@ void main() {
       }
 
       var n = 0;
-      Future<int> checkIn(String token) async {
+      Future<int> checkIn(String token, {bool waitForPush = false}) async {
         n++;
         await db.execute('UPDATE users SET check_in_pushed_at = NULL');
         final before = pusher.sent.length;
         final visit = {'id': '33333333-3333-4333-8333-${'$n'.padLeft(12, '0')}', 'visitedAt': DateTime.now().toUtc().toIso8601String()};
         expect((await call('POST', '/places/place-kebap/visits', body: visit, token: token)).$1, 201);
         await Future<void>.delayed(const Duration(milliseconds: 300));
+        for (var attempt = 0; waitForPush && pusher.sent.length == before && attempt < 50; attempt++) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
         return pusher.sent.length - before;
       }
 
@@ -679,16 +757,16 @@ void main() {
       await call('PATCH', '/users/me', body: {'quietHours': false}, token: dora);
 
       await db.execute(Sql.named('DELETE FROM push_events WHERE user_id = @id:uuid'), parameters: {'id': doraUser.id});
-      expect(await checkIn(emil), 1);
+      expect(await checkIn(emil, waitForPush: true), 1);
       final first = pusher.sent.last.data['id']!;
-      expect(await checkIn(carl), 1);
+      expect(await checkIn(carl, waitForPush: true), 1);
       expect(pusher.sent.last.data['id'], first, reason: 'replaces the notification');
       final details = PushEventDto.fromJson((await pushEvent(first, key)).$2 as Map<String, dynamic>);
       expect(details.title, 'Emil und Carl essen gerade 🥙');
       expect(details.body, startsWith('zuletzt Carl bei Kebap Haus'));
       expect([details.actorId, details.actorName], [emilUser.id, 'Emil'], reason: 'for "Weniger davon"');
       await call('PUT', '/me/mutes/${emilUser.id}', token: dora);
-      expect(await checkIn(carl), 1);
+      expect(await checkIn(carl, waitForPush: true), 1);
       expect(pusher.sent.last.data['id'], isNot(first), reason: "Emil's name would come back");
 
       expect((await call('PATCH', '/users/me', body: {'quietDays': 128}, token: dora)).$1, 400);
@@ -1831,12 +1909,14 @@ void main() {
     await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash');
     await db.execute('ALTER TABLE users DROP COLUMN updates_consent_at, DROP COLUMN unsubscribe_token');
     await db.execute('DROP TABLE reactions');
-    await db.execute('ALTER TABLE users DROP COLUMN push_paused_until, DROP COLUMN quiet_hours, DROP COLUMN quiet_days, '
+    await db.execute('ALTER TABLE users DROP COLUMN push_friend_requests, DROP COLUMN push_reactions');
+    await db.execute(
+      'ALTER TABLE users DROP COLUMN push_paused_until, DROP COLUMN quiet_hours, DROP COLUMN quiet_days, '
         'DROP COLUMN quiet_start, DROP COLUMN quiet_end, DROP COLUMN time_zone, DROP COLUMN inbox_seen_at');
     await db.execute('DROP FUNCTION in_quiet_hours');
     await db.execute('ALTER TABLE places DROP COLUMN hours_synced_at');
     await db.execute("DELETE FROM schedules WHERE name = 'place_prefetch'");
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 5 FROM schema_migrations)');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 6 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

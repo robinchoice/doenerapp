@@ -67,13 +67,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Switching a push on is a tap, so browsers allow asking for permission here.
-  Future<void> _updatePush({bool? pushFriends, bool? pushNewPlaces, DateTime? pushPausedUntil}) async {
+  Future<void> _updatePush({
+    bool? pushFriends,
+    bool? pushNewPlaces,
+    bool? pushFriendRequests,
+    bool? pushReactions,
+    DateTime? pushPausedUntil,
+  }) async {
     final session = context.read<Session>();
     final push = context.read<Push?>();
     final position = context.read<LocationService>().position;
     try {
-      await session.updateSettings(pushFriends: pushFriends, pushNewPlaces: pushNewPlaces, pushPausedUntil: pushPausedUntil);
-      if (pushFriends == true || pushNewPlaces == true) {
+      await session.updateSettings(
+        pushFriends: pushFriends,
+        pushNewPlaces: pushNewPlaces,
+        pushFriendRequests: pushFriendRequests,
+        pushReactions: pushReactions,
+        pushPausedUntil: pushPausedUntil,
+      );
+      if (pushFriends == true || pushNewPlaces == true || pushFriendRequests == true || pushReactions == true) {
         await push?.register(session, latitude: position?.latitude, longitude: position?.longitude);
       }
     } catch (e) {
@@ -237,6 +249,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('Sobald ein angekündigter Döner aufmacht.'),
                 value: session.user!.pushNewPlaces,
                 onChanged: (value) => _updatePush(pushNewPlaces: value),
+              ),
+              SwitchListTile(
+                title: const Text('Freundschaftsanfragen'),
+                subtitle: const Text('Wenn dich jemand als Freund hinzufügen möchte.'),
+                value: session.user!.pushFriendRequests,
+                onChanged: (value) => _updatePush(pushFriendRequests: value),
+              ),
+              SwitchListTile(
+                title: const Text('Reaktionen auf deine Posts'),
+                subtitle: const Text('Wenn Freunde auf deine Check-ins oder Bewertungen reagieren.'),
+                value: session.user!.pushReactions,
+                onChanged: (value) => _updatePush(pushReactions: value),
               ),
               ListTile(
                 leading: const Icon(Icons.bedtime_outlined),

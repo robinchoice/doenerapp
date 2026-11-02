@@ -32,10 +32,49 @@ void main() {
     expect(response.statusCode, 503);
   });
 
+  test('asks app builds below the minimum to update, but keeps feedback open', () async {
+    final config = Config(
+      database: Endpoint(host: 'localhost', port: 1, database: 'doener'),
+      webDir: '/nonexistent',
+      publicUrl: 'https://doener.test',
+      appDownloadUrl: 'https://testflight.test/join',
+      minBuildIos: 30,
+      minBuildAndroid: 20,
+    );
+    final db = openPool(config);
+    addTearDown(db.close);
+    final handler = buildHandler(Deps(db: db, config: config, mailer: LogMailer(), httpClient: http.Client()));
+    Future<Response> call(String path, [String? platform, String? build, String method = 'GET']) => Future.value(handler(Request(
+          method,
+          Uri.parse('http://localhost/api/v1/$path'),
+          headers: {'x-app-platform': ?platform, 'x-app-build': ?build},
+        )));
+
+    final outdated = await call('app', 'ios', '29');
+    expect(outdated.statusCode, 426);
+    expect(jsonDecode(await outdated.readAsString()), {
+      'error': 'Diese Version der App ist zu alt. Bitte aktualisiere sie.',
+      'code': 'UPDATE_REQUIRED',
+      'url': 'https://testflight.test/join',
+    });
+    final android = await call('app', 'android', '19');
+    expect(jsonDecode(await android.readAsString())['url'], 'https://doener.test/android');
+    // Before the login check, so a logged-out old build learns why
+    expect((await call('auth/me', 'ios', '29')).statusCode, 426);
+    expect((await call('feedback', 'ios', '1', 'POST')).statusCode, 401);
+    expect((await call('app', 'ios', '30')).statusCode, 200);
+    expect((await call('app', 'android', '20')).statusCode, 200);
+    // The web app and local builds send no build number
+    expect((await call('app')).statusCode, 200);
+    expect((await call('app', 'ios', '0')).statusCode, 200);
+  });
+
   test('production refuses to start without SMTP', () {
     expect(() => Config.fromEnvironment({'APP_ENV': 'production'}), throwsStateError);
     expect(Config.fromEnvironment({'APP_ENV': 'production', 'SMTP_HOST': 'smtp.test'}).smtp?.host, 'smtp.test');
     expect(Config.fromEnvironment({}).smtp, isNull);
+    expect(Config.fromEnvironment({'MIN_BUILD_IOS': '42'}).minBuildIos, 42);
+    expect(Config.fromEnvironment({}).minBuildAndroid, 0);
   });
 
   test('iOS finds the app for login, invite and review links', () async {

@@ -7,6 +7,16 @@ import 'package:http/http.dart' as http;
 const _productionApi = 'https://doener-api.pleasance.org/api/v1';
 const _apiFromBuild = String.fromEnvironment('API_BASE');
 
+/// The CI build number (`--dart-define=BUILD_NUMBER`, the same as
+/// `--build-number`). The API asks builds below MIN_BUILD_IOS/MIN_BUILD_ANDROID
+/// to update (README, „Update-Pflicht“). Local builds have 0 and are never asked.
+const buildNumber = int.fromEnvironment('BUILD_NUMBER');
+
+/// Platform and build for `server/lib/src/min_build.dart`. The web app sends nothing.
+Map<String, String> get _appHeaders => kIsWeb || buildNumber == 0
+    ? const {}
+    : {'x-app-platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android', 'x-app-build': '$buildNumber'};
+
 /// Build-time default: `--dart-define=API_BASE=…`, otherwise same origin on
 /// web (the server hosts the web app) and production on mobile.
 String get defaultApiBase {
@@ -38,6 +48,10 @@ class ApiClient {
 
   /// Called when the server rejects our session token.
   void Function()? onUnauthorized;
+
+  /// Set once the server no longer serves this build (426): where to update,
+  /// '' without a link. The app then shows only the update screen.
+  final updateRequired = ValueNotifier<String?>(null);
   final http.Client _client;
 
   ApiClient({required this.baseUrl, required this.token, http.Client? client}) : _client = client ?? http.Client();
@@ -63,7 +77,8 @@ class ApiClient {
     final auth = token();
     final request = http.Request(method, uri)
       ..headers['accept'] = 'application/json'
-      ..headers['content-type'] = 'application/json';
+      ..headers['content-type'] = 'application/json'
+      ..headers.addAll(_appHeaders);
     if (auth != null) request.headers['authorization'] = 'Bearer $auth';
     if (body != null) request.body = jsonEncode(body);
 
@@ -75,7 +90,25 @@ class ApiClient {
       throw const OfflineException();
     }
     if (response.statusCode == 401 && auth != null) onUnauthorized?.call();
+    if (response.statusCode == 426) {
+      try {
+        updateRequired.value = (jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>)['url'] as String? ?? '';
+      } catch (_) {
+        updateRequired.value = '';
+      }
+    }
     return response;
+  }
+
+  /// Asked at launch, so an outdated build learns it before anything else.
+  /// Offline or failing, the app just starts.
+  Future<void> checkBuild() async {
+    if (_appHeaders.isEmpty) return;
+    try {
+      await _send('GET', '/app');
+    } on OfflineException {
+      // Asked again with the next API call.
+    }
   }
 
   dynamic _decode(http.Response response) {

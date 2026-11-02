@@ -33,6 +33,7 @@ import 'features/settings/settings_screen.dart';
 import 'features/social/friends.dart';
 import 'features/social/invite.dart';
 import 'features/start/start_screen.dart';
+import 'features/update/update_screen.dart';
 import 'ui/widgets.dart';
 
 final _navigatorKey = GlobalKey<NavigatorState>();
@@ -70,7 +71,11 @@ class DoenerApp extends StatelessWidget {
             onInvoke: (intent) => intent.focusNode.unfocus(),
           ),
         },
-        builder: (context, child) => _FeedbackButton(child: child!),
+        // Below the minimum build only the update screen is left (README, „Update-Pflicht“).
+        builder: (context, child) => ValueListenableBuilder(
+          valueListenable: context.read<Session>().api.updateRequired,
+          builder: (context, url, _) => url != null ? UpdateScreen(url: url) : _FeedbackButton(child: child!),
+        ),
         home: _Root(
           onboardingDone: onboardingDone,
           invitePromptDone: invitePromptDone,

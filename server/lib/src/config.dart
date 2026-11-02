@@ -59,6 +59,11 @@ class Config {
   /// Commit of the build (`APP_VERSION`); `/health` reports it so the deploy can wait for it.
   final String revision;
 
+  /// App builds below these build numbers only see the update screen
+  /// (`MIN_BUILD_IOS`, `MIN_BUILD_ANDROID`, README „Update-Pflicht“). 0 = no minimum.
+  final int minBuildIos;
+  final int minBuildAndroid;
+
   const Config({
     required this.database,
     this.databaseTls = false,
@@ -78,6 +83,8 @@ class Config {
     this.asc,
     this.fcmServiceAccount,
     this.revision = 'dev',
+    this.minBuildIos = 0,
+    this.minBuildAndroid = 0,
   });
 
   String publicBase(Uri requestedUri) => publicUrl ?? requestedUri.origin;
@@ -136,6 +143,8 @@ class Config {
         null => null,
       },
       revision: get('APP_VERSION') ?? 'dev',
+      minBuildIos: int.parse(get('MIN_BUILD_IOS') ?? '0'),
+      minBuildAndroid: int.parse(get('MIN_BUILD_ANDROID') ?? '0'),
     );
   }
 }

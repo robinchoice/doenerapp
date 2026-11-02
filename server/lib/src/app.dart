@@ -12,6 +12,7 @@ import 'deps.dart';
 import 'http.dart';
 import 'inbox.dart';
 import 'landing.dart';
+import 'min_build.dart';
 import 'moderation.dart';
 import 'places.dart';
 import 'privacy.dart';
@@ -66,7 +67,9 @@ Handler buildHandler(Deps deps) {
         print('Health check failed: $e');
         return json({'status': 'database unavailable'}, status: 503);
       }
-    });
+    })
+    // The app asks this at launch, requireMinimumBuild answers it for outdated builds.
+    ..get('/app', (Request _) => json({'ok': true}));
   mountAuth(api, deps);
   mountPlaces(api, deps);
   mountRanking(api, deps);
@@ -78,7 +81,7 @@ Handler buildHandler(Deps deps) {
   mountTesterRequests(api, deps);
   mountAndroid(api, deps);
 
-  final root = Router()..mount('/api/v1/', api.call);
+  final root = Router()..mount('/api/v1/', const Pipeline().addMiddleware(requireMinimumBuild(deps)).addHandler(api.call));
   mountAgents(root, deps);
   root
     ..get('/', (Request request) => landingPage(request, english: false))

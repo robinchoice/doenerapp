@@ -73,6 +73,7 @@ Future<void> startApp() async {
   final invitePromptDone = await settingsStore.record('invitePromptDone').get(db) == true;
 
   // Don't block startup on the network.
+  session.api.checkBuild();
   session.refresh().then((_) async {
     await data.sync();
     await data.refreshMine();

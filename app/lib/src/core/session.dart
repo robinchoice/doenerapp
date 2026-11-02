@@ -162,8 +162,8 @@ class Session extends ChangeNotifier {
   Future<void> _clear() async {
     _token = null;
     user = null;
+    notifyListeners();
     await _secure.delete(key: 'session_token');
     await settingsStore.record('user').delete(_db);
-    notifyListeners();
   }
 }

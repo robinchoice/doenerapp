@@ -6,12 +6,14 @@ import 'package:doener_app/src/core/app_data.dart';
 import 'package:doener_app/src/core/location.dart';
 import 'package:doener_app/src/core/session.dart';
 import 'package:doener_app/src/features/social/friends.dart';
+import 'package:doener_app/src/features/start/start_screen.dart';
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:sembast/sembast_memory.dart';
@@ -64,6 +66,7 @@ class FakeServer {
 Future<(FakeServer, Database)> _pumpApp(
   WidgetTester tester, {
   bool loggedIn = false,
+  bool invitePromptDone = false,
   String name = 'Döner-Fan-1234',
   String? inviteCode,
   Stream<Uri>? links,
@@ -92,13 +95,38 @@ Future<(FakeServer, Database)> _pumpApp(
       ChangeNotifierProvider(create: (_) => LocationService()),
       ChangeNotifierProvider(create: (_) => Friends(session)),
     ],
-    child: DoenerApp(onboardingDone: true, invitePromptDone: false, inviteCode: inviteCode, links: links),
+    child: DoenerApp(onboardingDone: true, invitePromptDone: invitePromptDone, inviteCode: inviteCode, links: links),
   ));
   await tester.pumpAndSettle();
   return (server, db);
 }
 
 void main() {
+  setUpAll(() => initializeDateFormatting('de'));
+
+  testWidgets('an expired session leaves Start before storage cleanup finishes', (tester) async {
+    final (_, db) = await _pumpApp(tester, loggedIn: true, name: 'Robin', invitePromptDone: true);
+    expect(find.byType(StartScreen), findsOneWidget);
+    final context = tester.element(find.byType(StartScreen));
+    final session = context.read<Session>();
+    final location = context.read<LocationService>();
+    var loggedOutNotified = false;
+    session.addListener(() => loggedOutNotified = !session.isLoggedIn);
+
+    session.api.onUnauthorized!();
+    expect(loggedOutNotified, isTrue, reason: 'the login gate must rebuild before storage cleanup awaits');
+    location.notifyListeners();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(StartScreen), findsNothing);
+    expect(find.text('Code schicken'), findsOneWidget);
+    expect(session.expired, isTrue);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(await tester.runAsync(() => settingsStore.record('user').get(db)), isNull);
+  });
+
   testWidgets('without an account there is only the login', (tester) async {
     await _pumpApp(tester);
     expect(find.text('Code schicken'), findsOneWidget);

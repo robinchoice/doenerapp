@@ -152,8 +152,10 @@ Am 1. Januar friert der Server für jede Stadt die Bestenliste des Vorjahres ein
 Über Firebase Cloud Messaging für iOS, Android und Web (Firebase im GCP-Projekt `doener-app-510118`). Vier Arten, jede mit Schalter unter Einstellungen → Benachrichtigungen:
 - **Freunde checken ein:** „Lena isst gerade 🌯“, darunter „bei X (Nr. 2 in Freiburg)“ mit dem Platz im Döner-Ranking der Stadt. Nur für Check-ins, die gerade passieren, und pro Person höchstens alle 3 Stunden. Einzelne Freunde lassen sich in der Freundesliste mit der Glocke stummschalten
 - **Neue Läden in deiner Stadt:** sobald ein angekündigter Laden aufmacht, einmal an alle in der Stadt. Die Stadt nimmt der Server vom nächsten Laden zur Position, die das Gerät mit seinem Token schickt
-- **Freundschaftsanfragen:** wenn jemand dich hinzufügen möchte, einmal pro neuer Anfrage
-- **Reaktionen auf deine Posts:** wenn Freunde auf eigene Check-ins oder Bewertungen reagieren. Ein Emoji-Wechsel oder Löschen löst keinen Push aus. Reaktionen auf denselben Post ersetzen die Meldung, innerhalb von 30 Minuten mit gemeinsamem Titel
+- **Freundschaftsanfragen:** wenn jemand dich hinzufügen möchte, einmal pro neuer Anfrage, höchstens alle 30 Minuten von derselben Person
+- **Reaktionen auf deine Posts:** wenn Freunde auf eigene Check-ins oder Bewertungen reagieren. Ein Emoji-Wechsel oder Löschen löst keinen Push aus; auch Zurücknehmen und erneutes Reagieren meldet sich pro Person und Post höchstens alle 30 Minuten. Reaktionen auf denselben Post ersetzen die Meldung, innerhalb von 30 Minuten mit gemeinsamem Titel
+
+Die neuen Arten gehen nur an Geräte, die beim Anmelden ihres Tokens `socialPushes: true` melden. Ältere Builds behalten ihre bisherigen Push-Arten, damit „Weniger davon“ dort keine falsche Kategorie abschaltet.
 
 Ein Tipp auf den Push öffnet bei Anfragen und Reaktionen die Glocke, sonst den Laden. Handys fragen beim Start nach der Erlaubnis, Browser erst beim Einschalten eines Schalters, weil sie das nur nach einem Tipp erlauben. Beim Abmelden meldet die App das Gerät ab, Tokens, die FCM nicht mehr kennt, löscht der Server.
 

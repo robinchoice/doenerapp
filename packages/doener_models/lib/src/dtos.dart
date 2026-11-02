@@ -1313,10 +1313,12 @@ class PushTokenRequest {
   final double? latitude;
   final double? longitude;
   final String? fetchKey;
+  final bool socialPushes;
 
   /// IANA name such as `Europe/Berlin`, for the quiet hours.
   final String? timeZone;
-  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude, this.fetchKey, this.timeZone});
+  const PushTokenRequest({required this.token, required this.platform, this.latitude, this.longitude, this.fetchKey, this.timeZone,
+    this.socialPushes = false});
 
   factory PushTokenRequest.fromJson(Json j) => PushTokenRequest(
         token: j['token'] as String,
@@ -1324,10 +1326,12 @@ class PushTokenRequest {
         latitude: _doubleOrNull(j['latitude']),
         longitude: _doubleOrNull(j['longitude']),
         fetchKey: j['fetchKey'] as String?,
+        socialPushes: j['socialPushes'] as bool? ?? false,
         timeZone: j['timeZone'] as String?,
       );
   Json toJson() =>
-      {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude, 'fetchKey': ?fetchKey, 'timeZone': ?timeZone};
+      {'token': token, 'platform': platform, 'latitude': latitude, 'longitude': longitude, 'fetchKey': ?fetchKey, 'timeZone': ?timeZone,
+        'socialPushes': socialPushes};
 }
 
 /// What a push is about. The push itself carries only its type and event ID.

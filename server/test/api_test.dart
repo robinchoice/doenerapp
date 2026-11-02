@@ -536,9 +536,10 @@ void main() {
       final (third, thirdUser) = await signUp('push-third@example.org', 'PushThird');
       final key = 's' * 43;
       await call('PATCH', '/users/me', body: {'quietHours': false, 'pushNewPlaces': false}, token: owner);
-      await call('PUT', '/me/push-token', body: {'token': 'tok-social', 'platform': 'android', 'fetchKey': key}, token: owner);
+      await call('PUT', '/me/push-token', body: {'token': 'tok-social-legacy', 'platform': 'ios', 'fetchKey': 'l' * 43}, token: owner);
+      await call('PUT', '/me/push-token', body: {'token': 'tok-social', 'platform': 'android', 'fetchKey': key, 'socialPushes': true}, token: owner);
       final before = pusher.sent.length;
-      final (_, request) = await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: actor);
+      final (_, firstRequest) = await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: actor);
       expect(pusher.sent.length, before + 1);
       final invitation = pusher.sent.last;
       expect(invitation.tokens, ['tok-social']);
@@ -548,6 +549,9 @@ void main() {
       final details = (await pushEvent(invitation.data['id']!, key)).$2;
       expect(details['title'], contains('PushActor'));
       await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: actor);
+      await call('DELETE', '/friends/${firstRequest['id']}', token: actor);
+      final (_, request) = await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: actor);
+      expect(pusher.sent.length, before + 1, reason: 'withdrawing and asking again does not repeat a push');
       await call('POST', '/friends/${request['id']}/accept', token: owner);
       await call('POST', '/friends/requests', body: {'userId': actorUser.id}, token: owner);
       expect(pusher.sent.length, before + 1, reason: 'no duplicate or acceptance push');
@@ -563,6 +567,9 @@ void main() {
       expect((await pushEvent(reaction.data['id']!, key)).$2['placeId'], 'place-kebap');
       await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🥙'}, token: actor);
       expect(pusher.sent.length, before + 2, reason: 'changing an emoji does not notify again');
+      await call('DELETE', '/reviews/$reviewId/reaction', token: actor);
+      await call('PUT', '/reviews/$reviewId/reaction', body: {'emoji': '🤤'}, token: actor);
+      expect(pusher.sent.length, before + 2, reason: 'removing and adding a reaction does not repeat a push');
 
       await call('POST', '/friends/requests', body: {'userId': thirdUser.id}, token: owner);
       await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: third);
@@ -580,6 +587,7 @@ void main() {
       await call('POST', '/friends/requests', body: {'userId': ownerUser.id}, token: fourth);
       expect(pusher.sent.length, muted);
 
+      await db.execute("UPDATE rate_limits SET reset_at = now() - interval '1 minute' WHERE key LIKE 'social-push:%'");
       await call('PATCH', '/users/me', body: {'pushFriendRequests': true, 'pushReactions': true,
         'pushPausedUntil': DateTime.now().toUtc().add(const Duration(hours: 1)).toIso8601String()}, token: owner);
       final (fifth, _) = await signUp('push-fifth@example.org', 'PushFifth');
@@ -596,6 +604,7 @@ void main() {
       await pushPending(deps);
       expect(pusher.sent.length, muted + 1, reason: 'only the new reaction survives');
       expect(pusher.sent.last.data['type'], 'reaction');
+      expect(pusher.sent.last.tokens, ['tok-social'], reason: 'pending pushes also skip older apps');
       await pushPending(deps);
       expect(pusher.sent.length, muted + 1, reason: 'delivered once');
       await call('DELETE', '/users/me', token: owner);
@@ -1906,7 +1915,7 @@ void main() {
     await db.execute('DROP VIEW active_place_view');
     await db.execute('DROP TABLE rate_limits');
     await db.execute('DROP TABLE push_events, update_deliveries, update_dismissals, updates');
-    await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash');
+    await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash, DROP COLUMN social_pushes');
     await db.execute('ALTER TABLE users DROP COLUMN updates_consent_at, DROP COLUMN unsubscribe_token');
     await db.execute('DROP TABLE reactions');
     await db.execute('ALTER TABLE users DROP COLUMN push_friend_requests, DROP COLUMN push_reactions');

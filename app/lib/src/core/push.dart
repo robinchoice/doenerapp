@@ -158,7 +158,8 @@ class Push {
       _token = token;
       await session.api.put(
         '/me/push-token',
-        PushTokenRequest(token: token, platform: _platform, latitude: latitude, longitude: longitude, fetchKey: key, timeZone: zone)
+        PushTokenRequest(token: token, platform: _platform, latitude: latitude, longitude: longitude, fetchKey: key, timeZone: zone,
+          socialPushes: true)
             .toJson(),
       );
     }

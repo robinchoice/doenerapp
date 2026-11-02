@@ -122,7 +122,7 @@ Future<void> deleteOldPushEvents(Deps deps) => deps.db.execute(
     );
 
 /// Recipients: one row per device.
-const _recipientColumns = 't.token, t.user_id::text AS user_id, t.fetch_key_hash IS NOT NULL AS has_key';
+const _recipientColumns = 't.token, t.user_id::text AS user_id, t.fetch_key_hash IS NOT NULL AS has_key, t.social_pushes';
 
 /// SQL condition: the user `u` takes pushes now, neither paused nor in their
 /// quiet hours, which count in the time zone their phone reported last.
@@ -156,7 +156,9 @@ Future<List<Map<String, dynamic>>> _insertEvents(
 Future<void> _deliver(Deps deps, List<Map<String, dynamic>> recipients, String type, List<Map<String, dynamic>> events) async {
   final (neutralTitle, neutralBody) = neutralPushText(type);
   for (final event in events) {
-    final devices = [for (final r in recipients) if (r['user_id'] == event['user_id']) r];
+    final devices = [for (final r in recipients)
+      if (r['user_id'] == event['user_id'] &&
+          (!(type == 'friend_request' || type == 'reaction') || r['social_pushes'] == true)) r];
     await _send(deps, [for (final r in devices) if (!(r['has_key'] as bool)) r['token'] as String], title: neutralTitle, body: neutralBody);
     await _send(
       deps,
@@ -278,10 +280,12 @@ Future<void> pushSocial(
     final rows = await query(
       deps.db,
       'SELECT $_recipientColumns, $pushableNow AS now FROM push_tokens t JOIN users u ON u.id = t.user_id '
-      'WHERE u.id = @user:uuid AND u.$preference',
+      'WHERE u.id = @user:uuid AND u.$preference AND t.social_pushes',
       {'user': recipient},
     );
     if (rows.isEmpty) return;
+    final target = type == 'reaction' ? sourceId : recipient;
+    if (!await rateLimit(deps, 'social-push:$type:${actor.id}:$target', 1, const Duration(minutes: 30))) return;
     final pending = !(rows.first['now'] as bool);
     final events = await query(
       deps.db,
@@ -356,10 +360,12 @@ void mountPush(Router router, Deps deps) {
     final key = body.fetchKey;
     if (key != null && (key.length < 32 || key.length > 200)) throw const ApiException.badRequest('Ungültiger Schlüssel');
     await deps.db.execute(
-      Sql.named('INSERT INTO push_tokens (token, user_id, platform, fetch_key_hash) VALUES (@token, @me:uuid, @platform, @key:text) '
+      Sql.named('INSERT INTO push_tokens (token, user_id, platform, fetch_key_hash, social_pushes) '
+          'VALUES (@token, @me:uuid, @platform, @key:text, @social:boolean) '
           'ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform, '
-          'fetch_key_hash = EXCLUDED.fetch_key_hash, updated_at = now()'),
-      parameters: {'token': body.token, 'me': me.id, 'platform': body.platform, 'key': key == null ? null : hashToken(key)},
+          'fetch_key_hash = EXCLUDED.fetch_key_hash, social_pushes = EXCLUDED.social_pushes, updated_at = now()'),
+      parameters: {'token': body.token, 'me': me.id, 'platform': body.platform, 'key': key == null ? null : hashToken(key),
+        'social': body.socialPushes},
     );
     if (body.latitude != null && body.longitude != null) {
       final city = await nearestCity(deps.db, body.latitude!, body.longitude!);

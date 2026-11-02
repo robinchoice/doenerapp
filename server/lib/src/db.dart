@@ -434,6 +434,7 @@ final migrations = <List<String>>[
   [
     'ALTER TABLE users ADD COLUMN push_friend_requests boolean NOT NULL DEFAULT true',
     'ALTER TABLE users ADD COLUMN push_reactions boolean NOT NULL DEFAULT true',
+    'ALTER TABLE push_tokens ADD COLUMN social_pushes boolean NOT NULL DEFAULT false',
     'ALTER TABLE push_events ADD COLUMN source_id uuid',
     'CREATE UNIQUE INDEX push_events_source ON push_events (user_id, type, source_id)',
   ],

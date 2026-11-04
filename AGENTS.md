@@ -18,6 +18,8 @@
 
 Server- und CLI-Tests brauchen Postgres über `TEST_DB_PORT` (README, „Tests“), sonst überspringen sie sich.
 
+Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Standardrunner `xcode-27`, fest mit Xcode 27.1 und iOS-27.1-SDK. Das prüft die native Kompilierung für iPhone und iPad, keine Gerätebedienung. Der signierte Mobile-Workflow wählt weiterhin das neueste Xcode auf `macos-15`; seine Toolchain ist davon unabhängig.
+
 ## Deploy
 
 - Ein Push auf `main`, der `server/`, `packages/`, `app/`, `updates/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.

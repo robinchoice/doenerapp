@@ -401,7 +401,7 @@ cd app && flutter test
 
 | Workflow | Auslöser | Macht |
 |---|---|---|
-| `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres), CLI und App, dazu ein Probe-Build der CLI |
+| `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres), CLI und App, CLI-Probe-Build sowie nativer iOS-Build ohne Signing/Secrets/Upload mit Xcode 27.1 und iOS-27.1-SDK auf Standardrunner `xcode-27` |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
 | `mobile.yml` | Push auf `main` (`app/`, `packages/`), Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test, bei Tags und von Hand die APK ins Release `android-latest` |
 | `secrets.yml` | Jeder Push auf jedem Branch, PRs aus Forks | Secret-Scan mit gitleaks, siehe unten |

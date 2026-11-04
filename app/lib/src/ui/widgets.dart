@@ -606,38 +606,38 @@ void showMessage(BuildContext context, String message) =>
 
 /// Consistent modal sheet used for all forms.
 Future<T?> showAppSheet<T>(BuildContext context, WidgetBuilder builder) => showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Tall sheets scroll instead of closing on a downward swipe, so the handle row gets a close button.
-            SizedBox(
-              height: 48,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).bottomSheetTheme.dragHandleColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Positioned(
-                    right: 4,
-                    child: IconButton(icon: const Icon(Icons.close), tooltip: 'Schließen', onPressed: () => Navigator.pop(context)),
-                  ),
-                ],
-              ),
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  builder: (context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Tall sheets scroll instead of closing on a downward swipe, so the handle row gets a close button.
+          SizedBox(
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(color: Theme.of(context).bottomSheetTheme.dragHandleColor, borderRadius: BorderRadius.circular(2)),
+                ),
+                Positioned(
+                  right: 4,
+                  child: IconButton(icon: const Icon(Icons.close), tooltip: 'Schließen', onPressed: () => Navigator.pop(context)),
+                ),
+              ],
             ),
-            Flexible(child: builder(context)),
-          ],
-        ),
+          ),
+          Flexible(child: builder(context)),
+        ],
       ),
-    );
+    ),
+  ),
+);

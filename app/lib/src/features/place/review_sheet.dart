@@ -314,19 +314,17 @@ class _ReviewSheetState extends State<ReviewSheet> {
               Text(_mainTitle(_diet), style: theme.textTheme.titleSmall),
               for (final item in main) _row(item),
               const Divider(height: 20),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text('Gesamt', style: theme.textTheme.titleSmall),
-                  const SizedBox(width: 12),
                   DoenerRating(value: score, size: 22),
-                  const SizedBox(width: 10),
                   if (score > 0)
-                    Flexible(
-                      child: Text(
-                        _labels[score.round()],
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: context.accent, fontWeight: FontWeight.w600),
-                      ),
+                    Text(
+                      _labels[score.round()],
+                      style: TextStyle(color: context.accent, fontWeight: FontWeight.w600),
                     ),
                 ],
               ),

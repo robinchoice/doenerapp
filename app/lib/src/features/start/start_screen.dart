@@ -235,7 +235,7 @@ class _StartScreenState extends State<StartScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(children: [BrandTile(size: 30), SizedBox(width: 10), Text('Döner App')]),
+        title: const Row(children: [BrandTile(size: 30), SizedBox(width: 10), Flexible(child: Text('Döner App', overflow: TextOverflow.ellipsis))]),
         actions: const [InboxButton(), SizedBox(width: 8)],
       ),
       body: RefreshIndicator(

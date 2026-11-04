@@ -27,7 +27,10 @@ Future<void> showPlaceDetail(BuildContext context, PlaceDto place) => showModalB
         expand: false,
         initialChildSize: 0.6,
         maxChildSize: 1,
-        builder: (context, controller) => PlaceDetail(placeId: place.placeId, fallback: place, controller: controller),
+        builder: (context, controller) => SafeArea(
+          top: false,
+          child: PlaceDetail(placeId: place.placeId, fallback: place, controller: controller),
+        ),
       ),
     );
 

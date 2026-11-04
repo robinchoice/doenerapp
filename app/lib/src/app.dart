@@ -74,7 +74,7 @@ class DoenerApp extends StatelessWidget {
         // Below the minimum build only the update screen is left (README, „Update-Pflicht“).
         builder: (context, child) => ValueListenableBuilder(
           valueListenable: context.read<Session>().api.updateRequired,
-          builder: (context, url, _) => url != null ? UpdateScreen(url: url) : _FeedbackButton(child: child!),
+          builder: (context, url, _) => DisplayFeatureSubScreen(child: url != null ? UpdateScreen(url: url) : _FeedbackButton(child: child!)),
         ),
         home: _Root(
           onboardingDone: onboardingDone,
@@ -459,13 +459,21 @@ class _HomeShellState extends State<HomeShell> {
     final pending = context.select<AppData, int>((d) => d.pendingCount);
     context.watch<LocationService>();
     final onSite = context.select<AppData, bool>((d) => _nearby(d).isNotEmpty);
-    // Browsers on a desktop get a rail on the left and a column of readable width.
+    // Use the available window width, including split view and foldable panes.
     final wide = MediaQuery.sizeOf(context).width >= 900;
-    Widget column(Widget child) => wide ? Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 720), child: child)) : child;
+    Widget column(Widget child) => Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: wide ? 720 : double.infinity),
+        child: child,
+      ),
+    );
     final checkIn = GradientCircle(
       size: 44,
       active: onSite,
-      child: Opacity(opacity: onSite ? 1 : 0.4, child: const Text('🥙', style: TextStyle(fontSize: 22))),
+      child: Opacity(
+        opacity: onSite ? 1 : 0.4,
+        child: const Text('🥙', style: TextStyle(fontSize: 22)),
+      ),
     );
     final profileIcon = Badge(isLabelVisible: pending > 0, label: Text('$pending'), child: const Icon(Icons.account_circle_outlined));
     final destinations = [
@@ -485,11 +493,13 @@ class _HomeShellState extends State<HomeShell> {
         column(const ProfileScreen()),
       ],
     );
-    if (wide) {
-      return Scaffold(
-        body: Row(
-          children: [
+    return Scaffold(
+      body: Row(
+        children: [
+          if (wide)
             NavigationRail(
+              scrollable: true,
+              leadingAtTop: false,
               selectedIndex: _tab,
               onDestinationSelected: select,
               labelType: NavigationRailLabelType.all,
@@ -507,32 +517,32 @@ class _HomeShellState extends State<HomeShell> {
                   ),
               ],
             ),
-            const VerticalDivider(width: 1),
-            Expanded(child: body),
-          ],
-        ),
-      );
-    }
-    return Scaffold(
-      body: body,
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
-        // Larger system text would wrap "Einchecken", so the labels keep their size like an iOS tab bar.
-        child: MediaQuery.withNoTextScaling(
-          child: NavigationBar(
-            selectedIndex: _tab,
-            onDestinationSelected: select,
-            destinations: [
-              for (final (i, d) in destinations.indexed)
-                NavigationDestination(
-                  icon: d.icon,
-                  selectedIcon: i == _checkInTab ? d.selected : ActiveTabMark(icon: d.selected),
-                  label: d.label,
-                ),
-            ],
-          ),
-        ),
+          if (wide) const VerticalDivider(width: 1),
+          Expanded(child: body),
+        ],
       ),
+      bottomNavigationBar: wide
+          ? null
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+              ),
+              // Larger system text would wrap "Einchecken", so the labels keep their size like an iOS tab bar.
+              child: MediaQuery.withNoTextScaling(
+                child: NavigationBar(
+                  selectedIndex: _tab,
+                  onDestinationSelected: select,
+                  destinations: [
+                    for (final (i, d) in destinations.indexed)
+                      NavigationDestination(
+                        icon: d.icon,
+                        selectedIcon: i == _checkInTab ? d.selected : ActiveTabMark(icon: d.selected),
+                        label: d.label,
+                      ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 }

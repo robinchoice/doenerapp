@@ -403,7 +403,7 @@ cd app && flutter test
 |---|---|---|
 | `ci.yml` | PRs, Push auf `main` | Analyse + Tests für Models, Server (mit Postgres), CLI und App, CLI-Probe-Build sowie nativer iOS-Build ohne Signing/Secrets/Upload mit Xcode 27.1 und iOS-27.1-SDK auf Standardrunner `xcode-27` |
 | `deploy.yml` | Push auf `main` (`server/`, `app/`, `packages/`) | arm64-Image `ghcr.io/robinchoice/doener-api:<sha>` bauen, auf Coolify deployen |
-| `mobile.yml` | Push auf `main` (`app/`, `packages/`), Tags `v*`, manuell | iOS → TestFlight, Android → App Bundle als Artefakt und in den internen Play-Test, bei Tags und von Hand die APK ins Release `android-latest` |
+| `mobile.yml` | Push auf `main` (`app/`, `packages/`, `mobile.yml`), Tags `v*`, manuell | iOS mit festem Xcode 27.1 und iOS-27.1-SDK auf Standardrunner `xcode-27` → TestFlight; Android → App Bundle als Artefakt und in den internen Play-Test, bei Tags und von Hand die APK ins Release `android-latest` |
 | `secrets.yml` | Jeder Push auf jedem Branch, PRs aus Forks | Secret-Scan mit gitleaks, siehe unten |
 
 Das Image enthält Server und Web-App: Die API liegt unter `/api/v1`, die Landingpage unter `/` und `/en`, alles andere ist die Web-App (`/app`).

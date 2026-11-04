@@ -18,7 +18,7 @@
 
 Server- und CLI-Tests brauchen Postgres über `TEST_DB_PORT` (README, „Tests“), sonst überspringen sie sich.
 
-Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Standardrunner `xcode-27`, fest mit Xcode 27.1 und iOS-27.1-SDK. Das prüft die native Kompilierung für iPhone und iPad, keine Gerätebedienung. Der signierte Mobile-Workflow wählt weiterhin das neueste Xcode auf `macos-15`; seine Toolchain ist davon unabhängig.
+Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Standardrunner `xcode-27`, fest mit Xcode 27.1 und iOS-27.1-SDK. Das prüft die native Kompilierung für iPhone und iPad, keine Gerätebedienung. Der signierte Mobile-Workflow verwendet denselben Standardrunner und dieselbe feste Toolchain. Beide prüfen Xcode- und SDK-Version vor dem Build und wählen keine RC/Beta automatisch aus.
 
 ## Deploy
 

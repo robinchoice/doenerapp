@@ -26,16 +26,18 @@ env:
 jobs:
   ios:
     if: inputs.platform != 'android'
-    runs-on: macos-15
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
 
-      - name: Neuestes Xcode wählen
+      - name: Verify stable Xcode and iOS SDK
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
-          echo "Wähle: $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          test "$(xcodebuild -version | head -n 1)" = "Xcode 27.1"
+          test "$(xcrun --sdk iphoneos --show-sdk-version)" = "27.1"
 
       - uses: subosito/flutter-action@v2
         with:

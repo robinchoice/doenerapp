@@ -48,7 +48,8 @@ Future<void> _tapInSheet(WidgetTester tester, Finder finder) async {
 /// Taps the [value]th fork in the rating row of [label].
 Future<void> _rate(WidgetTester tester, String label, int value) async {
   final row = find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
-  await tester.tap(find.descendant(of: row, matching: find.byType(GestureDetector)).at(value - 1));
+  final fork = find.descendant(of: row, matching: find.byType(AnimatedScale)).at(value - 1);
+  await tester.tapAt(tester.getCenter(fork) + const Offset(2, 0)); // right half: the full value
   await tester.pumpAndSettle();
 }
 

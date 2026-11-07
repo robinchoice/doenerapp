@@ -162,7 +162,8 @@ class GlassCard extends StatelessWidget {
 }
 
 /// 1–5 rating in half steps shown as fork-and-knife icons; averages show
-/// rounded to half steps. Tapping the left half of an icon gives the half step.
+/// rounded to half steps. Tapping the left half of an icon gives the half step;
+/// dragging sideways across the icons changes the value as it goes.
 class DoenerRating extends StatelessWidget {
   final double value;
   final double size;
@@ -174,37 +175,49 @@ class DoenerRating extends StatelessWidget {
     final inactive = Theme.of(context).colorScheme.outlineVariant;
     final shown = value.halfStep;
     final padding = size * 0.08;
-    return Row(
+    final cell = size + 2 * padding;
+    void select(double dx) {
+      final i = (dx / cell).floor().clamp(0, 4);
+      final v = dx - i * cell < padding + size / 2 ? i + 0.5 : i + 1.0;
+      if (v != value) onChanged!(v);
+    }
+
+    final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 1; i <= 5; i++)
-          GestureDetector(
-            onTapUp: onChanged == null ? null : (d) => onChanged!(d.localPosition.dx < padding + size / 2 ? i - 0.5 : i.toDouble()),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: padding),
-              child: AnimatedScale(
-                scale: onChanged != null && (i == shown || i - 0.5 == shown) ? 1.12 : 1,
-                duration: const Duration(milliseconds: 200),
-                child: i - 0.5 == shown
-                    ? Stack(children: [
-                        Icon(Icons.restaurant_outlined, size: size, color: inactive),
-                        ClipRect(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: 0.5,
-                            child: Icon(Icons.restaurant, size: size, color: context.accent),
-                          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: padding),
+            child: AnimatedScale(
+              scale: onChanged != null && (i == shown || i - 0.5 == shown) ? 1.12 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: i - 0.5 == shown
+                  ? Stack(children: [
+                      Icon(Icons.restaurant_outlined, size: size, color: inactive),
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: 0.5,
+                          child: Icon(Icons.restaurant, size: size, color: context.accent),
                         ),
-                      ])
-                    : Icon(
-                        i <= shown ? Icons.restaurant : Icons.restaurant_outlined,
-                        size: size,
-                        color: i <= shown ? context.accent : inactive,
                       ),
-              ),
+                    ])
+                  : Icon(
+                      i <= shown ? Icons.restaurant : Icons.restaurant_outlined,
+                      size: size,
+                      color: i <= shown ? context.accent : inactive,
+                    ),
             ),
           ),
       ],
+    );
+    if (onChanged == null) return row;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (d) => select(d.localPosition.dx),
+      onHorizontalDragStart: (d) => select(d.localPosition.dx),
+      onHorizontalDragUpdate: (d) => select(d.localPosition.dx),
+      child: row,
     );
   }
 }

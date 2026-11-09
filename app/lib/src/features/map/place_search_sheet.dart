@@ -14,7 +14,9 @@ import '../../ui/widgets.dart';
 /// Searches the shops on the device and every shop the server knows, nearest
 /// first. Pops the chosen place.
 class PlaceSearchSheet extends StatefulWidget {
-  const PlaceSearchSheet({super.key});
+  /// Offered under the results, for a shop the app doesn't know yet.
+  final VoidCallback? onReport;
+  const PlaceSearchSheet({super.key, this.onReport});
 
   @override
   State<PlaceSearchSheet> createState() => _PlaceSearchSheetState();
@@ -102,6 +104,17 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
                   if (p.avgRating != null) ScoreBlock(average: p.avgRating!, count: p.reviewCount, size: 26),
                 ],
               ),
+            ),
+          ),
+        if (query.isNotEmpty && widget.onReport != null && !_searching)
+          Center(
+            child: TextButton.icon(
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Laden fehlt? Melden'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onReport!();
+              },
             ),
           ),
         if (places.isNotEmpty) const GoogleAttribution(),

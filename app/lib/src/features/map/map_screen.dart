@@ -69,7 +69,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _search() async {
-    final place = await showAppSheet<PlaceDto>(context, (_) => const PlaceSearchSheet());
+    final place = await showAppSheet<PlaceDto>(
+      context,
+      (_) => PlaceSearchSheet(onReport: () => showAppSheet(context, (_) => ReportShopSheet(position: _center))),
+    );
     if (place == null || !mounted) return;
     _controller?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(place.latitude, place.longitude), 16));
     await showPlaceDetail(context, place);
@@ -170,18 +173,17 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Döner Karte'),
-        leading: IconButton(
-          tooltip: 'Fehlenden Laden melden',
-          icon: const Icon(Icons.add_location_alt_outlined),
-          onPressed: () => showAppSheet(context, (_) => ReportShopSheet(position: _center)),
-        ),
+        // Labelled instead of bare icons: testers didn't know what the icons did.
         actions: [
           if (!mapsAvailable) IconButton(tooltip: 'Laden suchen', icon: const Icon(Icons.search), onPressed: _search),
-          IconButton(
-            tooltip: 'Nur Favoriten',
-            icon: Icon(_favoritesOnly ? Icons.favorite : Icons.favorite_border, color: _favoritesOnly ? Colors.pink : null),
-            onPressed: () => setState(() => _favoritesOnly = !_favoritesOnly),
+          FilterChip(
+            avatar: Icon(_favoritesOnly ? Icons.favorite : Icons.favorite_border, color: Colors.pink, size: 18),
+            showCheckmark: false,
+            label: const Text('Favoriten'),
+            selected: _favoritesOnly,
+            onSelected: (value) => setState(() => _favoritesOnly = value),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: !mapsAvailable

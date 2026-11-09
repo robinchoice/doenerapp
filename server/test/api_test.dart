@@ -1860,7 +1860,7 @@ void main() {
     final english = await (await get('/llms.txt?lang=en', {'accept-language': 'de'})).readAsString();
     expect(english, contains('The best döner in your city'));
     expect(english, contains('https://doener.test/index.md?lang=en'));
-    expect(await (await get('/index.md', {'accept-language': 'en-US,en'})).readAsString(), contains('Honest ratings'));
+    expect(await (await get('/index.md', {'accept-language': 'en-US,en'})).readAsString(), contains('Rate honestly'));
 
     final full = await (await get('/llms-full.txt')).readAsString();
     for (final path in ['/index.md', '/bestenliste/teststadt/2026.md', '/datenschutz.md']) {

@@ -158,19 +158,24 @@ final _de = _Texts(
   decimal: ',',
   features: [
     (
+      '🗺️',
+      'Läden entdecken',
+      'Die Karte zeigt jeden Döner-Laden um dich, das Ranking die besten deiner Stadt und was neu aufgemacht hat. Auch vegetarisch und vegan.',
+    ),
+    (
       '🥙',
-      'Ehrlich bewertet',
+      'Ehrlich bewerten',
       'Soße, Fleisch, Salat und Brot einzeln, in halben Punkten. Eine einzelne 5 schlägt keine dreißig 4,5er.',
     ),
     (
-      '🏆',
-      'Ranking deiner Stadt',
-      'Die Top 3 in deiner Nähe, was gerade im Trend ist und welcher Laden neu aufgemacht hat. Auch vegetarisch und vegan.',
+      '📍',
+      'Einchecken',
+      'Ein Tipp vor Ort: Deine Freunde sehen, wo du gerade isst, und am Jahresende kommt dein Döner Wrapped.',
     ),
     (
       '👋',
-      'Mit Freunden',
-      'Per QR-Code verbinden, sehen, wer gerade wo isst – und am Jahresende kommt dein Döner Wrapped.',
+      'Freunde verbinden',
+      'Per QR-Code verbinden, sehen, wer gerade wo isst, und auf ihre Bewertungen reagieren.',
     ),
   ],
   testH2: 'Teste die App, bevor sie im Store ist.',
@@ -226,17 +231,18 @@ final _en = _Texts(
   tabs: ['Home', 'Map', 'Ranking', 'Profile'],
   decimal: '.',
   features: [
-    ('🥙', 'Honest ratings', 'Sauce, meat, salad and bread separately, in half points. A single 5 doesn’t beat thirty 4.5s.'),
     (
-      '🏆',
-      'Your city’s ranking',
-      'The top 3 near you, what’s trending and which shop just opened. Vegetarian and vegan too.',
+      '🗺️',
+      'Discover shops',
+      'The map shows every döner shop around you, the ranking the best in your city and which shop just opened. Vegetarian and vegan too.',
     ),
+    ('🥙', 'Rate honestly', 'Sauce, meat, salad and bread separately, in half points. A single 5 doesn’t beat thirty 4.5s.'),
     (
-      '👋',
-      'With friends',
-      'Connect by QR code, see who’s eating where – and at the end of the year you get your Döner Wrapped.',
+      '📍',
+      'Check in',
+      'One tap on site: your friends see where you’re eating, and at the end of the year you get your Döner Wrapped.',
     ),
+    ('👋', 'Connect with friends', 'Connect by QR code, see who’s eating where and react to their ratings.'),
   ],
   testH2: 'Try the app before it’s in the store.',
   testLead: 'We’re letting people in step by step. Tell us which phone you have and we’ll send you the invite.',
@@ -434,7 +440,7 @@ a { color: inherit; }
 .tabbar { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: center; padding: 10px 6px 18px; background: var(--raised); border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 .tabbar .ci { width: 46px; height: 46px; border-radius: 50%; background: var(--grad); display: grid; place-items: center; font-size: 22px; margin-top: -18px; }
 .tabbar .active { color: var(--g2); }
-.feat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 24px 0 80px; }
+.feat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 0 80px; }
 .feat > div { background: var(--raised); border: 1px solid var(--line); border-radius: 24px; padding: 28px; }
 .feat .ico { font-size: 34px; }
 .feat h2 { font-size: 30px; margin: 14px 0 8px; }
@@ -468,6 +474,7 @@ a { color: inherit; }
 .mark i { position: absolute; bottom: -6px; left: 26%; width: 10%; height: 4px; background: var(--grad); z-index: 1; }
 .foot nav { display: flex; gap: 18px; font-size: 14px; }
 [hidden] { display: none !important; }
+@media (max-width: 1000px) { .feat { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 760px) {
   .wrap { padding: 0 18px; }
   .hide-m { display: none !important; }

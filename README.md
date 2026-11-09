@@ -462,6 +462,14 @@ Das Repo ist öffentlich, Code, Historie und CI-Logs. `.github/workflows/secrets
 
 Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte oben und fliegt hier raus.
 
+### Release Redesign und Rebrand
+
+Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit diesem Release an die externen Tester, vorher kein Release-Tag `v*`.
+
+1. Look: Workshop mit der Designerin in der Design-Werkstatt (Farben, Radien, eventuell Icon und Wortmarke), danach die Werte fest einbauen.
+2. Aufbau: Erst danach Mockups für den größeren Umbau („Start als Aktionsfläche“), schon im neuen Look, Bau nach Robins Freigabe.
+3. Ausliefern: Store-Screenshots neu, Store-Name „Lieblingsdöner“ in App Store Connect und Play, dann der Release-Tag.
+
 ### Leitlinie
 
 - **Kern:** Bewertungen und das Ranking der Stadt, nicht Menge oder Spiel.

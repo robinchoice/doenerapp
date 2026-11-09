@@ -468,7 +468,7 @@ Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit 
 
 1. Look: Workshop mit der Designerin in der Design-Werkstatt (Farben, Radien, eventuell Icon und Wortmarke), danach die Werte fest einbauen.
 2. Aufbau: Erst danach Mockups für den größeren Umbau („Start als Aktionsfläche“), schon im neuen Look, Bau nach Robins Freigabe.
-3. Ausliefern: Store-Screenshots neu, Store-Name „Lieblingsdöner“ in App Store Connect und Play, dann der Release-Tag.
+3. Ausliefern: Store-Screenshots neu, Store-Name „Lieblingsdöner“ in App Store Connect und Play, dann der Release-Tag. Die Store-Screenshots entstehen per Skript: rohe Handy-Screens nach `docs/play/raw/` (1080 breit, `1-karte` … `6-freunde`), dann `npm install --no-save --prefix tool playwright && node tool/store-screenshots.mjs` setzt die Überschriften dazu und schreibt `docs/play/de`. Hochgeladen wird erst mit diesem Release.
 
 ### Leitlinie
 

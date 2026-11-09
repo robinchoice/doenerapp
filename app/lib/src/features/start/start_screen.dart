@@ -365,12 +365,24 @@ class _StartScreenState extends State<StartScreen> {
               else if (_items.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    _friendsOnly
-                        ? 'Deine Freunde haben noch nichts eingecheckt oder bewertet.'
-                        : 'In deiner Gegend hat noch niemand bewertet. Fang du an!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                  child: Column(
+                    children: [
+                      Text(
+                        _friendsOnly
+                            ? 'Deine Freunde haben noch nichts eingecheckt oder bewertet.'
+                            : 'In deiner Gegend hat noch niemand bewertet. Fang du an!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                      ),
+                      if (_friendsOnly) ...[
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.group_add),
+                          label: const Text('Freunde einladen'),
+                          onPressed: () => showAppSheet(context, (_) => const InviteSheet()),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               const GoogleAttribution(),

@@ -167,7 +167,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 ),
             ],
             header('Freunde (${friends.accepted.length})'),
-            if (friends.accepted.isEmpty) const ListTile(title: Text('Noch keine Freunde')),
+            if (friends.accepted.isEmpty)
+              ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: const Text('Noch keine Freunde'),
+                subtitle: const Text('Lade welche ein, dann seht ihr gegenseitig, wo ihr esst.'),
+                onTap: () => showAppSheet(context, (_) => const InviteSheet()),
+              ),
             for (final f in friends.accepted)
               ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.person)),

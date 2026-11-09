@@ -1,7 +1,6 @@
 // Design studio: the real app with made-up data in a phone frame, the
-// brand's colours and corners editable beside it. Local only, web only:
-//   flutter run -d web-server -t lib/design_main.dart --web-port 8095
-// See README, "Design-Werkstatt".
+// brand's colours and corners editable beside it. Local only, web only,
+// started as in README, "Design-Werkstatt".
 import 'dart:convert';
 
 import 'package:doener_models/doener_models.dart';
@@ -387,10 +386,9 @@ class _DesignStudioState extends State<DesignStudio> {
           min: 1,
           max: 7,
           values: RangeValues(from, to),
-          onChanged: (v) {
-            _set('bandFrom', v.start);
-            _set('bandTo', v.end);
-          },
+          onChanged: (v) => _apply(() => _values
+            ..['bandFrom'] = v.start
+            ..['bandTo'] = v.end),
         ),
         Text('Ausschnitt ${from.toStringAsFixed(2)} bis ${to.toStringAsFixed(2)}', textAlign: TextAlign.center),
       ],

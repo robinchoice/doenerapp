@@ -176,10 +176,14 @@ class DoenerRating extends StatelessWidget {
     final shown = value.halfStep;
     final padding = size * 0.08;
     final cell = size + 2 * padding;
+    // Several drag updates can arrive before the rebuild, so compare with the last one sent.
+    var last = value;
     void select(double dx) {
       final i = (dx / cell).floor().clamp(0, 4);
       final v = dx - i * cell < padding + size / 2 ? i + 0.5 : i + 1.0;
-      if (v != value) onChanged!(v);
+      if (v == last) return;
+      last = v;
+      onChanged!(v);
     }
 
     final row = Row(

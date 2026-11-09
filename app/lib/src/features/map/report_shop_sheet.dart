@@ -9,14 +9,15 @@ import '../../ui/widgets.dart';
 /// "Laden fehlt?" — reports go to the server (they used to stay on the device).
 class ReportShopSheet extends StatefulWidget {
   final LatLng? position;
-  const ReportShopSheet({super.key, this.position});
+  final String? name;
+  const ReportShopSheet({super.key, this.position, this.name});
 
   @override
   State<ReportShopSheet> createState() => _ReportShopSheetState();
 }
 
 class _ReportShopSheetState extends State<ReportShopSheet> {
-  final _name = TextEditingController();
+  late final _name = TextEditingController(text: widget.name);
   final _hint = TextEditingController();
   final _note = TextEditingController();
   bool _attachLocation = true;

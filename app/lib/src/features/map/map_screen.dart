@@ -71,7 +71,7 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _search() async {
     final place = await showAppSheet<PlaceDto>(
       context,
-      (_) => PlaceSearchSheet(onReport: () => showAppSheet(context, (_) => ReportShopSheet(position: _center))),
+      (_) => PlaceSearchSheet(onReport: (name) => showAppSheet(context, (_) => ReportShopSheet(position: _center, name: name))),
     );
     if (place == null || !mounted) return;
     _controller?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(place.latitude, place.longitude), 16));

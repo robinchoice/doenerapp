@@ -24,20 +24,62 @@ const deep = [
   Color(0xFF6A33A0),
 ];
 
+/// The adjustable part of the look: neutrals, the app's section of the band
+/// (or own colours instead of it) and corner radii. The app runs with the
+/// defaults; the design studio (`lib/design_main.dart`) swaps [brand] live.
+class Brand {
+  final Color paper;
+  final Color card;
+  final Color ink;
+  final Color muted;
+  final Color night;
+  final Color nightRaised;
+  final Color nightText;
+  final Color nightMuted;
+
+  /// This app's section of the band, positions from 1 to 7.
+  final double bandFrom;
+  final double bandTo;
+
+  /// Own colours instead of the band: gradient start and end, accent on light and on dark ground.
+  final ({Color from, Color to, Color light, Color dark})? custom;
+
+  final double cardRadius;
+  final double buttonRadius;
+
+  const Brand({
+    this.paper = const Color(0xFFF4F4F1),
+    this.card = const Color(0xFFFFFFFF),
+    this.ink = const Color(0xFF17171A),
+    this.muted = const Color(0xFF5E5E66),
+    this.night = const Color(0xFF0E0D12),
+    this.nightRaised = const Color(0xFF16151B),
+    this.nightText = const Color(0xFFF2F0EA),
+    this.nightMuted = const Color(0xFF9A98A3),
+    this.bandFrom = 2.55,
+    this.bandTo = 3.20,
+    this.custom,
+    this.cardRadius = 14,
+    this.buttonRadius = 8,
+  });
+}
+
+Brand brand = const Brand();
+
 /// This app's section of the band.
-const appBand = (from: 2.55, to: 3.20);
+({double from, double to}) get appBand => (from: brand.bandFrom, to: brand.bandTo);
 
 /// The vegan seal's section, so it differs from the overall one next to it.
 const veganBand = (from: 3.40, to: 4.00);
 
-const paper = Color(0xFFF4F4F1);
-const ink = Color(0xFF17171A);
-const muted = Color(0xFF5E5E66);
-const hairline = Color(0x2917171A);
-const night = Color(0xFF0E0D12);
-const nightRaised = Color(0xFF16151B);
-const nightText = Color(0xFFF2F0EA);
-const nightMuted = Color(0xFF9A98A3);
+Color get paper => brand.paper;
+Color get ink => brand.ink;
+Color get muted => brand.muted;
+Color get hairline => brand.ink.withAlpha(0x29);
+Color get night => brand.night;
+Color get nightRaised => brand.nightRaised;
+Color get nightText => brand.nightText;
+Color get nightMuted => brand.nightMuted;
 const nightLine = Color(0x14FFFFFF);
 const tileColor = Color(0xFF121117);
 
@@ -75,21 +117,36 @@ Color bandColor(double position, List<Color> tones) {
 }
 
 /// Gradient of this app's section (or [band]), from bottom left to top right.
-LinearGradient bandGradient(List<Color> tones, {({double from, double to}) band = appBand}) => LinearGradient(
-      begin: Alignment.bottomLeft,
-      end: Alignment.topRight,
-      colors: [
-        bandColor(band.from, tones),
-        bandColor((band.from + band.to) / 2, tones),
-        bandColor(band.to, tones),
-      ],
-    );
+LinearGradient bandGradient(List<Color> tones, {({double from, double to})? band}) {
+  final b = band ?? appBand;
+  return LinearGradient(
+    begin: Alignment.bottomLeft,
+    end: Alignment.topRight,
+    colors: [
+      bandColor(b.from, tones),
+      bandColor((b.from + b.to) / 2, tones),
+      bandColor(b.to, tones),
+    ],
+  );
+}
 
-final actionGradient = bandGradient(glow);
+LinearGradient get actionGradient {
+  final custom = brand.custom;
+  if (custom == null) return bandGradient(glow);
+  return LinearGradient(
+    begin: Alignment.bottomLeft,
+    end: Alignment.topRight,
+    colors: [custom.from, Color.lerp(custom.from, custom.to, 0.5)!, custom.to],
+  );
+}
 
 /// The middle of the section: deep on light ground, glow on dark.
-Color accentFor(Brightness brightness) =>
-    bandColor((appBand.from + appBand.to) / 2, brightness == Brightness.dark ? glow : deep);
+Color accentFor(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  final custom = brand.custom;
+  if (custom != null) return dark ? custom.dark : custom.light;
+  return bandColor((appBand.from + appBand.to) / 2, dark ? glow : deep);
+}
 
 /// Dark tile with the app's sign, a skewer, in the gradient.
 class BrandTile extends StatelessWidget {
@@ -98,11 +155,12 @@ class BrandTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Semantics(label: 'Lieblingsdöner', child: CustomPaint(size: Size.square(size), painter: const _TilePainter()));
+      Semantics(label: 'Lieblingsdöner', child: CustomPaint(size: Size.square(size), painter: _TilePainter(actionGradient)));
 }
 
 class _TilePainter extends CustomPainter {
-  const _TilePainter();
+  final LinearGradient gradient;
+  const _TilePainter(this.gradient);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -128,12 +186,12 @@ class _TilePainter extends CustomPainter {
         ..strokeWidth = 9
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
-        ..shader = actionGradient.createShader(const Rect.fromLTRB(22, 22, 78, 78)),
+        ..shader = gradient.createShader(const Rect.fromLTRB(22, 22, 78, 78)),
     );
   }
 
   @override
-  bool shouldRepaint(_TilePainter oldDelegate) => false;
+  bool shouldRepaint(_TilePainter oldDelegate) => oldDelegate.gradient != gradient;
 }
 
 /// Gradient mark of the active tab: a 2 px line above its icon.

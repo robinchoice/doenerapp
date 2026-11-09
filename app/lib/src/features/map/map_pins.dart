@@ -11,7 +11,7 @@ typedef MapPin = ({BitmapDescriptor icon, Offset anchor});
 /// Pin colours: favourites pink, visited green, the rest in the app's tone.
 const favoritePinColor = Color(0xFFF06292);
 const visitedPinColor = newGlow;
-final placePinColor = bandColor((appBand.from + appBand.to) / 2, glow);
+Color get placePinColor => bandColor((appBand.from + appBand.to) / 2, glow);
 
 /// A pin like Google's: the [score] in a pill with a tip, the [name] beside
 /// it. Without a score only a small dot, anchored at its centre.

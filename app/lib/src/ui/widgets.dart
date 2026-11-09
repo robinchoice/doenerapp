@@ -13,7 +13,7 @@ ThemeData buildTheme(Brightness brightness) {
   final isDark = brightness == Brightness.dark;
   final accent = accentFor(brightness);
   final ground = isDark ? night : paper;
-  final card = isDark ? nightRaised : Colors.white;
+  final card = isDark ? nightRaised : brand.card;
   final text = isDark ? nightText : ink;
   final quiet = isDark ? nightMuted : muted;
   final line = isDark ? nightLine : hairline;
@@ -40,7 +40,7 @@ ThemeData buildTheme(Brightness brightness) {
   final base = ThemeData(colorScheme: scheme, useMaterial3: true, scaffoldBackgroundColor: ground, dividerColor: line);
   TextStyle? display(TextStyle? style) => style?.merge(displayStyle);
   final textTheme = base.textTheme;
-  const radius = BorderRadius.all(Radius.circular(8));
+  final radius = BorderRadius.circular(brand.buttonRadius);
   final selectedChip = WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? text : null);
   return base.copyWith(
     textTheme: textTheme.copyWith(
@@ -63,7 +63,7 @@ ThemeData buildTheme(Brightness brightness) {
       elevation: 0,
       margin: EdgeInsets.zero,
       color: card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: line)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(brand.cardRadius), side: BorderSide(color: line)),
     ),
     dividerTheme: DividerThemeData(color: line, space: 1, thickness: 1),
     bottomSheetTheme: BottomSheetThemeData(
@@ -103,14 +103,14 @@ ThemeData buildTheme(Brightness brightness) {
       color: selectedChip,
       checkmarkColor: ground,
       side: BorderSide(color: line),
-      shape: const RoundedRectangleBorder(borderRadius: radius),
+      shape: RoundedRectangleBorder(borderRadius: radius),
     ),
     // Main actions carry the gradient, with dark text on it.
     filledButtonTheme: FilledButtonThemeData(
       style: ButtonStyle(
         backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
-        foregroundColor: const WidgetStatePropertyAll(ink),
-        shape: const WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: radius)),
+        foregroundColor: WidgetStatePropertyAll(ink),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: radius)),
         minimumSize: const WidgetStatePropertyAll(Size(64, 46)),
         textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         backgroundBuilder: (context, states, child) => Opacity(
@@ -120,7 +120,7 @@ ThemeData buildTheme(Brightness brightness) {
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(foregroundColor: text, side: BorderSide(color: line), shape: const RoundedRectangleBorder(borderRadius: radius)),
+      style: OutlinedButton.styleFrom(foregroundColor: text, side: BorderSide(color: line), shape: RoundedRectangleBorder(borderRadius: radius)),
     ),
     textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: accent)),
     floatingActionButtonTheme: FloatingActionButtonThemeData(

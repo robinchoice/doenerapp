@@ -368,7 +368,7 @@ class _WrappedScreenState extends State<WrappedScreen> {
     // Always dark, like the tile: big numbers glow, the text stays light.
     final highlight = accentFor(Brightness.dark);
     Widget big(String text) => Text(text, style: numberStyle.copyWith(fontSize: 96, color: highlight), textAlign: TextAlign.center);
-    Widget label(String text) => Text(text, style: const TextStyle(color: nightText, fontSize: 20), textAlign: TextAlign.center);
+    Widget label(String text) => Text(text, style: TextStyle(color: nightText, fontSize: 20), textAlign: TextAlign.center);
     Widget emoji(String e) => Text(e, style: const TextStyle(fontSize: 80));
 
     final pages = [

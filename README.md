@@ -336,6 +336,18 @@ Für iOS den Key in `app/ios/Flutter/Secrets.xcconfig` eintragen (`GOOGLE_MAPS_I
 
 In der App lässt sich die Backend-URL auch unter Einstellungen → Backend-URL umstellen.
 
+### Design-Werkstatt
+
+Die echte App mit ausgedachten Daten in einem Handyrahmen, daneben Farbrad, Farbcodes, Ausschnitt des Pleasance-Bands (oder eigene Verlaufsfarben) und Eckenradien. Jede Änderung ist sofort im Handy zu sehen, hell und dunkel, auf Start, Willkommen und Anmelden, durch die ganze App klickbar. Ohne Server, Konto oder Google-Key, deshalb zeigt die Karte keine Karte. Nur lokal, sie wird nicht ausgeliefert.
+
+```bash
+cd app
+flutter build web -t lib/design_main.dart -o build/design
+python3 -m http.server 8095 --directory build/design   # http://localhost:8095
+```
+
+Die Werte bleiben im Browser bis „Zurücksetzen“. „Werte“ zeigt sie als Dart-Code zum Kopieren, der in `Brand` (`app/lib/src/ui/brand.dart`) die Standardwerte ersetzt.
+
 ### Tests
 
 ```bash

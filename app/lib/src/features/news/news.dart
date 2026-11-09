@@ -65,13 +65,13 @@ class _NewsCardState extends State<NewsCard> {
         actions: [
           TextButton(onPressed: () => _dismiss(update), child: const Text('Ausblenden')),
           if (subscribed)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('Kommt auch per Mail', style: TextStyle(color: nightMuted)),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Icon(Icons.check, size: 16, color: nightMuted),
                 ],
               ),
@@ -117,9 +117,9 @@ class NewsPreview extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('•  ', style: TextStyle(color: nightMuted)),
+                    Text('•  ', style: TextStyle(color: nightMuted)),
                     Expanded(
-                      child: Text(feature, style: const TextStyle(color: nightText)),
+                      child: Text(feature, style: TextStyle(color: nightText)),
                     ),
                   ],
                 ),

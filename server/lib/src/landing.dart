@@ -137,7 +137,7 @@ PublicPage landingPublicPage(String base, {required bool english}) {
 
 final _de = _Texts(
   lang: 'de',
-  title: 'Döner App – Der beste Döner deiner Stadt',
+  title: 'Lieblingsdöner – Der beste Döner deiner Stadt',
   description: 'Döner bewertet nach Soße, Fleisch, Salat und Brot – von Leuten, die in deiner Gegend essen.',
   ogImage: 'og-image-de.png',
   navTest: 'Testen',
@@ -207,7 +207,7 @@ final _de = _Texts(
 
 final _en = _Texts(
   lang: 'en',
-  title: 'Döner App – The best döner in your city',
+  title: 'Lieblingsdöner – The best döner in your city',
   description: 'Döner rated by sauce, meat, salad and bread – by people who eat in your area.',
   ogImage: 'og-image-en.png',
   navTest: 'Try it',
@@ -378,7 +378,7 @@ String _page(_Texts t) {
 </script>
 <title>${t.title}</title>
 <meta name="description" content="${t.description}">
-<meta property="og:site_name" content="Döner App">
+<meta property="og:site_name" content="Lieblingsdöner">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${t.title}">
 <meta property="og:description" content="${t.description}">
@@ -483,7 +483,7 @@ a { color: inherit; }
 <body>
 <div class="wrap">
   <header class="nav">
-    <a class="brand display" href="${t.lang == 'de' ? '/' : '/en'}"><img src="/icons/Icon-192.png" alt="">Döner App</a>
+    <a class="brand display" href="${t.lang == 'de' ? '/' : '/en'}"><img src="/icons/Icon-192.png" alt="">Lieblingsdöner</a>
     <a class="btn btn-ghost hide-m" href="#test">${t.navTest}</a>
   </header>
 

@@ -209,7 +209,7 @@ jobs:
           cp app/build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/doener.apk"
           echo "{\"build\": $((GITHUB_RUN_NUMBER + 10))}" > "$RUNNER_TEMP/version.json"
           gh release view android-latest > /dev/null 2>&1 ||
-            gh release create android-latest --prerelease --target "$GITHUB_SHA" --title "Döner App für Android" \
+            gh release create android-latest --prerelease --target "$GITHUB_SHA" --title "Lieblingsdöner für Android" \
               --notes "Die aktuelle Testversion. Download über https://doener-api.pleasance.org/android"
           gh release upload android-latest "$RUNNER_TEMP/doener.apk" "$RUNNER_TEMP/version.json" --clobber
 

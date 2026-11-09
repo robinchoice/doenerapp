@@ -1,5 +1,5 @@
 name: doener_server
-description: API server for the Döner app — also serves the Flutter web build.
+description: API server for Lieblingsdöner — also serves the Flutter web build.
 version: 1.0.0
 publish_to: none
 

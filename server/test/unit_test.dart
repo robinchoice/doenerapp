@@ -257,7 +257,7 @@ void main() {
       '11111111-1111-4111-8111-111111111111',
       'https://doener.test',
     );
-    expect(mail.subject, 'Neu in der Döner App: Karte <neu>');
+    expect(mail.subject, 'Neu bei Lieblingsdöner: Karte <neu>');
     expect(mail.html, allOf(contains('Karte &lt;neu&gt;'), contains('Läden &amp; mehr'), isNot(contains('<neu>'))));
     expect(mail.text, contains('Abbestellen: https://doener.test/abmelden?token=11111111-1111-4111-8111-111111111111'));
     expect(mail.headers['List-Unsubscribe'], '<https://doener.test/api/v1/updates/unsubscribe?token=11111111-1111-4111-8111-111111111111>');

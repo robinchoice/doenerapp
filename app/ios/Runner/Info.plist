@@ -7,19 +7,19 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Döner App</string>
+	<string>Döner</string>
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Döner App braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
+	<string>Lieblingsdöner braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Döner App braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
+	<string>Lieblingsdöner braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>An Bewertungen und Feedback kannst du Fotos anhängen.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Für Bewertungen und Feedback kannst du ein Foto aufnehmen.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Die Döner App nimmt keinen Ton auf.</string>
+	<string>Lieblingsdöner nimmt keinen Ton auf.</string>
 	<key>GMSApiKey</key>
 	<string>$(GOOGLE_MAPS_IOS_KEY)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

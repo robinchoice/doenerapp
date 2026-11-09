@@ -12,7 +12,7 @@ import 'friends.dart';
 Future<void> shareInvite(BuildContext context, InviteDto invite) async {
   final box = context.findRenderObject() as RenderBox?;
   await SharePlus.instance.share(ShareParams(
-    text: 'Komm in meine Döner-Crew! In der Döner App siehst du, wo ich gerade Döner esse: ${invite.url}',
+    text: 'Komm in meine Döner-Crew! Bei Lieblingsdöner siehst du, wo ich gerade Döner esse: ${invite.url}',
     sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
   ));
 }

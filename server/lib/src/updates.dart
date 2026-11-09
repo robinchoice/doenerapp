@@ -131,32 +131,32 @@ UpdateDto _updateFromRow(Map<String, dynamic> row) => UpdateDto(
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f1"><tr><td align="center" style="padding:32px 16px">'
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:16px">'
       '<tr><td style="padding:32px 28px">'
-      '<div style="font-size:13px;color:#5e5e66;margin-bottom:8px">Neu in der Döner App</div>'
+      '<div style="font-size:13px;color:#5e5e66;margin-bottom:8px">Neu bei Lieblingsdöner</div>'
       '<h1 style="margin:0 0 16px;font-size:24px;line-height:30px;color:#17171a">${e(update.title)}</h1>'
       '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">$items</table>'
       '<div style="height:26px"></div>'
       '<a href="${e(appUrl)}" style="display:inline-block;background:#f2c14e;color:#17171a;font-weight:600;text-decoration:none;'
-      'padding:12px 22px;border-radius:999px">Döner App öffnen</a>'
+      'padding:12px 22px;border-radius:999px">Lieblingsdöner öffnen</a>'
       '</td></tr></table>'
       '<p style="max-width:520px;font-size:12px;line-height:18px;color:#5e5e66;margin:18px auto 0">'
-      'Du bekommst diese Mail, weil du in der Döner App „Neuigkeiten per Mail“ eingeschaltet hast.<br>'
+      'Du bekommst diese Mail, weil du bei Lieblingsdöner „Neuigkeiten per Mail“ eingeschaltet hast.<br>'
       '<a href="${e(unsubscribePage)}" style="color:#5e5e66">Abbestellen</a></p>'
       '</td></tr></table></body></html>';
   final text = [
-    'Neu in der Döner App',
+    'Neu bei Lieblingsdöner',
     '',
     update.title,
     '',
     for (final f in update.features) '- $f',
     '',
-    'Döner App öffnen: $appUrl',
+    'Lieblingsdöner öffnen: $appUrl',
     '',
     '--',
-    'Du bekommst diese Mail, weil du in der Döner App „Neuigkeiten per Mail“ eingeschaltet hast.',
+    'Du bekommst diese Mail, weil du bei Lieblingsdöner „Neuigkeiten per Mail“ eingeschaltet hast.',
     'Abbestellen: $unsubscribePage',
   ].join('\n');
   return (
-    subject: 'Neu in der Döner App: ${update.title}',
+    subject: 'Neu bei Lieblingsdöner: ${update.title}',
     text: text,
     html: html,
     headers: {
@@ -229,7 +229,7 @@ Response _page(String title, String body, {int status = 200}) => Response(
       status,
       body: '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
           '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">'
-          '<title>${_htmlEscape.convert(title)} – Döner App</title><style>'
+          '<title>${_htmlEscape.convert(title)} – Lieblingsdöner</title><style>'
           'body{margin:0;font-family:system-ui,sans-serif;background:#f4f4f1;color:#17171a;line-height:1.5}'
           'main{max-width:480px;margin:0 auto;padding:64px 24px;text-align:center}'
           'button{font:inherit;font-weight:600;border:0;border-radius:999px;padding:12px 24px;background:#f2c14e;color:#17171a;cursor:pointer}'
@@ -249,7 +249,7 @@ Future<Response> unsubscribePage(Deps deps, Request request) async {
   final token = _htmlEscape.convert(request.url.queryParameters['token'] ?? '');
   return _page(
     'Neuigkeiten abbestellen?',
-    '<p>Danach bekommst du keine Neuigkeiten zur Döner App mehr per Mail. Dein Konto bleibt, wie es ist.</p>'
+    '<p>Danach bekommst du keine Neuigkeiten zu Lieblingsdöner mehr per Mail. Dein Konto bleibt, wie es ist.</p>'
         '<form method="post" action="/abmelden?token=$token"><button type="submit">Abbestellen</button></form>',
   );
 }

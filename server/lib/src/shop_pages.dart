@@ -39,7 +39,7 @@ Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) asyn
     200,
     '''<title>$title</title>
 <meta property="og:title" content="$title">
-<meta property="og:description" content="Bewerte den Laden in der Döner App.">
+<meta property="og:description" content="Bewerte den Laden bei Lieblingsdöner.">
 <meta property="og:image" content="${_escape.convert(deps.config.publicBase(request.requestedUri))}/icons/Icon-512.png">
 <style>
   main { max-width: 420px; margin: 0 auto; padding: 48px 24px; text-align: center; }
@@ -88,7 +88,7 @@ Future<Response> posterPage(Deps deps, Request request, String placeId) async {
 ${_qrSvg(link)}
 <p class="link">${_escape.convert(link)}</p>
 <p class="steps">QR-Code scannen, Soße, Fleisch, Salat und Brot benoten –<br>daraus entsteht das Döner-Ranking${city == null ? '' : ' von ${_escape.convert(city)}'}.</p>
-<p class="source">Döner App · Ortsdaten: Google Maps</p>
+<p class="source">Lieblingsdöner · Ortsdaten: Google Maps</p>
 <button onclick="window.print()">Drucken</button>
 </main></body>''',
   );

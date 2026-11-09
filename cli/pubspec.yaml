@@ -1,5 +1,5 @@
 name: doener_cli
-description: Command line for the Döner app, over the same HTTP API as the app.
+description: Command line for Lieblingsdöner, over the same HTTP API as the app.
 version: 1.0.0
 publish_to: none
 

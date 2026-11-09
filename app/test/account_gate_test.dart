@@ -216,7 +216,7 @@ void main() {
   });
 
   testWidgets('the bug button sends feedback with a screenshot of the screen', (tester) async {
-    PackageInfo.setMockInitialValues(appName: 'Döner App', packageName: 'doener', version: '1.0.0', buildNumber: '42', buildSignature: '');
+    PackageInfo.setMockInitialValues(appName: 'Lieblingsdöner', packageName: 'doener', version: '1.0.0', buildNumber: '42', buildSignature: '');
     final (server, _) = await _pumpApp(tester, loggedIn: true, name: 'Robin');
 
     // The screenshot is rendered for real, outside the test's fake clock.

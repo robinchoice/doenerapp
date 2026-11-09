@@ -56,7 +56,7 @@ Result _help() {
   return (
     data: {'commands': lines(rows), 'options': lines(_options), 'exitCodes': Exit.all},
     text: [
-      '$slug – die Döner-App auf der Befehlszeile',
+      '$slug – Lieblingsdöner auf der Befehlszeile',
       '',
       'Aufruf: $slug <befehl> [optionen]',
       '',

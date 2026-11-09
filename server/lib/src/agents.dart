@@ -57,9 +57,9 @@ void mountAgents(Router router, Deps deps) {
       final pages = await publicPages(deps, base, english: english);
       return _text(
         [
-          '# Döner App',
+          '# Lieblingsdöner',
           '> ${landing.description}',
-          '${t('Öffentliche Inhalte der Döner App als Markdown, ohne Login. Alles in einer Datei', 'Public content of the Döner App as Markdown, no login needed. Everything in one file')}: '
+          '${t('Öffentliche Inhalte von Lieblingsdöner als Markdown, ohne Login. Alles in einer Datei', 'Public content of Lieblingsdöner as Markdown, no login needed. Everything in one file')}: '
               '$base/llms-full.txt$query\n\n'
               '${t('English', 'Deutsch')}: $base/llms.txt?lang=${english ? 'de' : 'en'}',
           '## ${t('Seiten', 'Pages')}',

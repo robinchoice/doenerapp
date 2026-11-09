@@ -1,4 +1,4 @@
-# Döner-App 🥙
+# Lieblingsdöner 🥙
 
 **Der beste Döner der Stadt – empfohlen von Leuten in deiner Umgebung.**
 
@@ -10,7 +10,7 @@ Die App wird gerade auf diese Ausrichtung umgebaut. Was beschlossen, aber noch n
 
 ## Überblick
 
-Die Döner-App zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Jedes Profil ist öffentlich: Stufe, Bewertungen und die persönliche Bestenliste.
+Lieblingsdöner zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Jedes Profil ist öffentlich: Stufe, Bewertungen und die persönliche Bestenliste.
 
 **Stack:**
 - App: Flutter (iOS, Android, Web), Google Maps (google_maps_flutter), sembast als lokaler Store
@@ -359,7 +359,7 @@ cd app && flutter test
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SSL` | –, `587` | Mailversand; ohne Host stehen Codes im Log, in Produktion startet der Server dann nicht |
 | `APP_ENV` | – (`production` im Image) | `production` macht `SMTP_HOST` zur Pflicht; die lokale Compose setzt `development` |
 | `APP_VERSION` | `dev` (Commit im Image) | Von `/api/v1/health` als `revision` gemeldet |
-| `MAIL_FROM` | `Döner App <noreply@localhost>` | Absender |
+| `MAIL_FROM` | `Lieblingsdöner <noreply@localhost>` | Absender |
 | `WEB_DIR` | `web` | Web-Build, der unter `/` ausgeliefert wird |
 | `UPDATES_DIR` | `../updates` | Entwürfe für Neuigkeiten, im Image `/app/updates` |
 | `CORS_ORIGIN` | – | Nur für lokale Web-Entwicklung |
@@ -458,7 +458,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 - **Bewertung:** optional mit Foto. Bewerten darf jeder, wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
 - **Push für direkte soziale Aktivität und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Außerdem Freundschaftsanfragen und Reaktionen auf eigene Posts. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar, dazu Pause und Ruhezeiten. Was man verpasst hat, steht in der Glocke auf Start.
 - **Belohnung:** Ab Phase 2 zählen die Upvotes zur Stufe.
-- **Texte:** Einladung „Welcher Döner ist der beste in [Stadt]? Die Döner-App weiß es, und du siehst, wo ich gerade esse: [Link]“, App-Store-Untertitel „Der beste Döner deiner Stadt“.
+- **Texte:** Einladung „Welcher Döner ist der beste in [Stadt]? Lieblingsdöner weiß es, und du siehst, wo ich gerade esse: [Link]“, App-Store-Untertitel „Der beste Döner deiner Stadt“.
 
 ### Phase 2 – Community
 
@@ -476,7 +476,7 @@ Langfristige Richtung (Robin, 28.10.2026), gebaut wird erst nach Phase 2. Vorbil
 - **Gutscheine:** Jeder Laden entwirft eigene Gutscheine wie bei McDonald's oder Burger King und löst sie selbst ein, z. B. per QR-Code an der Kasse.
 - **Stempelkarte:** Der Laden legt seine Regel fest (z. B. jeder 10. Döner gratis). Den Stempel gibt der Laden an der Kasse per QR-Code, nicht der Check-in, denn der lässt sich ohne Kauf auslösen.
 - **Bezahlte Plätze:** klar als „Anzeige“ markiert und neben dem Ranking, z. B. oben in Suche oder Karte, ein hervorgehobener Pin oder ein Angebot auf Start. Gezielt wird nur nach Ort, nicht nach Nutzerdaten. Dazu eventuell ein Abo für Inhaber.
-- **Zahlungen annehmen:** Der Laden kassiert per Smartphone (Tap to Pay) über die Döner-App statt über SumUp, wir verdienen an jeder Zahlung. Lightning ist dabei.
+- **Zahlungen annehmen:** Der Laden kassiert per Smartphone (Tap to Pay) über Lieblingsdöner statt über SumUp, wir verdienen an jeder Zahlung. Lightning ist dabei.
 
 Grenzen und Offenes:
 - Ranking, Bestenliste und Siegel sind nicht käuflich. Bezahlte Platzierung im Ranking müsste nach § 5b UWG offengelegt werden und würde den Kern der App entwerten.

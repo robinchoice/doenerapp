@@ -467,9 +467,9 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
   // Only known codes are echoed into the page, and those consist of [_inviteAlphabet] only.
   final title = inviter == null
       ? 'Einladung nicht gefunden'
-      : '${escape.convert(inviter.displayName)} lädt dich in die Döner App ein';
+      : '${escape.convert(inviter.displayName)} lädt dich zu Lieblingsdöner ein';
   final content = inviter == null
-      ? '<p>Der Link wurde zurückgesetzt oder ist falsch.</p><a class="button" href="/">Zur Döner App</a>'
+      ? '<p>Der Link wurde zurückgesetzt oder ist falsch.</p><a class="button" href="/">Zu Lieblingsdöner</a>'
       : '<p>Sieh, wo deine Freunde gerade Döner essen – und iss mit. Die App ist noch im Test: '
           'Bewirb dich, dann schalten wir dich frei.</p>'
           '<a class="button" href="/?von=$code#test">Als Tester bewerben</a>'

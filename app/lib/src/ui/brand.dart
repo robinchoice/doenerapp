@@ -98,7 +98,7 @@ class BrandTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Semantics(label: 'Döner App', child: CustomPaint(size: Size.square(size), painter: const _TilePainter()));
+      Semantics(label: 'Lieblingsdöner', child: CustomPaint(size: Size.square(size), painter: const _TilePainter()));
 }
 
 class _TilePainter extends CustomPainter {

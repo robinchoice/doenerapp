@@ -24,8 +24,8 @@ const neutral = {
 firebase.messaging().onBackgroundMessage(async (payload) => {
   const { type, id } = payload.data || {};
   if (!type || !id) return;
-  let title = 'Döner App';
-  let body = neutral[type] || 'Es gibt Neues in der Döner App.';
+  let title = 'Lieblingsdöner';
+  let body = neutral[type] || 'Es gibt Neues bei Lieblingsdöner.';
   let placeId;
   try {
     const stored = await (await caches.open('doener-push')).match('/push-key');

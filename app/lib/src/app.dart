@@ -57,7 +57,7 @@ class DoenerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
         navigatorKey: _navigatorKey,
-        title: 'Döner App',
+        title: 'Lieblingsdöner',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),

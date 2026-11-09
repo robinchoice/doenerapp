@@ -10,8 +10,8 @@ PublicPage privacyPublicPage({required bool english}) => (
       path: '/datenschutz',
       title: english ? 'Privacy policy (German)' : 'Datenschutz',
       description: english
-          ? 'What the Döner App stores, who processes it and your rights. Only available in German.'
-          : 'Was die Döner App speichert, wer es verarbeitet und welche Rechte du hast.',
+          ? 'What Lieblingsdöner stores, who processes it and your rights. Only available in German.'
+          : 'Was Lieblingsdöner speichert, wer es verarbeitet und welche Rechte du hast.',
       body: _privacyMarkdown,
     );
 
@@ -30,7 +30,7 @@ const _privacyHtml = '''<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Datenschutz – Döner App</title>
+<title>Datenschutz – Lieblingsdöner</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #fff8f0; color: #222; line-height: 1.5; }
   main { max-width: 680px; margin: 0 auto; padding: 32px 24px 64px; }
@@ -41,7 +41,7 @@ const _privacyHtml = '''<!DOCTYPE html>
 </head>
 <body><main>
 <h1>Datenschutz</h1>
-<p>Diese Erklärung gilt für die Döner App auf iOS und Android und für die Web-Version unter dieser Adresse. Stand: Oktober 2026.</p>
+<p>Diese Erklärung gilt für Lieblingsdöner auf iOS und Android und für die Web-Version unter dieser Adresse. Stand: Oktober 2026.</p>
 
 <h2>1. Verantwortlicher</h2>
 <p>Robin Wahl<br>Pleasance<br>Bugginger Straße 37<br>79114 Freiburg<br>E-Mail: <a href="mailto:hello@pleasance.org">hello@pleasance.org</a></p>

@@ -87,7 +87,7 @@ void main() {
 
   var emails = 0;
   String freshEmail() => 'cli-${emails++}@example.org';
-  String lastCode() => RegExp(r'Döner App: (\d{6})').firstMatch(mailer.sent.last.text)!.group(1)!;
+  String lastCode() => RegExp(r'Lieblingsdöner: (\d{6})').firstMatch(mailer.sent.last.text)!.group(1)!;
 
   /// One device: its own config folder, so its own token. Answers the code
   /// question from the last mail, the email question with [email]. Adds

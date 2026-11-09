@@ -62,7 +62,7 @@ class FakeServer {
         ).toJson()),
       '/me/inbox' => json(InboxDto(seenAt: now.subtract(const Duration(hours: 1)), items: [
           InboxItemDto(type: 'friend_visit', id: 'v1', timestamp: now, title: 'Tom hat bei Kebap Haus eingecheckt', placeId: 'p1', userId: 'u2', userName: 'Tom'),
-          InboxItemDto(type: 'news', id: 'n1', timestamp: now.subtract(const Duration(days: 2)), title: 'Neu in der Döner App', body: 'Die Glocke'),
+          InboxItemDto(type: 'news', id: 'n1', timestamp: now.subtract(const Duration(days: 2)), title: 'Neu bei Lieblingsdöner', body: 'Die Glocke'),
         ]).toJson()),
       '/updates/current' => json(const UpdateDto(id: 'n1', title: 'Neuigkeiten in der App', features: ['Eine Karte auf Start']).toJson()),
       '/places/new' => json(NewPlacesDto(
@@ -178,7 +178,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.text('Tom hat bei Kebap Haus eingecheckt'), findsOneWidget);
-    expect(find.text('Neu in der Döner App'), findsOneWidget);
+    expect(find.text('Neu bei Lieblingsdöner'), findsOneWidget);
     expect(server.calls('/me/inbox/seen'), hasLength(1));
 
     await tester.tap(find.byTooltip('Weniger davon'));

@@ -196,7 +196,7 @@ void main() {
     return (response.statusCode, text.isEmpty ? null : jsonDecode(text));
   }
 
-  String lastCode() => RegExp(r'Döner App: (\d{6})').firstMatch(mailer.sent.last.text)!.group(1)!;
+  String lastCode() => RegExp(r'Lieblingsdöner: (\d{6})').firstMatch(mailer.sent.last.text)!.group(1)!;
   String lastLinkToken() => RegExp(r'login\?token=([\w-]+)').firstMatch(mailer.sent.last.text)!.group(1)!;
 
   Future<(String, UserDto)> signUp(String email, String name) async {
@@ -688,7 +688,7 @@ void main() {
       await call('PUT', '/me/push-token', body: {...token}..remove('fetchKey'), token: bob);
       await resetLimit();
       await checkIn(waitForPush: true);
-      expect(pusher.sent.last.title, 'Döner App');
+      expect(pusher.sent.last.title, 'Lieblingsdöner');
       expect(pusher.sent.last.body, neutralPushText('friend_check_in').$2);
       expect(pusher.sent.last.data, isEmpty);
       expect((await call('DELETE', '/me/push-tokens/tok-bob', token: bob)).$1, 204);
@@ -1453,7 +1453,7 @@ void main() {
       final (invited, result) = await call('POST', '/auth/invite', body: {'email': ' Tess@Example.org'}, token: robin, closed: true);
       expect((invited, result['testFlight']), (200, null), reason: 'no iPhone, no TestFlight');
       expect(mailer.sent.last.to, 'tess@example.org');
-      expect(mailer.sent.last.subject, 'Robin lädt dich in die Döner App ein');
+      expect(mailer.sent.last.subject, 'Robin lädt dich zu Lieblingsdöner ein');
 
       final (status, body) = await verify('tess@example.org');
       expect(status, 200);
@@ -1553,7 +1553,7 @@ void main() {
 
       final (status, html) = await page('/i/$code');
       expect(status, 200);
-      expect(html, contains('<meta property="og:title" content="&lt;i&gt;Nora&lt;/i&gt; lädt dich in die Döner App ein">'));
+      expect(html, contains('<meta property="og:title" content="&lt;i&gt;Nora&lt;/i&gt; lädt dich zu Lieblingsdöner ein">'));
       expect(html, isNot(contains('<i>Nora')));
       expect(html, contains('<meta property="og:image" content="https://doener.test/icons/Icon-512.png">'));
       expect(html, contains('href="/app?invite=$code"'));
@@ -1712,7 +1712,7 @@ void main() {
     await maintainPlaceCache(deps);
     expect(pusher.sent.length, pushes + 1);
     expect(pusher.sent.last.tokens, ['tok-olga'], reason: 'everyone in the city who takes pushes now');
-    expect(pusher.sent.last.title, 'Döner App', reason: 'no fetch key, neutral');
+    expect(pusher.sent.last.title, 'Lieblingsdöner', reason: 'no fetch key, neutral');
     final event = await db.execute("SELECT title, body, pending FROM push_events WHERE type = 'new_place' ORDER BY pending");
     expect(event, [
       ['Neuer Döner in Freiburg', 'Neuer Grill hat aufgemacht', false],
@@ -1850,10 +1850,10 @@ void main() {
     final llms = await get('/llms.txt');
     expect(llms.headers['content-type'], 'text/plain; charset=utf-8');
     final text = await llms.readAsString();
-    expect(text, startsWith('# Döner App\n\n> Döner bewertet nach Soße'));
+    expect(text, startsWith('# Lieblingsdöner\n\n> Döner bewertet nach Soße'));
     expect(text, contains('https://doener.test/llms-full.txt'));
     expect(text, contains('https://doener.test/llms.txt?lang=en'));
-    expect(text, contains('- [Döner App – Der beste Döner deiner Stadt](https://doener.test/index.md): '));
+    expect(text, contains('- [Lieblingsdöner – Der beste Döner deiner Stadt](https://doener.test/index.md): '));
     expect(text, contains('- [Die besten Döner in Teststadt 2026](https://doener.test/bestenliste/teststadt/2026.md): 1. Grill 1 · 2. Grill 2 · 3. Grill 3'));
     expect(text, contains('(https://doener.test/datenschutz.md)'));
 
@@ -1879,8 +1879,8 @@ void main() {
 
     // Accept: text/markdown gets the Markdown under the page's own URL, everyone else the HTML.
     const md = {'accept': 'text/markdown'};
-    expect(await (await get('/', md)).readAsString(), startsWith('# Döner App – Der beste Döner deiner Stadt'));
-    expect(await (await get('/en', md)).readAsString(), startsWith('# Döner App – The best döner in your city'));
+    expect(await (await get('/', md)).readAsString(), startsWith('# Lieblingsdöner – Der beste Döner deiner Stadt'));
+    expect(await (await get('/en', md)).readAsString(), startsWith('# Lieblingsdöner – The best döner in your city'));
     expect(await (await get('/bestenliste/teststadt/2026/', md)).readAsString(), startsWith('# Die besten Döner in Teststadt 2026'));
     expect((await get('/')).headers['content-type'], 'text/html; charset=utf-8');
 
@@ -1996,7 +1996,7 @@ void main() {
 
     expect((await call('POST', '/admin/updates/$id/test', token: admin)).$1, 204);
     final test = mailer.sent.last;
-    expect((test.to, test.subject), ('robin@doener.test', '[Test] Neu in der Döner App: Neue Karte'));
+    expect((test.to, test.subject), ('robin@doener.test', '[Test] Neu bei Lieblingsdöner: Neue Karte'));
     expect(test.html, contains('Zwei'));
 
     final (published, update) = await call('POST', '/admin/updates/$id/publish', token: admin);
@@ -2015,7 +2015,7 @@ void main() {
     await deliverUpdateMails(deps, pause: Duration.zero);
     expect(mailer.sent.length, mails + 1);
     final mail = mailer.sent.last;
-    expect((mail.to, mail.subject), ('leser@example.org', 'Neu in der Döner App: Neue Karte'));
+    expect((mail.to, mail.subject), ('leser@example.org', 'Neu bei Lieblingsdöner: Neue Karte'));
     expect(mail.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
     final (_, list) = await call('GET', '/admin/updates', token: admin);
     final listed = AdminUpdatesDto.fromJson(list as Map<String, dynamic>);

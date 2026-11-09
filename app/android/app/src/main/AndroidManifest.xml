@@ -8,7 +8,7 @@
     <!-- geolocator declares a location foreground service the app never starts; Play would ask for a declaration. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove" />
     <application
-        android:label="Döner App"
+        android:label="Döner"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <service android:name="com.baseflow.geolocator.GeolocatorLocationService" tools:node="remove" />

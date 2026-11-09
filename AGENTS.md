@@ -1,7 +1,8 @@
-# Döner-App
+# Lieblingsdöner
 
 ## Zweck & Links
 
+- Anzeigename „Lieblingsdöner“ (Robins Entscheidung vom 09.11.2026), unter dem App-Icon und als `short_name` kurz „Döner“. Slug `doener`, Bundle-ID und Domain bleiben.
 - Döner-Community für iOS, Android und Web aus einer Flutter-Codebase, Server in Dart, Befehlszeile `doener` in `cli/`. Web und API laufen unter https://doener-api.pleasance.org (Landingpage unter `/` und `/en`, API unter `/api/v1`, Web-App unter `/app`).
 - Coolify auf VPS 1, Projekt `pleasance-doener`, Datenbank `doener-db`.
 - Öffentlicher TestFlight-Link: https://testflight.apple.com/join/nJJ5wARs (externe Gruppe „Erste Tester“). Er steht als `APP_DOWNLOAD_URL` in Coolify und in der Mail einer Einladung ohne Android. `/i/<code>` und `/b/<placeId>` führen statt dorthin zur Bewerbung, weil ohne Konto nichts geht.

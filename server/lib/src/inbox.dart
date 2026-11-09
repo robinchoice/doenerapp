@@ -92,7 +92,7 @@ InboxItemDto _item(Map<String, dynamic> r) {
       'reaction' => '$actor reagiert ${r['emoji']} auf ${r['extra'] == 'visit' ? 'deinen Check-in bei' : 'deine Bewertung von'} $place',
       'friend_request' => '$actor möchte mit dir befreundet sein',
       'new_place' => 'Neuer Döner in ${r['place_city']}',
-      _ => 'Neu in der Döner App',
+      _ => 'Neu bei Lieblingsdöner',
     },
     body: switch (type) {
       'new_place' => '$place hat aufgemacht',

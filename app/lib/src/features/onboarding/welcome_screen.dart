@@ -71,7 +71,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     children: [
                       page(
                         top: const BrandTile(size: 132),
-                        title: 'Döner App',
+                        title: 'Lieblingsdöner',
                         text: 'Finde, bewerte und sammle deine liebsten Döner-Läden.',
                         extra: widget.inviteCode == null ? null : InviterBanner(code: widget.inviteCode!),
                       ),

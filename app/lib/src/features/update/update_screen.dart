@@ -28,7 +28,7 @@ class UpdateScreen extends StatelessWidget {
           child: EmptyState(
             icon: Icons.system_update,
             title: 'Update nötig',
-            message: 'Diese Version der Döner App ist zu alt. Aktualisiere sie, deine Daten bleiben.',
+            message: 'Diese Version von Lieblingsdöner ist zu alt. Aktualisiere sie, deine Daten bleiben.',
             action: url.isEmpty ? null : FilledButton(onPressed: _open, child: const Text('Jetzt aktualisieren')),
           ),
         ),

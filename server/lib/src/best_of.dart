@@ -203,7 +203,7 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
   final url = '$base${bestOfPath(city, year)}';
   final head = '''<title>${_escape.convert(title)}</title>
 <meta name="description" content="${_escape.convert(top)}">
-<meta property="og:site_name" content="Döner App">
+<meta property="og:site_name" content="Lieblingsdöner">
 <meta property="og:type" content="article">
 <meta property="og:title" content="${_escape.convert(title)}">
 <meta property="og:description" content="${_escape.convert(top)}">
@@ -330,7 +330,7 @@ summary { cursor: pointer; padding: 8px 0; }
 </style>
 </head>
 <body><main>
-<header class="nav"><a class="brand display" href="${english ? '/en' : '/'}"><img src="/icons/Icon-192.png" alt="">Döner App</a>${otherLang == null ? '' : '<a class="muted" href="${_escape.convert(otherLang)}">${english ? 'Deutsch' : 'English'}</a>'}</header>
+<header class="nav"><a class="brand display" href="${english ? '/en' : '/'}"><img src="/icons/Icon-192.png" alt="">Lieblingsdöner</a>${otherLang == null ? '' : '<a class="muted" href="${_escape.convert(otherLang)}">${english ? 'Deutsch' : 'English'}</a>'}</header>
 $body
 <footer class="foot">
   <a class="sender" href="https://pleasance.org"><span>${english ? 'a tool by' : 'ein Werkzeug von'}</span><span class="mark"><img src="/assets/assets/pleasance-wordmark.svg" alt="Pleasance"><i></i></span></a>

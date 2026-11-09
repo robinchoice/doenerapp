@@ -321,7 +321,7 @@ class _NewsEditorState extends State<NewsEditor> {
             const SizedBox(height: 12),
             NewsPreview(update: _preview),
             const SizedBox(height: 12),
-            const Text('Die Mail zeigt denselben Text mit dem Knopf „Döner App öffnen“. Wie sie ankommt, zeigt die Testmail.'),
+            const Text('Die Mail zeigt denselben Text mit dem Knopf „Lieblingsdöner öffnen“. Wie sie ankommt, zeigt die Testmail.'),
           ],
         ),
       ),

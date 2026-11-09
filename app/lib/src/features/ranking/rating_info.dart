@@ -32,7 +32,7 @@ class _RatingInfo extends StatelessWidget {
         Text('So funktionieren Bewertungen', style: theme.textTheme.titleLarge),
         section(
           'Wer bewertet',
-          'Alle mit einem Konto in der Döner App. Pro Laden zählt eine Bewertung pro Person, eine neue ersetzt die alte. '
+          'Alle mit einem Konto bei Lieblingsdöner. Pro Laden zählt eine Bewertung pro Person, eine neue ersetzt die alte. '
               'Bewertungen werden nicht bezahlt.',
         ),
         section(

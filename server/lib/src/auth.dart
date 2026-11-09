@@ -313,9 +313,9 @@ Future<void> _mailLoginCode(Deps deps, String email,
   final appUrl = android ? (publicUrl == null ? null : '$publicUrl/android') : deps.config.appDownloadUrl;
   await deps.mailer.send(
     to: email,
-    subject: invitedBy == null ? 'Dein Login-Code: $code' : '$invitedBy lädt dich in die Döner App ein',
-    text: '${invitedBy == null ? '' : '$invitedBy hat dir ein Konto in der Döner App angelegt.\n\n'}'
-        'Dein Code für die Döner App: $code\n\n'
+    subject: invitedBy == null ? 'Dein Login-Code: $code' : '$invitedBy lädt dich zu Lieblingsdöner ein',
+    text: '${invitedBy == null ? '' : '$invitedBy hat dir ein Konto bei Lieblingsdöner angelegt.\n\n'}'
+        'Dein Code für Lieblingsdöner: $code\n\n'
         '${publicUrl == null ? '' : 'Oder direkt anmelden:\n$publicUrl/login?token=$token\n\n'}'
         '${testFlight ? 'Die iPhone-App kommt über TestFlight, die Einladung schickt dir Apple in einer eigenen Mail.\n\n' : invitedBy == null || appUrl == null ? '' : 'Die App für dein Handy:\n$appUrl\n\n'}'
         'Der Code ist ${loginRequestTtl.inMinutes} Minuten gültig. '

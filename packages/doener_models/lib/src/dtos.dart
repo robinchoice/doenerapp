@@ -1433,11 +1433,11 @@ class InboxDto {
 
 /// What the notification says when the details can't be loaded: the type only.
 (String, String) neutralPushText(String? type) => switch (type) {
-      'friend_check_in' => ('Döner App', 'Ein Freund ist gerade beim Döner. Öffne die App für Details.'),
-      'friend_request' => ('Döner App', 'Du hast eine Freundschaftsanfrage. Öffne die App für Details.'),
-      'reaction' => ('Döner App', 'Jemand hat auf deinen Post reagiert. Öffne die App für Details.'),
-      'new_place' => ('Döner App', 'Ein neuer Döner hat aufgemacht. Öffne die App für Details.'),
-      _ => ('Döner App', 'Es gibt Neues in der Döner App.'),
+      'friend_check_in' => ('Lieblingsdöner', 'Ein Freund ist gerade beim Döner. Öffne die App für Details.'),
+      'friend_request' => ('Lieblingsdöner', 'Du hast eine Freundschaftsanfrage. Öffne die App für Details.'),
+      'reaction' => ('Lieblingsdöner', 'Jemand hat auf deinen Post reagiert. Öffne die App für Details.'),
+      'new_place' => ('Lieblingsdöner', 'Ein neuer Döner hat aufgemacht. Öffne die App für Details.'),
+      _ => ('Lieblingsdöner', 'Es gibt Neues bei Lieblingsdöner.'),
     };
 
 // MARK: - News

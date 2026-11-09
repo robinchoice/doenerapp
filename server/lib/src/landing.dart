@@ -116,7 +116,10 @@ Future<void> _mailTesterRequest(Deps deps, String to, String email, String platf
 /// `/` (German) and `/en` — the public landing page. Logged-in browsers go
 /// straight on to the web app under `/app`.
 Response landingPage(Request _, {required bool english}) =>
-    Response.ok(_page(english ? _en : _de), headers: {'content-type': 'text/html; charset=utf-8'});
+    Response.ok(english ? _enHtml : _deHtml, headers: {'content-type': 'text/html; charset=utf-8'});
+
+final _deHtml = _page(_de);
+final _enHtml = _page(_en);
 
 /// The landing page as Markdown for agents (agents.dart), without the example ranking.
 PublicPage landingPublicPage(String base, {required bool english}) {

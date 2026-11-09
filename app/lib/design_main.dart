@@ -114,11 +114,12 @@ String _hex(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(
 String _export(Brand b) {
   String color(Color c) => 'Color(0x${c.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()})';
   final custom = b.custom;
+  final j = _toJson(b);
   return [
     '// Lieblingsdöner, Design-Werkstatt ${DateTime.now().toIso8601String().substring(0, 10)}',
     'const Brand(',
-    for (final (key, label) in _lightColors) '  $key: ${color(Color(_toJson(b)[key] as int))}, // Hell: $label ${_hex(Color(_toJson(b)[key] as int))}',
-    for (final (key, label) in _darkColors) '  $key: ${color(Color(_toJson(b)[key] as int))}, // Dunkel: $label ${_hex(Color(_toJson(b)[key] as int))}',
+    for (final (key, label) in _lightColors) '  $key: ${color(Color(j[key] as int))}, // Hell: $label ${_hex(Color(j[key] as int))}',
+    for (final (key, label) in _darkColors) '  $key: ${color(Color(j[key] as int))}, // Dunkel: $label ${_hex(Color(j[key] as int))}',
     if (custom == null) ...[
       '  bandFrom: ${b.bandFrom.toStringAsFixed(2)}, // Pleasance-Band',
       '  bandTo: ${b.bandTo.toStringAsFixed(2)},',
@@ -148,6 +149,15 @@ class _DesignStudioState extends State<DesignStudio> {
   var _view = _View.app;
   var _brightness = Brightness.light;
   String _selected = 'paper';
+  late final _hexController = TextEditingController(text: _selectedHex);
+
+  String get _selectedHex => _hex(Color(_values[_selected] as int));
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
 
   void _set(String key, Object value) => _apply(() => _values[key] = value);
 
@@ -160,6 +170,7 @@ class _DesignStudioState extends State<DesignStudio> {
     setState(() {
       change();
       brand = _fromJson(_values);
+      _hexController.text = _selectedHex;
     });
     web.window.localStorage.setItem(_storageKey, jsonEncode(_values));
     // Widgets that read the brand directly instead of through the theme.
@@ -173,6 +184,7 @@ class _DesignStudioState extends State<DesignStudio> {
 
   void _select(String key) => setState(() {
         _selected = key;
+        _hexController.text = _selectedHex;
         if (_darkColors.any((c) => c.$1 == key)) _brightness = Brightness.dark;
         if (_lightColors.any((c) => c.$1 == key)) _brightness = Brightness.light;
       });
@@ -303,8 +315,7 @@ class _DesignStudioState extends State<DesignStudio> {
           ),
           // flex_color_picker's own code field needs material_ui's localizations, so a plain one.
           TextField(
-            key: ValueKey('hex-$_selected-${_values[_selected]}'),
-            controller: TextEditingController(text: _hex(Color(_values[_selected] as int))),
+            controller: _hexController,
             decoration: const InputDecoration(labelText: 'Farbcode', isDense: true, border: OutlineInputBorder()),
             style: const TextStyle(fontFamily: 'monospace'),
             onSubmitted: (text) {

@@ -208,7 +208,18 @@ class _DesignStudioState extends State<DesignStudio> {
       );
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) {
+    // `?bare`: only the app, filling the window, for store screenshots
+    // (`tool/store-screenshots.mjs`).
+    if (Uri.base.queryParameters.containsKey('bare')) {
+      final size = MediaQuery.sizeOf(context);
+      final tablet = size.shortestSide >= 600;
+      return _preview(size, tablet ? const EdgeInsets.only(top: 24, bottom: 20) : const EdgeInsets.only(top: 47, bottom: 34));
+    }
+    return _studio();
+  }
+
+  Widget _studio() => MaterialApp(
         title: 'Design-Werkstatt · Lieblingsdöner',
         debugShowCheckedModeBanner: false,
         // The studio keeps its own neutral look, so it doesn't change with the brand.
@@ -226,13 +237,25 @@ class _DesignStudioState extends State<DesignStudio> {
 
   Widget _phone() {
     const size = Size(390, 844);
-    final preview = KeyedSubtree(
+    final preview = _preview(size, const EdgeInsets.only(top: 47, bottom: 34));
+    return FittedBox(
+      child: Container(
+        width: size.width + 24,
+        height: size.height + 24,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(56)),
+        child: ClipRRect(borderRadius: BorderRadius.circular(44), child: preview),
+      ),
+    );
+  }
+
+  Widget _preview(Size size, EdgeInsets insets) => KeyedSubtree(
       key: _previewKey,
       child: MediaQuery(
         data: MediaQuery.of(context).copyWith(
           size: size,
-          padding: const EdgeInsets.only(top: 47, bottom: 34),
-          viewPadding: const EdgeInsets.only(top: 47, bottom: 34),
+          padding: insets,
+          viewPadding: insets,
           platformBrightness: _brightness,
         ),
         child: MaterialApp(
@@ -252,16 +275,6 @@ class _DesignStudioState extends State<DesignStudio> {
         ),
       ),
     );
-    return FittedBox(
-      child: Container(
-        width: size.width + 24,
-        height: size.height + 24,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: const Color(0xFF111111), borderRadius: BorderRadius.circular(56)),
-        child: ClipRRect(borderRadius: BorderRadius.circular(44), child: preview),
-      ),
-    );
-  }
 
   Widget _panel() {
     final custom = _values['customOn'] == true;

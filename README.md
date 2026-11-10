@@ -439,6 +439,15 @@ flutter symbolize -i trace.txt -d /tmp/symbols/apk/app.android-arm64.symbols   #
 
 `trace.txt` ist der rohe Stacktrace mit `build_id` und `abs …/virt …`-Zeilen (z. B. aus `adb logcat`). Builds, die älter als 90 Tage sind, lassen sich nicht mehr symbolisieren. Keine Secrets im Client: Die Verschleierung schützt nichts, alles im App-Bundle lässt sich auslesen.
 
+### App Store und Play
+
+Robins Entscheidung vom 10.11.2026: Der aktuelle Build geht schon vor dem Redesign in die Prüfung beider Stores, damit die lange Erstprüfung läuft. Veröffentlicht wird von Hand (Apple „Manuell veröffentlichen“, Play „Verwaltete Veröffentlichung“), das entscheidet Robin, ebenso, ob die Registrierung dann aufgeht.
+
+- Texte: `docs/store/<locale>/` (`name`, `subtitle`, `short-description`, `description`, `keywords`), für App Store und Play.
+- App Store: `cd server && with-secret ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 REVIEW_CODE=DOENER_REVIEW_PASSWORD -- bash -c 'REVIEW_EMAIL=<Prüfadresse> dart run tool/app_store.dart prepare'` trägt Name, Texte, Kategorie, Altersfreigabe, Preis, Prüfkonto und den neuesten Build ein, `screenshots` lädt `docs/store/ios/de-DE/{iphone,ipad}` hoch, `submit` reicht ein. Die Prüfadresse steht in Coolify (`REVIEW_EMAIL`). Den Datenschutz-Fragebogen („App-Datenschutz“) gibt es nur in App Store Connect im Browser.
+- iOS-Screenshots: `(cd app && flutter build web -t lib/design_main.dart -o build/design) && node tool/app-store-screenshots.mjs` fotografiert die Design-Werkstatt mit `?bare` (nur die App, Demodaten) in iPhone- und iPad-Größe. Braucht Netz für CanvasKit, die Klickpunkte nach UI-Umbauten prüfen.
+- Play: Screenshots und Vorstellungsgrafiken in `docs/play/` (`node tool/store-screenshots.mjs`), Datensicherheit und Altersfreigabe im Savor-Dokument „Döner: Play-Test einrichten“.
+
 ### Secret-Scan
 
 Das Repo ist öffentlich, Code, Historie und CI-Logs. `.github/workflows/secrets.yml` läuft bei jedem Push auf jedem Branch und bei PRs aus Forks, ohne `paths-ignore`, und scannt mit gitleaks (Docker-Image, Version per Digest fest) die neuen Commits. Ein Fund macht den Lauf rot, der Wert steht dank `--redact` nicht im Log.
@@ -469,7 +478,7 @@ Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit 
 
 1. Look: Workshop mit der Designerin in der Design-Werkstatt (Farben, Radien, eventuell Icon und Wortmarke), danach die Werte fest einbauen.
 2. Aufbau: Erst danach Mockups für den größeren Umbau („Start als Aktionsfläche“), schon im neuen Look, Bau nach Robins Freigabe.
-3. Ausliefern: Store-Screenshots neu, Store-Name „Lieblingsdöner“ in App Store Connect und Play, dann der Release-Tag. Die Store-Screenshots entstehen per Skript: rohe Handy-Screens nach `docs/play/raw/` (1080 breit, `1-karte` … `6-freunde`), dann `npm install --no-save --prefix tool playwright && node tool/store-screenshots.mjs` setzt die Überschriften dazu und schreibt `docs/play/de`. Hochgeladen wird erst mit diesem Release.
+3. Ausliefern: Store-Screenshots neu (siehe „App Store und Play“), als Update der schon geprüften Store-Version, dann der Release-Tag.
 
 ### Leitlinie
 

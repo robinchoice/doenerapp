@@ -57,6 +57,43 @@ try {
     writeFileSync(new URL(`${key}.png`, OUT), await page.screenshot());
     console.log(`${key}.png  ${headline}`);
   }
+
+  // Feature graphics (1024×500) with the start screen, one per language.
+  const icon = readFileSync(new URL('../app/assets/icon.png', HERE)).toString('base64');
+  const wordmark = readFileSync(new URL('../app/assets/pleasance-wordmark.svg', HERE)).toString('base64');
+  const start = readFileSync(new URL('2-start.png', RAW)).toString('base64');
+  const FEATURE = {
+    de: ['Der beste Döner', 'deiner Stadt.', 'Bewertet nach Soße, Fleisch, Salat und Brot – von Leuten aus deiner Gegend.', 'ein Werkzeug von'],
+    en: ['The best döner', 'in your city.', 'Rated by sauce, meat, salad and bread – by people from your area.', 'a tool by'],
+  };
+  const feature = await browser.newPage({ viewport: { width: 1024, height: 500 }, deviceScaleFactor: 1 });
+  for (const [lang, [h1, accent, lead, by]] of Object.entries(FEATURE)) {
+    await feature.setContent(
+      `<!doctype html><html><head><meta charset="utf-8"><style>
+        @font-face { font-family: Bricolage; src: url(data:font/ttf;base64,${font}) format('truetype'); font-weight: 200 800; }
+        * { margin: 0; box-sizing: border-box; }
+        body { width: 1024px; height: 500px; overflow: hidden; background: #0E0D12; color: #F2F0EA; font-family: Bricolage, sans-serif; position: relative; }
+        .brand { position: absolute; left: 64px; top: 52px; display: flex; align-items: center; gap: 16px; font-weight: 800; font-stretch: 78%; font-size: 30px; }
+        .brand img { width: 48px; height: 48px; border-radius: 12px; }
+        h1 { position: absolute; left: 64px; top: 136px; font-weight: 800; font-stretch: 78%; font-size: 70px; line-height: 1.02; }
+        h1 span { background: linear-gradient(90deg, #F5A847, #E2C55A); -webkit-background-clip: text; color: transparent; }
+        .rule { position: absolute; left: 64px; top: 312px; width: 120px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, #F5A847, #E2C55A); }
+        p { position: absolute; left: 64px; top: 340px; width: 420px; font-family: sans-serif; font-size: 19px; line-height: 1.45; color: #B9B6AE; }
+        .by { position: absolute; left: 64px; top: 440px; display: flex; align-items: center; gap: 14px; font-family: sans-serif; font-size: 13px; color: #B9B6AE; }
+        .by img { height: 14px; }
+        .phone { position: absolute; right: 90px; top: 34px; width: 210px; padding: 9px; background: #1d1c22; border-radius: 40px; transform: rotate(4deg); box-shadow: 0 20px 60px #000a; }
+        .phone img { display: block; width: 100%; border-radius: 32px; }
+      </style></head><body>
+        <div class="brand"><img src="data:image/png;base64,${icon}">Lieblingsdöner</div>
+        <h1>${h1}<br><span>${accent}</span></h1><div class="rule"></div><p>${lead}</p>
+        <div class="by">${by}<img src="data:image/svg+xml;base64,${wordmark}"></div>
+        <div class="phone"><img src="data:image/png;base64,${start}"></div>
+      </body></html>`,
+    );
+    await feature.evaluate(() => document.fonts.ready);
+    writeFileSync(new URL(`../feature-${lang}.png`, OUT), await feature.screenshot());
+    console.log(`feature-${lang}.png`);
+  }
 } finally {
   await browser.close();
 }

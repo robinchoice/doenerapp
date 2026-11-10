@@ -64,6 +64,12 @@ class Config {
   final int minBuildIos;
   final int minBuildAndroid;
 
+  /// Login for the App Store and Play reviewers (`REVIEW_EMAIL`, `REVIEW_CODE`
+  /// with 6 digits): that address gets no mail, the fixed code logs it in and
+  /// may create its account while sign-up is closed. Both or neither.
+  final String? reviewEmail;
+  final String? reviewCode;
+
   const Config({
     required this.database,
     this.databaseTls = false,
@@ -85,6 +91,8 @@ class Config {
     this.revision = 'dev',
     this.minBuildIos = 0,
     this.minBuildAndroid = 0,
+    this.reviewEmail,
+    this.reviewCode,
   });
 
   String publicBase(Uri requestedUri) => publicUrl ?? requestedUri.origin;
@@ -102,6 +110,16 @@ class Config {
     // The image sets APP_ENV=production. Without SMTP the log would hand out login codes and links.
     if (smtpHost == null && get('APP_ENV') == 'production') {
       throw StateError('SMTP_HOST is required in production, otherwise login codes would end up in the log');
+    }
+    final reviewEmail = get('REVIEW_EMAIL')?.toLowerCase();
+    final reviewCode = get('REVIEW_CODE');
+    // Never an admin: the code sits in the store review notes.
+    final review = reviewEmail != null &&
+        reviewCode != null &&
+        RegExp(r'^\d{6}$').hasMatch(reviewCode) &&
+        !list('ADMIN_EMAILS').contains(reviewEmail);
+    if (!review && (reviewEmail != null || reviewCode != null)) {
+      print('WARNING: REVIEW_EMAIL and REVIEW_CODE (6 digits) belong together, never for an admin — the review login stays off.');
     }
     return Config(
       database: Endpoint(
@@ -145,6 +163,8 @@ class Config {
       revision: get('APP_VERSION') ?? 'dev',
       minBuildIos: int.parse(get('MIN_BUILD_IOS') ?? '0'),
       minBuildAndroid: int.parse(get('MIN_BUILD_ANDROID') ?? '0'),
+      reviewEmail: review ? reviewEmail : null,
+      reviewCode: review ? reviewCode : null,
     );
   }
 }

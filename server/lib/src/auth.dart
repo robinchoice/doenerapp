@@ -229,7 +229,12 @@ final signupClosedAt = DateTime.utc(2026, 10, 15, 14, 30);
 /// can't bring in others.
 Future<bool> _maySignUp(Deps deps, String email) async {
   final config = deps.config;
-  if (config.signupOpen || config.signupAllowlist.contains(email) || config.adminEmails.contains(email)) return true;
+  if (config.signupOpen ||
+      config.signupAllowlist.contains(email) ||
+      config.adminEmails.contains(email) ||
+      email == config.reviewEmail) {
+    return true;
+  }
   return await queryOne(
         deps.db,
         'SELECT 1 FROM tester_requests WHERE email = @email AND created_at < @closed '
@@ -295,7 +300,10 @@ Future<void> _mailLoginCode(Deps deps, String email,
   );
   if ((recent!['n'] as int) >= maxLoginRequestsPerHour) throw tooManyRequests;
 
-  final code = randomCode();
+  // The store reviewers can't read mails: their address takes the fixed code
+  // and gets none. The limits above and per code still apply.
+  final review = email == deps.config.reviewEmail;
+  final code = review ? deps.config.reviewCode! : randomCode();
   final token = randomToken();
   await deps.db.execute(
     Sql.named('INSERT INTO login_requests (email, code_hash, token_hash, expires_at, invite_code) '
@@ -308,6 +316,7 @@ Future<void> _mailLoginCode(Deps deps, String email,
       'expires': DateTime.now().toUtc().add(loginRequestTtl),
     },
   );
+  if (review) return;
 
   final publicUrl = deps.config.publicUrl;
   final appUrl = android ? (publicUrl == null ? null : '$publicUrl/android') : deps.config.appDownloadUrl;

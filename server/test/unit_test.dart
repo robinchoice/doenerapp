@@ -75,6 +75,14 @@ void main() {
     expect(Config.fromEnvironment({}).smtp, isNull);
     expect(Config.fromEnvironment({'MIN_BUILD_IOS': '42'}).minBuildIos, 42);
     expect(Config.fromEnvironment({}).minBuildAndroid, 0);
+    final review = Config.fromEnvironment({'REVIEW_EMAIL': 'Review@Example.org', 'REVIEW_CODE': '424242'});
+    expect((review.reviewEmail, review.reviewCode), ('review@example.org', '424242'));
+    expect(Config.fromEnvironment({'REVIEW_EMAIL': 'review@example.org', 'REVIEW_CODE': '1234'}).reviewEmail, isNull);
+    expect(Config.fromEnvironment({'REVIEW_EMAIL': 'review@example.org'}).reviewEmail, isNull);
+    expect(
+      Config.fromEnvironment({'REVIEW_EMAIL': 'chef@example.org', 'REVIEW_CODE': '424242', 'ADMIN_EMAILS': 'Chef@example.org'}).reviewEmail,
+      isNull,
+    );
   });
 
   test('iOS finds the app for login, invite and review links', () async {

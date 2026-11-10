@@ -384,6 +384,7 @@ cd app && flutter test
 | `SIGNUP_OPEN` | – (lokale Compose: `true`) | `true` öffnet die Registrierung für alle, nur nach Robins Go |
 | `SIGNUP_ALLOWLIST` | – | Kommagetrennte Adressen, die ohne Einladung ein neues Konto bekommen |
 | `ADMIN_EMAILS` | – | Kommagetrennte Adressen, die Tester einladen (robin@pleasance.org, nie admin@pleasance.org) |
+| `REVIEW_EMAIL`, `REVIEW_CODE` | – | Prüfkonto für App Store und Play: Die Adresse bekommt keine Mail, der feste 6-stellige Code meldet sie an und legt das Konto auch bei geschlossener Registrierung an. Normales Konto, nie in `ADMIN_EMAILS` (sonst bleibt es aus), Limits wie bei jedem Code. Die Adresse hat einen Zufallsteil und steht nur in den Prüfhinweisen der Stores, denn 25 Versuche pro Stunde reichen über Monate an den festen Code heran. Nur beide zusammen, der Code liegt in `~/.secrets` (`DOENER_REVIEW_PASSWORD`) |
 
 **App (`--dart-define`):**
 

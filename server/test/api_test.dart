@@ -165,6 +165,8 @@ void main() {
       webDir: config.webDir,
       signupAllowlist: {'liste@example.org'},
       adminEmails: {...config.adminEmails, 'chefin@example.org'},
+      reviewEmail: 'review@example.org',
+      reviewCode: '424242',
     );
     closedHandler = buildHandler(Deps(db: db, config: closed, mailer: mailer, httpClient: google));
   });
@@ -315,6 +317,25 @@ void main() {
       expect((await call('POST', '/auth/verify', body: body, ip: 'guess')).$1, 429);
       await db.execute("UPDATE rate_limits SET reset_at = now() WHERE key = 'code-checks-per-ip:guess'");
       expect((await call('POST', '/auth/verify', body: body, ip: 'guess')).$1, 200);
+    });
+
+    test('the store reviewers log in with the fixed code, without a mail', () async {
+      final mails = mailer.sent.length;
+      Future<(int, dynamic)> verify(String code) =>
+          call('POST', '/auth/verify', body: {'email': 'review@example.org', 'code': code}, closed: true);
+
+      expect((await call('POST', '/auth/login', body: {'email': 'Review@example.org'}, closed: true)).$1, 204);
+      expect(mailer.sent.length, mails);
+      expect((await verify('000000')).$1, 401);
+      final (status, body) = await verify('424242');
+      expect(status, 200);
+      expect(body['isNewUser'], isTrue);
+      expect(body['user']['admin'], isFalse);
+      expect((await verify('424242')).$1, 401, reason: 'single-use like any code');
+
+      expect((await call('POST', '/auth/login', body: {'email': 'review@example.org'}, closed: true)).$1, 204);
+      expect((await verify('424242')).$2['isNewUser'], isFalse);
+      expect(mailer.sent.length, mails);
     });
 
     test('login requests are rate limited', () async {

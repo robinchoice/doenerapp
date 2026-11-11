@@ -123,7 +123,8 @@ void mountSocial(Router router, Deps deps) {
       final me = await requireUser(deps, request);
       final body = await readBody(request, ReactionRequest.fromJson);
       if (!reactionEmojis.contains(body.emoji)) throw const ApiException.badRequest('Unbekannte Reaktion');
-      final params = {'me': me.id, 'id': requireUuid(id)};
+      final postId = requireUuid(id);
+      final params = {'me': me.id, 'id': postId};
       final post = await queryOne(
         deps.db,
         '$friendIdsCte SELECT p.user_id::text AS user_id, s.google_place_id FROM $table p '
@@ -145,7 +146,7 @@ void mountSocial(Router router, Deps deps) {
           me,
           recipient: post['user_id'] as String,
           type: 'reaction',
-          sourceId: params['id']!,
+          sourceId: postId,
           title: '${me.displayName} hat auf ${table == 'visits' ? 'deinen Check-in' : 'deine Bewertung'} reagiert',
           body: '${body.emoji} bei deinem Post',
           placeId: post['google_place_id'] as String,

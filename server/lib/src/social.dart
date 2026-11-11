@@ -56,7 +56,8 @@ void mountSocial(Router router, Deps deps) {
       '         NULL::jsonb AS items, NULL::uuid AS photo_id, 0 AS visit_count,'
       '         v.food_type, true AS from_friend, ${reactionCounts('visit_id', 'v.id')}, ${myReaction('visit_id', 'v.id')},'
       '         ${reactorsOf('visit_id', 'v.id')}'
-      '  FROM visits v WHERE v.user_id IN (SELECT id FROM friends)'
+      '  FROM visits v JOIN places p ON p.id = v.place_id WHERE v.user_id IN (SELECT id FROM friends)'
+      "    AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING'"
       '  UNION ALL'
       '  SELECT \'review\', r.id, r.user_id, r.place_id, r.updated_at, r.text,'
       '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, NULL,'
@@ -64,6 +65,7 @@ void mountSocial(Router router, Deps deps) {
       '         ${reactorsOf('review_id', 'r.id')}'
       '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE (r.user_id IN (SELECT id FROM friends)'
       '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}) AND ${notBlocked('r.user_id')}'
+      "    AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING'"
       ') f ${cursor == null ? '' : 'WHERE (f.ts, f.id) < (@ts:timestamptz, @id:uuid)'}'
       ' ORDER BY f.ts DESC, f.id DESC LIMIT @limit:int4',
       {
@@ -83,7 +85,7 @@ void mountSocial(Router router, Deps deps) {
     ).wait;
 
     final items = [
-      // A shop that went back to FUTURE_OPENING is missing from place_view.
+      // A shop that went back to FUTURE_OPENING since the query is missing from place_view.
       for (final r in page)
         if (places[r['place_id']] case final place?)
           FeedItem(

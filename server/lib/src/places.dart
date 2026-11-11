@@ -294,10 +294,7 @@ void mountPlaces(Router router, Deps deps) {
     if (request.headers.containsKey('authorization')) {
       if (row == null) {
         final user = await requireUser(deps, request);
-        // Each lookup costs a Place Details call, so it counts like a search.
-        if (await _countSearches(deps, user.id, 1) && await _fetchShop(deps, placeId)) {
-          row = await _requirePlace(deps, placeId);
-        }
+        if (await _fetchShop(deps, placeId, user.id)) row = await _requirePlace(deps, placeId);
       } else if (apiKey != null && await _hoursDue(deps, placeId)) {
         await requireUser(deps, request);
         await _fetchHours(deps, apiKey, placeId);
@@ -605,10 +602,13 @@ Future<bool> _countSearches(Deps deps, String userId, int n) async {
   return counted != null;
 }
 
-/// Loads one shop from Google into the cache; false if it is unknown, closed or no Döner shop.
-Future<bool> _fetchShop(Deps deps, String placeId) async {
+/// Loads one shop from Google into the cache; false if it is unknown, closed,
+/// no Döner shop or the user's searches are used up.
+Future<bool> _fetchShop(Deps deps, String placeId, String userId) async {
   final apiKey = deps.config.googlePlacesApiKey;
   if (apiKey == null || !RegExp(r'^[A-Za-z0-9_-]{1,300}$').hasMatch(placeId)) return false;
+  // Each lookup costs a Place Details call, so it counts like a search.
+  if (!await _countSearches(deps, userId, 1)) return false;
   try {
     final place = await fetchPlace(deps.httpClient, apiKey, placeId);
     if (place == null || !place.isOpenBusiness || !place.looksLikeDoener) return false;

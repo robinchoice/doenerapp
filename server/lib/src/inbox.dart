@@ -38,7 +38,7 @@ void mountInbox(Router router, Deps deps) {
       "  SELECT 'reaction', x.user_id::text || coalesce(x.visit_id, x.review_id)::text, x.created_at, x.user_id,"
       "         coalesce(v.place_id, r.place_id), x.emoji, CASE WHEN x.visit_id IS NULL THEN 'review' ELSE 'visit' END"
       '  FROM reactions x LEFT JOIN visits v ON v.id = x.visit_id LEFT JOIN reviews r ON r.id = x.review_id'
-      "  WHERE @me:uuid IN (v.user_id, r.user_id) AND x.user_id <> @me:uuid AND x.created_at > now() - interval '7 days'"
+      "  WHERE @me:uuid IN (v.user_id, r.user_id) AND x.user_id IN (SELECT id FROM friends) AND x.created_at > now() - interval '7 days'"
       '  UNION ALL'
       "  SELECT 'friend_request', f.id::text, f.created_at, f.requester_id, NULL, NULL, NULL"
       "  FROM friendships f WHERE f.addressee_id = @me:uuid AND f.status = 'pending'"

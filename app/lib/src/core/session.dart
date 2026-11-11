@@ -148,8 +148,8 @@ class Session extends ChangeNotifier {
       await settingsStore.record('apiBaseOverride').delete(_db);
       apiBase = defaultApiBase;
     } else {
-      await settingsStore.record('apiBaseOverride').put(_db, value.replaceAll(RegExp(r'/+$'), ''));
-      apiBase = value;
+      apiBase = value.replaceAll(RegExp(r'/+$'), '');
+      await settingsStore.record('apiBaseOverride').put(_db, apiBase);
     }
     notifyListeners();
   }

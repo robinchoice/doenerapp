@@ -167,11 +167,11 @@ Future<void> prepare(String? buildNumber) async {
 
   // Ratings, photos and names are visible to everyone nearby; nothing else applies.
   // Apple answers a repeated PATCH with 500, so only once.
-  final rating = (await call('GET', '/v1/appInfos/${info['id']}/ageRatingDeclaration'))['data']['attributes'] as Map;
-  if (rating['userGeneratedContent'] == null) {
+  final rating = (await call('GET', '/v1/appInfos/${info['id']}/ageRatingDeclaration'))['data'] as Map;
+  if (rating['attributes']['userGeneratedContent'] == null) {
     await patch(
       'ageRatingDeclarations',
-      info['id'] as String,
+      rating['id'] as String,
       attributes: {
         'alcoholTobaccoOrDrugUseOrReferences': 'NONE',
         'contests': 'NONE',
@@ -336,8 +336,8 @@ Future<void> screenshots() async {
           for (final h in op['requestHeaders'] as List) {
             request.headers[h['name'] as String] = h['value'] as String;
           }
-          final response = await _client.send(request);
-          if (response.statusCode >= 300) throw http.ClientException('upload $name: ${response.statusCode}');
+          final response = await http.Response.fromStream(await _client.send(request));
+          if (response.statusCode >= 300) throw http.ClientException('upload $name: ${response.statusCode} ${response.body}');
         }
         await patch(
           'appScreenshots',

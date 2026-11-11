@@ -293,8 +293,11 @@ void mountPlaces(Router router, Deps deps) {
     final apiKey = deps.config.googlePlacesApiKey;
     if (request.headers.containsKey('authorization')) {
       if (row == null) {
-        await requireUser(deps, request);
-        if (await _fetchShop(deps, placeId)) row = await _requirePlace(deps, placeId);
+        final user = await requireUser(deps, request);
+        // Each lookup costs a Place Details call, so it counts like a search.
+        if (await _countSearches(deps, user.id, 1) && await _fetchShop(deps, placeId)) {
+          row = await _requirePlace(deps, placeId);
+        }
       } else if (apiKey != null && await _hoursDue(deps, placeId)) {
         await requireUser(deps, request);
         await _fetchHours(deps, apiKey, placeId);

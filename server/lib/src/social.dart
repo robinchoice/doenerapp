@@ -81,26 +81,28 @@ void mountSocial(Router router, Deps deps) {
     final places = await _placesById(deps, page.map((r) => r['place_id'] as String).toSet());
 
     final items = [
+      // A shop that went back to FUTURE_OPENING is missing from place_view.
       for (final r in page)
-        FeedItem(
-          id: r['id'] as String,
-          type: FeedItemType.values.byName(r['type'] as String),
-          user: users[r['user_id']]!,
-          place: places[r['place_id']]!,
-          timestamp: r['ts'] as DateTime,
-          fromFriend: r['from_friend'] as bool,
-          rating: r['rating'] as double?,
-          ratings: ratingsFromRow(r),
-          text: r['text'] as String?,
-          foodType: r['food_type'] as String?,
-          photoId: r['photo_id'] as String?,
-          onSite: r['visit_count'] as int > 0,
-          regular: r['visit_count'] as int >= regularVisits,
-          // Only friends react: on posts of others around, the viewer sees none.
-          reactions: r['from_friend'] as bool ? reactionsFromRow(r) : const {},
-          myReaction: r['from_friend'] as bool ? r['my_reaction'] as String? : null,
-          reactors: r['from_friend'] as bool ? reactorsFromRow(r) : const [],
-        ),
+        if (places[r['place_id']] case final place?)
+          FeedItem(
+            id: r['id'] as String,
+            type: FeedItemType.values.byName(r['type'] as String),
+            user: users[r['user_id']]!,
+            place: place,
+            timestamp: r['ts'] as DateTime,
+            fromFriend: r['from_friend'] as bool,
+            rating: r['rating'] as double?,
+            ratings: ratingsFromRow(r),
+            text: r['text'] as String?,
+            foodType: r['food_type'] as String?,
+            photoId: r['photo_id'] as String?,
+            onSite: r['visit_count'] as int > 0,
+            regular: r['visit_count'] as int >= regularVisits,
+            // Only friends react: on posts of others around, the viewer sees none.
+            reactions: r['from_friend'] as bool ? reactionsFromRow(r) : const {},
+            myReaction: r['from_friend'] as bool ? r['my_reaction'] as String? : null,
+            reactors: r['from_friend'] as bool ? reactorsFromRow(r) : const [],
+          ),
     ];
     final last = page.isEmpty ? null : page.last;
     return json(FeedPage(
@@ -139,7 +141,7 @@ void mountSocial(Router router, Deps deps) {
           me,
           recipient: post['user_id'] as String,
           type: 'reaction',
-          sourceId: id,
+          sourceId: params['id']!,
           title: '${me.displayName} hat auf ${table == 'visits' ? 'deinen Check-in' : 'deine Bewertung'} reagiert',
           body: '${body.emoji} bei deinem Post',
           placeId: post['google_place_id'] as String,

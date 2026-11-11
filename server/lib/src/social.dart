@@ -77,8 +77,10 @@ void mountSocial(Router router, Deps deps) {
 
     final hasMore = rows.length > limit;
     final page = rows.take(limit).toList();
-    final users = await _usersById(deps, page.map((r) => r['user_id'] as String).toSet());
-    final places = await _placesById(deps, page.map((r) => r['place_id'] as String).toSet());
+    final (users, places) = await (
+      _usersById(deps, page.map((r) => r['user_id'] as String).toSet()),
+      _placesById(deps, page.map((r) => r['place_id'] as String).toSet()),
+    ).wait;
 
     final items = [
       // A shop that went back to FUTURE_OPENING is missing from place_view.

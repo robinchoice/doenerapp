@@ -64,12 +64,10 @@ AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
     );
 
 class AuthUser {
-  final String id;
-  final String displayName;
   final AccountDto account;
-  AuthUser(this.account)
-      : id = account.id,
-        displayName = account.displayName;
+  AuthUser(this.account);
+  String get id => account.id;
+  String get displayName => account.displayName;
 }
 
 Future<AuthUser> requireUser(Deps deps, Request request) async {
@@ -78,11 +76,7 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   final tokenHash = hashToken(header.substring(7).trim());
   final row = await queryOne(
     deps.db,
-    'SELECT u.id, u.email, u.display_name, u.diet, u.expert_mode, u.push_friends, u.push_new_places, u.push_friend_requests, u.push_reactions, '
-    'u.updates_consent_at IS NOT NULL AS update_mails, '
-    'CASE WHEN u.push_paused_until > now() THEN u.push_paused_until END AS push_paused_until, '
-    'u.quiet_hours, u.quiet_days, u.quiet_start, u.quiet_end, '
-    's.expires_at AS session_expires_at FROM sessions s '
+    'SELECT $_accountColumns, s.expires_at AS session_expires_at FROM sessions s '
     'JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
     {'hash': tokenHash},

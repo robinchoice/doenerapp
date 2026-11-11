@@ -12,7 +12,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
 
 const _package = 'com.robinchoice.doener';
@@ -27,17 +27,10 @@ final _client = http.Client();
 late String _accessToken;
 
 Future<void> _login() async {
-  final key = jsonDecode(utf8.decode(base64.decode(Platform.environment['GOOGLE_DOENER_PLAY_KEY_BASE64']!.trim())))
-      as Map<String, dynamic>;
-  final assertion = JWT({
-    'iss': key['client_email'],
-    'scope': 'https://www.googleapis.com/auth/androidpublisher',
-    'aud': 'https://oauth2.googleapis.com/token',
-  }).sign(RSAPrivateKey(key['private_key'] as String), algorithm: JWTAlgorithm.RS256, expiresIn: const Duration(minutes: 30));
-  final response = await _client.post(Uri.parse('https://oauth2.googleapis.com/token'),
-      body: {'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion': assertion});
-  if (response.statusCode != 200) throw http.ClientException('token: ${response.statusCode} ${response.body}');
-  _accessToken = (jsonDecode(response.body) as Map)['access_token'] as String;
+  final key = utf8.decode(base64.decode(Platform.environment['GOOGLE_DOENER_PLAY_KEY_BASE64']!.trim()));
+  final access = await obtainAccessCredentialsViaServiceAccount(
+      ServiceAccountCredentials.fromJson(key), ['https://www.googleapis.com/auth/androidpublisher'], _client);
+  _accessToken = access.accessToken.data;
 }
 
 Future<Map<String, dynamic>> call(String method, String url, {Object? body, List<int>? bytes}) async {

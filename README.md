@@ -477,7 +477,7 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit diesem Release an die externen Tester, vorher kein Release-Tag `v*`.
 
 1. Look: Workshop mit der Designerin in der Design-Werkstatt (Farben, Radien, eventuell Icon und Wortmarke), danach die Werte fest einbauen.
-2. Aufbau: Erst danach Mockups für den größeren Umbau („Start als Aktionsfläche“), schon im neuen Look, Bau nach Robins Freigabe. Mit hinein gehört das Tester-Feedback vom 12.11.2026: Posts im Feed klarer voneinander trennen, Feed auf Start näher an X oder Instagram, und das Essensrad beim Einchecken wie einen Regler im Kreis drehen statt nur seitlich wischen.
+2. Aufbau: Erst danach Mockups für den größeren Umbau („Start als Aktionsfläche“), schon im neuen Look, Bau nach Robins Freigabe. Mit hinein gehört das Tester-Feedback vom 12.11.2026: Posts im Feed klarer voneinander trennen, Feed auf Start näher an X oder Instagram, und das Essensrad beim Einchecken wie einen Regler im Kreis drehen statt nur seitlich wischen. Die Mockups planen ganz Phase 2 mit ein, damit der Feed nicht zweimal umgebaut wird. Gebaut werden mit diesem Release aber nur die Kommentare (Robins Entscheidung vom 12.11.2026).
 3. Ausliefern: Store-Screenshots neu (siehe „App Store und Play“), als Update der schon geprüften Store-Version, dann der Release-Tag.
 
 ### Leitlinie
@@ -493,7 +493,7 @@ Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit 
 ### Phase 2 – Community
 
 - Fragen an den Umkreis, Antworten mit verlinktem Laden
-- Kommentare unter Freunden an Check-ins und Bewertungen im Feed, wie bei Instagram. Sie bleiben am Post und erscheinen nicht auf der Ladenseite, damit sie Laden und Bewertungen nicht überfluten (Tester-Feedback vom 23.10. und 12.11.2026)
+- Kommentare unter Freunden an Check-ins und Bewertungen im Feed, wie bei Instagram, schon mit dem Release Redesign und Rebrand. Sie bleiben am Post und erscheinen nicht auf der Ladenseite, damit sie Laden und Bewertungen nicht überfluten (Tester-Feedback vom 23.10. und 12.11.2026)
 - Up- und Downvotes, ab −5 ausgeblendet, Upvotes neben dem Namen
 - Kenner des Monats 👑 (meiste Upvotes in der Stadt)
 - Favoriten werden zur Merkliste „Will ich probieren“

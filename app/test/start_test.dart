@@ -224,10 +224,20 @@ void main() {
     expect(find.text('Die besten Döner in Freiburg im Breisgau 2026'), findsOneWidget);
     expect(find.text('Mardin Döner'), findsOneWidget);
 
+    await tester.tap(find.text('Preis-Leistung'));
+    await tester.pumpAndSettle();
+    expect(server.calls('/ranking').last.queryParameters['by'], 'value');
+    expect(find.textContaining('Note pro Euro'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Soße'));
     await tester.tap(find.text('Soße'));
     await tester.pumpAndSettle();
     expect(server.calls('/ranking').last.queryParameters['by'], 'sauce');
     expect(find.text('Fleischerei Grill'), findsOneWidget);
+
+    await tester.tap(find.text('Halal'));
+    await tester.pumpAndSettle();
+    expect(server.calls('/ranking').last.queryParameters, allOf(containsPair('by', 'sauce'), containsPair('halal', 'true')));
   });
 
   testWidgets('vegans rank by vegan food and miss the places without any', (tester) async {

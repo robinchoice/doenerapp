@@ -205,7 +205,7 @@ void main() {
     expect(legacy.ingredients, [Ingredient.roteZwiebel]);
     expect(legacy.meats, [Meat.kalb], reason: 'older apps send one meat');
     expect(UpsertReviewRequest.fromJson(const {}).meats, isNull);
-    expect(() => UpsertReviewRequest.fromJson({'items': {'zwiebel': 3}}), throwsArgumentError);
+    expect(UpsertReviewRequest.fromJson({'newerRatings': {'zwiebel': 3}}).ratings, isEmpty, reason: 'items of later builds are skipped');
   });
 
   test('salad and price stay out of what older apps read', () {
@@ -224,6 +224,49 @@ void main() {
     final summaryBack = PlaceSummaryDto.fromJson(summaryJson);
     expect(summaryBack.items.keys, {RatingItem.salat, RatingItem.ayran});
     expect(summaryBack.price, 700);
+  });
+
+  test('size and halal stay out of what apps up to 1.0.9 read', () {
+    const request = UpsertReviewRequest(ratings: {RatingItem.sauce: 4, RatingItem.salat: 3.5, RatingItem.groesse: 4.5}, halal: true);
+    final json = request.toJson();
+    expect((json['ratings'] as Map).keys, ['sauce']);
+    expect(json['newRatings'], {'salat': 3.5}, reason: 'apps up to 1.0.9 fail on unknown names here too');
+    expect(json['newerRatings'], {'groesse': 4.5});
+    expect(json['items'], isEmpty);
+    final back = UpsertReviewRequest.fromJson(json);
+    expect(back.ratings, request.ratings);
+    expect(back.halal, isTrue);
+
+    const summary = PlaceSummaryDto(items: {RatingItem.groesse: ItemAverage(4, 2), RatingItem.salat: ItemAverage(3, 1)}, halal: false);
+    final summaryJson = summary.toJson();
+    expect((summaryJson['items'] as Map).keys, isEmpty);
+    expect((summaryJson['newItems'] as Map).keys, ['salat']);
+    expect((summaryJson['newerItems'] as Map).keys, ['groesse']);
+    final summaryBack = PlaceSummaryDto.fromJson(summaryJson);
+    expect(summaryBack.items.keys.toSet(), {RatingItem.groesse, RatingItem.salat});
+    expect(summaryBack.halal, isFalse);
+  });
+
+  test('the size alone is no score', () {
+    expect(Diet.all.headline({RatingItem.groesse: 5}), isNull);
+    expect(Diet.all.headline({RatingItem.groesse: 5, RatingItem.sauce: 3}), 3);
+    expect(Diet.vegan.headline({RatingItem.groesse: 5, RatingItem.brot: 4}), 4);
+  });
+
+  test('rankings per euro have keys of their own', () {
+    expect([for (final d in Diet.values) RankBy.value(d).key], ['value', 'vegetarianValue', 'veganValue']);
+    for (final key in RankBy.keys) {
+      expect(RankBy.parse(key)!.key, key);
+    }
+    expect(RankBy.parse('value'), isNot(RankBy.overall));
+    expect(RankBy.parse('value')!.label, 'Preis-Leistung');
+    for (final diet in Diet.values) {
+      expect(RankBy.forDiet(diet).take(2), [diet == Diet.all ? RankBy.overall : RankBy.score(diet), RankBy.value(diet)]);
+    }
+    const ranking = RankingDto(by: RankBy.value(Diet.vegan), entries: [], cityPrice: 750, cityPriceReports: 6);
+    final back = RankingDto.fromJson(ranking.toJson());
+    expect((back.by, back.cityPrice, back.cityPriceReports), (const RankBy.value(Diet.vegan), 750, 6));
+    expect(RankingDto.fromJson(const {'by': 'overall', 'entries': []}).cityPriceReports, 0, reason: 'older servers');
   });
 
   test('account settings default for profiles cached by older builds', () {

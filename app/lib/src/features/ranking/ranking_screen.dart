@@ -37,15 +37,25 @@ class _RankingScreenState extends State<RankingScreen> {
   String? _visiting;
   int? _maxPrice;
   Ingredient? _ingredient;
+  bool _halal = false;
+  bool _homemadeSkewer = false;
 
   void _load() {
     final location = context.read<LocationService>();
     final center = _center = location.center;
     _visiting = location.visiting?.name;
-    _ranking = context
-        .read<AppData>()
-        .ranking(center.latitude, center.longitude, _by!, city: location.visiting?.name, maxPrice: _maxPrice, ingredient: _ingredient);
+    _ranking = context.read<AppData>().ranking(center.latitude, center.longitude, _by!,
+        city: location.visiting?.name,
+        maxPrice: _maxPrice,
+        ingredient: _ingredient,
+        halal: _halal,
+        skewer: _homemadeSkewer ? Skewer.homemade : null);
   }
+
+  void _filter(VoidCallback change) => setState(() {
+        change();
+        _load();
+      });
 
   Future<void> _pickIngredient() async {
     final picked = await showAppSheet<(Ingredient?,)>(context, (_) => _IngredientPicker(selected: _ingredient));
@@ -57,10 +67,12 @@ class _RankingScreenState extends State<RankingScreen> {
   }
 
   static String _hint(RankBy by) => switch (by) {
+        RankBy(perPrice: true) => 'Note pro Euro des üblichen Preises, nur Läden mit Preisangaben',
         RankBy(diet: Diet.all) => 'Durchschnitt aus Soße, Fleisch, Salat und Brot',
         RankBy(diet: Diet.vegetarian) => 'Falafel, Halloumi und veganer Döner mit Soße, Salat und Brot',
         RankBy(diet: Diet.vegan) => 'Falafel, veganer Döner, vegane Soße und Hummus mit Salat und Brot',
         RankBy(item: RatingItem.ayran) => 'Nur selbstgemachter Ayran',
+        RankBy(item: RatingItem.groesse) => 'Wie satt der Döner macht, zählt nicht in die Gesamtnote',
         _ => '',
       };
 
@@ -73,6 +85,8 @@ class _RankingScreenState extends State<RankingScreen> {
     if (diet != _diet) {
       _diet = diet;
       _by = RankBy.forDiet(diet).first;
+      _halal = false;
+      _homemadeSkewer = false;
       _ranking = null;
     }
     final by = _by!;
@@ -154,17 +168,33 @@ class _RankingScreenState extends State<RankingScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilterChip(
-                    avatar: const Text('🧅'),
-                    label: Text(_ingredient == null ? 'Jede Zutat' : 'Mit ${_ingredient!.label}'),
-                    selected: _ingredient != null,
-                    showCheckmark: false,
-                    onSelected: (_) => _pickIngredient(),
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    FilterChip(
+                      avatar: const Text('🧅'),
+                      label: Text(_ingredient == null ? 'Jede Zutat' : 'Mit ${_ingredient!.label}'),
+                      selected: _ingredient != null,
+                      showCheckmark: false,
+                      onSelected: (_) => _pickIngredient(),
+                    ),
+                    // Both are about the meat.
+                    if (diet == Diet.all) ...[
+                      FilterChip(
+                        label: const Text('Halal'),
+                        selected: _halal,
+                        onSelected: (on) => _filter(() => _halal = on),
+                      ),
+                      FilterChip(
+                        label: const Text('Selbst gesteckter Spieß'),
+                        selected: _homemadeSkewer,
+                        onSelected: (on) => _filter(() => _homemadeSkewer = on),
+                      ),
+                    ],
+                  ],
                 ),
-                if (_hint(by).isNotEmpty || _maxPrice != null || _ingredient != null)
+                if (_hint(by).isNotEmpty || _maxPrice != null || _ingredient != null || _halal || _homemadeSkewer)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
@@ -172,6 +202,8 @@ class _RankingScreenState extends State<RankingScreen> {
                         if (_hint(by).isNotEmpty) _hint(by),
                         if (_maxPrice != null) 'Nur Läden, deren Döner laut Bewertungen meist höchstens ${formatPrice(_maxPrice!)} kostet',
                         if (_ingredient case final i?) 'Nur Läden, bei denen die meisten Experten ${i.label} im Döner hatten',
+                        if (_halal) 'Nur Läden, deren Fleisch laut den meisten Bewertungen halal ist',
+                        if (_homemadeSkewer) 'Nur Läden, deren Spieß laut den meisten Experten selbst gesteckt ist',
                       ].join(' · '),
                       style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12),
                     ),
@@ -225,6 +257,24 @@ class _RankingScreenState extends State<RankingScreen> {
                       child: const Text('Jeder Preis'),
                     ),
                   )
+                else if (entries.isEmpty && (_halal || _homemadeSkewer))
+                  EmptyState(
+                    icon: Icons.search_off,
+                    title: 'Nichts gefunden',
+                    message: _halal
+                        ? 'Ob das Fleisch halal ist, kommt aus den Bewertungen. Sag beim nächsten Döner, was du weißt.'
+                        : 'Den Spieß tragen Experten in ihre Bewertungen ein. Schalt den Expertenmodus in den Einstellungen ein.',
+                    action: OutlinedButton(
+                      onPressed: () => _filter(() => _halal = _homemadeSkewer = false),
+                      child: const Text('Alle Läden'),
+                    ),
+                  )
+                else if (entries.isEmpty && by.perPrice)
+                  EmptyState(
+                    icon: Icons.euro,
+                    title: 'Noch keine Preise in $city',
+                    message: 'Preis-Leistung braucht Preise. Trag beim nächsten Döner ein, was du bezahlt hast.',
+                  )
                 else if (entries.isEmpty)
                   EmptyState(
                     icon: Icons.emoji_events_outlined,
@@ -247,6 +297,14 @@ class _RankingScreenState extends State<RankingScreen> {
                       child: Text(
                         'Am 1. Januar erscheint die Bestenliste ${DateTime.now().year} für $city: Läden mit mindestens '
                         '$bestOfMinReviews Bewertungen aus diesem Jahr.',
+                        style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12.5),
+                      ),
+                    ),
+                  if (ranking.cityPrice case final price?)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '💶 Ein Döner kostet in $city meist ${formatPrice(price)} (aus ${ranking.cityPriceReports} Preisangaben)',
                         style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12.5),
                       ),
                     ),

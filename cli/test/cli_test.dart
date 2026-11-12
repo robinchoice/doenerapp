@@ -258,6 +258,10 @@ void main() {
     expect(again.json['review']['ratings'], {'sauce': 4.5, 'fleisch': 4.0});
     expect(again.json['review']['newRatings'], {'salat': 3.0});
     expect([again.json['review']['price'], again.json['review']['text'], again.json['review']['meats']], [750, 'Lecker', ['kalb']]);
+    final halal = await ali.cli(['review', '--place', 'cli-rank', '--rate', 'groesse=4', '--halal', 'ja', '--json']);
+    expect([halal.json['review']['newerRatings'], halal.json['review']['halal']], [{'groesse': 4.0}, true]);
+    final kept = await ali.cli(['review', '--place', 'cli-rank', '--rate', 'pizza=4', '--json']);
+    expect([kept.json['review']['newerRatings'], kept.json['review']['halal']], [{'groesse': 4.0}, true], reason: 'unnamed answers stay');
 
     final feed = await ben.cli(['feed', '--json']);
     expect(feed.code, Exit.ok);
@@ -286,6 +290,10 @@ void main() {
     expect([for (final entry in sauce.json['entries']) entry['place']['placeId']], ['cli-rank']);
     expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--max-price', '5'])).out, 'Freiburg, Gesamt: noch keine Läden.');
     expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--ingredient', 'roteZwiebel'])).out, 'Freiburg, Gesamt: noch keine Läden.');
+    expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--halal'])).out, startsWith('Freiburg, Gesamt:\n 1. Grill Eck'));
+    expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--skewer', 'homemade'])).out, 'Freiburg, Gesamt: noch keine Läden.');
+    expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--by', 'value'])).out, startsWith('Freiburg, Preis-Leistung:\n 1. Grill Eck'));
+    expect((await ben.cli(['ranking', '--lat', '47.99', '--lon', '7.84', '--by', 'groesse'])).out, startsWith('Freiburg, Größe:\n 1. Grill Eck – 4,0'));
 
     expect((await ben.cli(['unfriend', '--user', aliUser['id']])).out, 'Freundschaft mit $aliName beendet.');
     expect((await ali.cli(['friends'])).out, 'Noch keine Freunde.');

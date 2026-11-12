@@ -52,6 +52,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
   late final _extras = {for (final item in RatingItem.extraItems) if (_ratings.containsKey(item)) item};
   late _Answer? _vegan = _answer(_existing?.veganOptions);
   late _Answer? _ayran = _answer(_existing?.ayranHomemade);
+  late _Answer? _halal = _answer(_existing?.halal);
   late final _ingredients = <Ingredient>{...?(_existing?.ingredients ?? widget.summary?.ingredients)};
   late final _meats = <Meat>{...?(_existing?.meats ?? widget.summary?.meats)};
   late Skewer? _skewer = _existing?.skewer ?? widget.summary?.skewer;
@@ -88,6 +89,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
           _cents != null ||
       _bool(_vegan) != null ||
       _bool(_ayran) != null ||
+      _bool(_halal) != null ||
       _expertTouched ||
           _hasPhoto ||
           Validation.clean(_text.text) != null);
@@ -164,6 +166,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
             ratings: Map.of(_ratings),
             veganOptions: _bool(_vegan),
             ayranHomemade: _bool(_ayran),
+            halal: _bool(_halal),
             price: _cents,
             // Without expert mode, earlier answers stay as they were.
             ingredients: _expertTouched ? (_ingredients.toList()..sort((a, b) => a.index.compareTo(b.index))) : _existing?.ingredients,
@@ -221,7 +224,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
                 ChoiceChip(label: Text(label), selected: value == answer, onSelected: (on) => onChanged(on ? answer : null)),
             ],
           ),
-          if (value == _Answer.yes) ...[
+          if (value == _Answer.yes && items.isNotEmpty) ...[
             const SizedBox(height: 4),
             for (final item in items) _row(item),
             Text('Nur bewerten, was du probiert hast. „Ja“ allein hilft auch.',
@@ -339,6 +342,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
                 ],
               ),
               const Divider(height: 20),
+              _row(RatingItem.groesse),
               Row(
                 children: [
                   const Expanded(child: Text('💶 Was hast du bezahlt?')),
@@ -397,6 +401,10 @@ class _ReviewSheetState extends State<ReviewSheet> {
           _question('🌱 Vegane Optionen?', _vegan, _answerVegan, RatingItem.veganItems),
           const SizedBox(height: 12),
           _question('🥛 Selbstgemachter Ayran?', _ayran, _answerAyran, const [RatingItem.ayran]),
+        ],
+        if (_diet == Diet.all) ...[
+          const SizedBox(height: 12),
+          _question('Fleisch halal?', _halal, (answer) => setState(() => _halal = answer), const []),
         ],
         if (_expert) ...[const SizedBox(height: 12), _expertCard()],
         const SizedBox(height: 16),

@@ -448,6 +448,10 @@ final migrations = <List<String>>[
     // Photos stored before uploads lost their metadata get stripped once (stripStoredPhotos).
     "INSERT INTO schedules (name, next_run_at) VALUES ('photo_metadata', now())",
   ],
+  [
+    // Whether the meat is halal, as far as the reviewer knows; per place the majority counts.
+    'ALTER TABLE reviews ADD COLUMN halal boolean',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

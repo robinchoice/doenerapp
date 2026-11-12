@@ -1314,6 +1314,54 @@ void main() {
       expect((await call('GET', '/ranking?lat=52&lon=8&maxPrice=billig', token: ute)).$1, 400);
     });
 
+    test('size, value for money, halal and skewer rank on their own, the city has a usual price', () async {
+      final (paula, _) = await signUp('paula@example.org', 'Paula');
+      final (quin, _) = await signUp('quin@example.org', 'Quin');
+      await place('t-big', 'Groß Kebap', 53.0, 'Preisstadt');
+      await place('t-cheap', 'Billig Kebap', 53.0, 'Preisstadt');
+      await place('t-none', 'Ohne Preis Kebap', 53.0, 'Preisstadt');
+      await review(ute, 't-big', {'sauceRating': 5, 'fleischRating': 5, 'newerRatings': {'groesse': 5}, 'price': 900, 'halal': true, 'skewer': 'homemade'});
+      await review(vic, 't-big', {'sauceRating': 5, 'newerRatings': {'groesse': 4}, 'price': 1000, 'halal': true, 'skewer': 'homemade'});
+      await review(wim, 't-big', {'sauceRating': 4, 'halal': false});
+      await review(ute, 't-cheap', {'sauceRating': 4, 'fleischRating': 4, 'newerRatings': {'groesse': 2}, 'price': 500, 'skewer': 'industrial'});
+      await review(vic, 't-cheap', {'sauceRating': 4, 'price': 500, 'halal': false});
+      await review(paula, 't-none', {'sauceRating': 5, 'fleischRating': 5});
+
+      final (_, mine) = await call('GET', '/me/reviews', token: ute);
+      final big = (mine as List).map((r) => ReviewDto.fromJson(r as Map<String, dynamic>)).firstWhere((r) => r.placeId == 't-big');
+      expect((big.ratings[RatingItem.groesse], big.halal, big.rating), (5, true, 5), reason: 'the size counts for no score');
+      expect((mine.firstWhere((r) => r['placeId'] == 't-big')['ratings'] as Map).containsKey('groesse'), isFalse,
+          reason: 'apps up to 1.0.9 fail on unknown items');
+
+      final (_, body) = await call('GET', '/places/t-big/summary');
+      final summary = PlaceSummaryDto.fromJson(body as Map<String, dynamic>);
+      expect((summary.items[RatingItem.groesse]!.average, summary.halal, summary.skewer), (4.5, true, Skewer.homemade));
+
+      Future<RankingDto> ranking(String query) async {
+        final (status, body) = await call('GET', '/ranking?lat=53&lon=8&city=Preisstadt&$query', token: ute);
+        expect(status, 200, reason: '$body');
+        return RankingDto.fromJson(body as Map<String, dynamic>);
+      }
+
+      List<String> ids(RankingDto r) => [for (final e in r.entries) e.place.placeId];
+      expect(ids(await ranking('by=overall')), ['t-none', 't-big', 't-cheap']);
+      expect(ids(await ranking('by=groesse')), ['t-big', 't-cheap']);
+      final value = await ranking('by=value');
+      expect(ids(value), ['t-cheap', 't-big'], reason: 'per euro, without the place nobody paid at');
+      expect(value.by, const RankBy.value(Diet.all));
+      expect(ids(await ranking('halal=true')), ['t-big']);
+      expect(ids(await ranking('skewer=homemade')), ['t-big']);
+      expect(ids(await ranking('skewer=industrial')), ['t-cheap']);
+      expect((await call('GET', '/ranking?lat=53&lon=8&halal=ja', token: ute)).$1, 400);
+      expect((await call('GET', '/ranking?lat=53&lon=8&skewer=dreh', token: ute)).$1, 400);
+
+      final few = await ranking('by=overall');
+      expect((few.cityPrice, few.cityPriceReports), (null, 4), reason: 'not shown below $cityPriceMinReports prices');
+      await review(quin, 't-cheap', {'price': 600});
+      final enough = await ranking('by=overall');
+      expect((enough.cityPrice, enough.cityPriceReports), (600, 5), reason: 'median of 5, 5, 6, 9 and 10 €');
+    });
+
     test('ranking by an ingredient most experts got', () async {
       await place('t-onion', 'Zwiebel Kebap', 52.0, 'Zwiebelstadt');
       await place('t-plain', 'Ohne Kebap', 52.0, 'Zwiebelstadt');
@@ -1969,7 +2017,8 @@ void main() {
     await db.execute('UPDATE reviews SET meat = meats[1]');
     await db.execute('ALTER TABLE reviews DROP COLUMN meats');
     await db.execute("DELETE FROM schedules WHERE name = 'photo_metadata'");
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 8 FROM schema_migrations)');
+    await db.execute('ALTER TABLE reviews DROP COLUMN halal');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 9 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

@@ -55,12 +55,16 @@ enum Diet {
   /// The score a review shows to someone with this diet — only from food the
   /// diet eats: the own main score, else a stricter diet's one, else the
   /// average of the fitting dishes (drinks only when nothing else is rated).
+  /// The size alone is no score.
   double? headline(Map<RatingItem, double> ratings) {
     for (final diet in Diet.values.skip(index)) {
       final value = diet.score(ratings);
       if (value != null) return value;
     }
-    final fitting = {for (final e in ratings.entries) if (allows(e.key.diet)) e.key: e.value};
+    final fitting = {
+      for (final e in ratings.entries)
+        if (allows(e.key.diet) && !RatingItem.sideItems.contains(e.key)) e.key: e.value,
+    };
     final dishes = [for (final e in fitting.entries) if (e.key != RatingItem.ayran) e.value];
     final rest = dishes.isEmpty ? fitting.values.toList() : dishes;
     return rest.isEmpty ? null : rest.reduce((a, b) => a + b) / rest.length;
@@ -83,7 +87,8 @@ enum RatingItem {
   veganDoener('Veganer Döner', '🌱', Diet.vegan, hint: 'Seitan oder Soja'),
   veganSauce('Vegane Soße', '🥣', Diet.vegan),
   hummus('Hummus', '🫘', Diet.vegan),
-  ayran('Ayran', '🥛', Diet.vegetarian, hint: 'selbstgemacht');
+  ayran('Ayran', '🥛', Diet.vegetarian, hint: 'selbstgemacht'),
+  groesse('Größe', '📏', Diet.vegan, hint: 'Satt geworden?');
 
   final String label;
   final String emoji;
@@ -102,6 +107,15 @@ enum RatingItem {
   /// Unknown to clients before 1.1, which fail on item names they don't know.
   /// The JSON carries these in keys of their own that those clients don't read.
   static const newItems = [salat];
+
+  /// Unknown to clients up to 1.0.9, which also fail on unknown names in the
+  /// keys of [newItems]. The JSON carries these in `newerRatings`/`newerItems`.
+  /// Clients since then skip names they don't know there, so every item added
+  /// from now on goes here.
+  static const newerItems = [groesse];
+
+  /// Rated on their own: not part of any main score.
+  static const sideItems = [groesse];
 
   /// "Was gab's noch?"
   static const extraItems = [falafel, halloumi, pizza, pide, lahmacun, seele];
@@ -189,53 +203,82 @@ enum Bread {
   const Bread(this.label);
 }
 
-/// What a ranking sorts by: a diet's main score or a single item. On the wire
-/// it is the item's name, `overall` for the Döner or the diet's name.
+/// What a ranking sorts by: a diet's main score, that score per euro of the
+/// usual price ([perPrice], "Preis-Leistung") or a single item. On the wire it
+/// is the item's name, `overall` for the Döner or the diet's name, with
+/// `Value` appended per euro (`value` for the Döner).
 class RankBy {
   final Diet? diet;
   final RatingItem? item;
-  const RankBy.score(Diet this.diet) : item = null;
-  const RankBy.item(RatingItem this.item) : diet = null;
+  final bool perPrice;
+  const RankBy.score(Diet this.diet)
+      : item = null,
+        perPrice = false;
+  const RankBy.value(Diet this.diet)
+      : item = null,
+        perPrice = true;
+  const RankBy.item(RatingItem this.item)
+      : diet = null,
+        perPrice = false;
 
   static const overall = RankBy.score(Diet.all);
 
-  String get key => item?.name ?? (diet == Diet.all ? 'overall' : diet!.name);
-  String get label => item?.label ?? diet!.scoreLabel;
+  String get key {
+    if (item case final item?) return item.name;
+    return switch ((diet!, perPrice)) {
+      (Diet.all, false) => 'overall',
+      (Diet.all, true) => 'value',
+      (final diet, false) => diet.name,
+      (final diet, true) => '${diet.name}Value',
+    };
+  }
+
+  String get label => item?.label ?? (perPrice ? 'Preis-Leistung' : diet!.scoreLabel);
 
   static RankBy? parse(String key) {
-    if (key == overall.key) return overall;
-    for (final diet in [Diet.vegetarian, Diet.vegan]) {
-      if (key == diet.name) return RankBy.score(diet);
+    for (final diet in Diet.values) {
+      for (final by in [RankBy.score(diet), RankBy.value(diet)]) {
+        if (key == by.key) return by;
+      }
     }
     final item = RatingItem.values.asNameMap()[key];
     return item == null ? null : RankBy.item(item);
   }
 
+  /// Every key [parse] knows.
+  static List<String> get keys => [
+        for (final diet in Diet.values) ...[RankBy.score(diet).key, RankBy.value(diet).key],
+        for (final item in RatingItem.values) item.name,
+      ];
+
   /// The rankings someone with [diet] gets to see, the main score first.
   static List<RankBy> forDiet(Diet diet) => switch (diet) {
         Diet.all => [
             overall,
-            for (final i in [RatingItem.sauce, RatingItem.fleisch, RatingItem.salat, RatingItem.brot, RatingItem.falafel, RatingItem.halloumi])
+            const RankBy.value(Diet.all),
+            for (final i in [RatingItem.sauce, RatingItem.fleisch, RatingItem.salat, RatingItem.brot, RatingItem.groesse, RatingItem.falafel, RatingItem.halloumi])
               RankBy.item(i),
             const RankBy.score(Diet.vegan),
             for (final i in [RatingItem.pizza, RatingItem.pide, RatingItem.lahmacun, RatingItem.seele, RatingItem.ayran]) RankBy.item(i),
           ],
         Diet.vegetarian => [
             const RankBy.score(Diet.vegetarian),
-            for (final i in [RatingItem.falafel, RatingItem.halloumi]) RankBy.item(i),
+            const RankBy.value(Diet.vegetarian),
+            for (final i in [RatingItem.falafel, RatingItem.halloumi, RatingItem.groesse]) RankBy.item(i),
             const RankBy.score(Diet.vegan),
             for (final i in [RatingItem.sauce, RatingItem.salat, RatingItem.brot, RatingItem.pizza, RatingItem.pide, RatingItem.seele, RatingItem.ayran])
               RankBy.item(i),
           ],
         Diet.vegan => [
             const RankBy.score(Diet.vegan),
-            for (final i in [RatingItem.veganDoener, RatingItem.falafel, RatingItem.hummus, RatingItem.veganSauce, RatingItem.salat, RatingItem.brot])
+            const RankBy.value(Diet.vegan),
+            for (final i in [RatingItem.veganDoener, RatingItem.falafel, RatingItem.hummus, RatingItem.veganSauce, RatingItem.salat, RatingItem.brot, RatingItem.groesse])
               RankBy.item(i),
           ],
       };
 
   @override
-  bool operator ==(Object other) => other is RankBy && other.diet == diet && other.item == item;
+  bool operator ==(Object other) => other is RankBy && other.diet == diet && other.item == item && other.perPrice == perPrice;
   @override
-  int get hashCode => Object.hash(diet, item);
+  int get hashCode => Object.hash(diet, item, perPrice);
 }

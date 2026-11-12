@@ -52,13 +52,30 @@ Future<(int, String)?> cityRank(Session db, Map<String, dynamic> place) async {
   return index < 0 ? null : (index + 1, city);
 }
 
+/// What a Döner usually costs in [city]: the median of the prices reported
+/// in the last 365 days (or in [year]) and how many there are. The median is
+/// null below [cityPriceMinReports].
+Future<(int?, int)> usualPrice(Session db, String city, {int? year}) async {
+  final row = await queryOne(
+    db,
+    'SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY r.price))::int AS price, count(*)::int AS n '
+    'FROM reviews r JOIN active_place_view pv ON pv.id = r.place_id WHERE pv.city = @city AND r.price IS NOT NULL AND '
+    "${year == null ? "r.updated_at > now() - interval '365 days'" : "extract(year FROM r.updated_at AT TIME ZONE 'Europe/Berlin') = @year"}",
+    {'city': city, 'year': ?year},
+  );
+  final n = row!['n'] as int;
+  return (n >= cityPriceMinReports ? row['price'] as int? : null, n);
+}
+
 void mountRanking(Router router, Deps deps) {
-  // GET /ranking?lat&lon&by[&city][&maxPrice][&ingredient] — the rated places
-  // of the city around lat/lon or of [city] (by their address), best first,
-  // with the friends who rated them. With maxPrice (cents) only places whose
-  // Döner mostly costs that much at most, with ingredient only those where at
-  // least half of the experts got it, as on the place; they keep their order
-  // from the full list.
+  // GET /ranking?lat&lon&by[&city][&maxPrice][&ingredient][&halal][&skewer] —
+  // the rated places of the city around lat/lon or of [city] (by their
+  // address), best first, with the friends who rated them. With maxPrice
+  // (cents) only places whose Döner mostly costs that much at most, with
+  // ingredient only those where at least half of the experts got it, with
+  // halal=true or skewer=<Skewer> only those where most reviewers said so, as
+  // on the place; they keep their order from the full list. Rankings per euro
+  // (Preis-Leistung) only hold places with prices.
   router.get('/ranking', (Request request) async {
     final me = await requireUser(deps, request);
     final lat = queryDouble(request, 'lat');
@@ -71,13 +88,21 @@ void mountRanking(Router router, Deps deps) {
     final ingredientParam = request.url.queryParameters['ingredient'];
     final ingredient = ingredientParam == null ? null : Ingredient.values.asNameMap()[ingredientParam];
     if (ingredientParam != null && ingredient == null) throw const ApiException.badRequest('Parameter "ingredient" ist ungültig');
+    final halal = switch (request.url.queryParameters['halal']) {
+      null => false,
+      'true' => true,
+      _ => throw const ApiException.badRequest('Parameter "halal" ist ungültig'),
+    };
+    final skewerParam = request.url.queryParameters['skewer'];
+    final skewer = skewerParam == null ? null : Skewer.values.asNameMap()[skewerParam];
+    if (skewerParam != null && skewer == null) throw const ApiException.badRequest('Parameter "skewer" ist ungültig');
     final ratings = _ratings(by);
     final itemParam = {if (by.item case final item? when !RatingItem.classicItems.contains(item)) 'item': item.name};
 
     final city = request.url.queryParameters['city'] ?? await nearestCity(deps.db, lat, lon);
     if (city == null) return json(RankingDto(by: by, entries: const []).toJson());
 
-    final rows = rankByWeight(await query(
+    final places = await query(
       deps.db,
       'SELECT pv.*, s.avg, s.n, pr.price FROM active_place_view pv JOIN ('
       '  SELECT place_id, avg(value)::float8 AS avg, count(*)::int AS n FROM ($ratings) x GROUP BY place_id'
@@ -87,9 +112,19 @@ void mountRanking(Router router, Deps deps) {
       ') pr ON pr.place_id = pv.id${ingredient == null ? '' : ' JOIN ('
           '  SELECT place_id FROM reviews WHERE ingredients IS NOT NULL GROUP BY place_id '
           '  HAVING 2 * count(*) FILTER (WHERE @ingredient:text = ANY(ingredients)) >= count(*)'
-          ') ing ON ing.place_id = pv.id'} WHERE pv.city = @city',
-      {'city': city, ...itemParam, 'ingredient': ?ingredient?.name},
-    )).where((r) => maxPrice == null || (r['price'] is int && r['price'] as int <= maxPrice)).take(_maxEntries).toList();
+          ') ing ON ing.place_id = pv.id'}${halal ? ' JOIN ('
+          '  SELECT place_id FROM reviews GROUP BY place_id '
+          '  HAVING count(*) FILTER (WHERE halal) > count(*) FILTER (WHERE NOT halal)'
+          ') hal ON hal.place_id = pv.id' : ''}${skewer == null ? '' : ' JOIN ('
+          '  SELECT place_id FROM reviews GROUP BY place_id '
+          '  HAVING count(*) FILTER (WHERE skewer = @skewer) > count(*) FILTER (WHERE skewer <> @skewer)'
+          ') sk ON sk.place_id = pv.id'} WHERE pv.city = @city',
+      {'city': city, ...itemParam, 'ingredient': ?ingredient?.name, 'skewer': ?skewer?.name},
+    );
+    final rows = rankByWeight([for (final r in places) if (!by.perPrice || r['price'] != null) r], perPrice: by.perPrice)
+        .where((r) => maxPrice == null || (r['price'] is int && r['price'] as int <= maxPrice))
+        .take(_maxEntries)
+        .toList();
 
     final friends = <String, List<FriendRatingDto>>{};
     if (rows.isNotEmpty) {
@@ -109,7 +144,8 @@ void mountRanking(Router router, Deps deps) {
     }
 
     final bestOf = await latestBestOf(deps.db, city, by.diet == Diet.vegan ? BestOfCategory.vegan : BestOfCategory.overall);
-    return json(RankingDto(city: city, by: by, bestOf: bestOf, entries: [
+    final (cityPrice, cityPriceReports) = await usualPrice(deps.db, city);
+    return json(RankingDto(city: city, by: by, bestOf: bestOf, cityPrice: cityPrice, cityPriceReports: cityPriceReports, entries: [
       for (final r in rows)
         RankingEntryDto(
           place: placeFromRow(r),

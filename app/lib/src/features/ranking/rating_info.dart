@@ -45,13 +45,16 @@ class _RatingInfo extends StatelessWidget {
         section(
           'Noten',
           'Bewertet wird von 1 bis 5 in halben Schritten. Die Döner-Note ist der Schnitt aus Soße, Fleisch, Salat und Brot. '
-              'Bei Vegetarisch und Vegan zählen eigene Noten, etwa für Falafel oder veganen Döner.',
+              'Bei Vegetarisch und Vegan zählen eigene Noten, etwa für Falafel oder veganen Döner. Die Größe zählt in keine Note, '
+              'sie hat ein eigenes Ranking.',
         ),
         section(
           'Ranking',
           'Verglichen werden die Läden einer Stadt. Damit eine einzelne 5 nicht viele gute Bewertungen überholt, startet '
               'jeder Laden mit $rankingPriorWeight gedachten Bewertungen in Höhe des Stadtschnitts. Angezeigt werden der echte '
-              'Schnitt und die Anzahl. Läden können sich keinen Platz kaufen.',
+              'Schnitt und die Anzahl. Läden können sich keinen Platz kaufen. Preis-Leistung teilt diese gewichtete Note durch '
+              'den üblichen Preis, also den Median der Preisangaben, und zeigt nur Läden mit Preisen. Ob ein Laden halal ist '
+              'oder seinen Spieß selbst steckt, sagt die Mehrheit der Bewertungen dazu. Geprüft wird das nicht.',
         ),
         section(
           'Bestenliste und Siegel',

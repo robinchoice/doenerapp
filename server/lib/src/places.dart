@@ -109,6 +109,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       ratings: ratingsFromRow(row),
       veganOptions: row['vegan_options'] as bool?,
       ayranHomemade: row['ayran_homemade'] as bool?,
+      halal: row['halal'] as bool?,
       price: row['price'] as int?,
       ingredients: (row['ingredients'] as List?)?.map((i) => Ingredient.values.byName(i as String)).toList(),
       meats: (row['meats'] as List?)?.map((m) => Meat.values.byName(m as String)).toList(),
@@ -354,6 +355,7 @@ void mountPlaces(Router router, Deps deps) {
     if (ratings.isEmpty &&
         veganOptions == null &&
         ayranHomemade == null &&
+        body.halal == null &&
         body.price == null &&
         body.ingredients == null &&
         meats.isEmpty &&
@@ -370,9 +372,9 @@ void mountPlaces(Router router, Deps deps) {
       final row = await queryOne(
         tx,
         'INSERT INTO reviews (user_id, place_id, rating, vegetarian_rating, vegan_rating, sauce_rating, fleisch_rating, '
-        'brot_rating, vegan_options, ayran_homemade, price, ingredients, meats, skewer, bread, text) '
+        'brot_rating, vegan_options, ayran_homemade, halal, price, ingredients, meats, skewer, bread, text) '
         'VALUES (@user:uuid, @place:uuid, @rating:float4, @vegetarian:float4, @vegan:float4, @sauce:float4, @fleisch:float4, '
-        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @price:int4, @ingredients:_text, @meats:_text, @skewer:text, @bread:text, @text) '
+        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @halal:boolean, @price:int4, @ingredients:_text, @meats:_text, @skewer:text, @bread:text, @text) '
         // Older reviews may only have an overall rating, without sauce, meat or
         // bread. It stays until the review rates the Döner itself.
         'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = CASE WHEN num_nonnulls(EXCLUDED.sauce_rating, '
@@ -380,7 +382,7 @@ void mountPlaces(Router router, Deps deps) {
         'THEN reviews.rating ELSE EXCLUDED.rating END, '
         'vegetarian_rating = EXCLUDED.vegetarian_rating, vegan_rating = EXCLUDED.vegan_rating, '
         'sauce_rating = EXCLUDED.sauce_rating, fleisch_rating = EXCLUDED.fleisch_rating, brot_rating = EXCLUDED.brot_rating, '
-        'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, price = EXCLUDED.price, '
+        'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, halal = EXCLUDED.halal, price = EXCLUDED.price, '
         'ingredients = EXCLUDED.ingredients, meats = EXCLUDED.meats, skewer = EXCLUDED.skewer, bread = EXCLUDED.bread, '
         'text = EXCLUDED.text, updated_at = now() RETURNING *',
         {
@@ -395,6 +397,7 @@ void mountPlaces(Router router, Deps deps) {
           'brot': ratings[RatingItem.brot],
           'veganOptions': veganOptions,
           'ayran': ayranHomemade,
+          'halal': body.halal,
           'price': body.price,
           'ingredients': body.ingredients?.map((i) => i.name).toList(),
           'meats': meats.isEmpty ? null : meats,
@@ -773,14 +776,18 @@ String distanceSql(String alias) =>
 
 /// Best first by [weightedRating]; rows need `avg` and `n` (review count).
 /// The mean is that of all reviews in [rows] — the area or city being ranked.
-List<Map<String, dynamic>> rankByWeight(List<Map<String, dynamic>> rows) {
+/// [perPrice] divides it by the usual price (`price`, cents, never null then).
+List<Map<String, dynamic>> rankByWeight(List<Map<String, dynamic>> rows, {bool perPrice = false}) {
   var total = 0.0;
   var count = 0;
   for (final r in rows) {
     total += (r['avg'] as double) * (r['n'] as int);
     count += r['n'] as int;
   }
-  final score = {for (final r in rows) r['id']: weightedRating(r['avg'] as double, r['n'] as int, total / count)};
+  final score = {
+    for (final r in rows)
+      r['id']: weightedRating(r['avg'] as double, r['n'] as int, total / count) / (perPrice ? r['price'] as int : 1),
+  };
 
   int compare(Map<String, dynamic> a, Map<String, dynamic> b) {
     final byScore = score[b['id']]!.compareTo(score[a['id']]!);
@@ -814,6 +821,7 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, {List<AwardDto> aw
         if (values[item] case final v?) item: ItemAverage(v.reduce((a, b) => a + b) / v.length, v.length),
     },
     ayranHomemade: plurality([for (final r in reviews) r['ayran_homemade'] as bool?]),
+    halal: plurality([for (final r in reviews) r['halal'] as bool?]),
     price: median([for (final r in reviews) ?r['price'] as int?]),
     // What at least half of the experts got.
     ingredients: [

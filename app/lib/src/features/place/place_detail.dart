@@ -112,6 +112,8 @@ class _PlaceDetailState extends State<PlaceDetail> {
     final friendIds = {for (final f in context.watch<Friends>().accepted) f.user.id};
     final others = _reviews.where((r) => r.userId != session.user?.id).toList()
       ..sort((a, b) => (friendIds.contains(a.userId) ? 0 : 1).compareTo(friendIds.contains(b.userId) ? 0 : 1));
+    // The newest first, as the server sends them.
+    final photos = [for (final r in _reviews) ?r.photoId];
 
     return ListView(
       controller: widget.controller,
@@ -146,6 +148,8 @@ class _PlaceDetailState extends State<PlaceDetail> {
                       if (place.veganOptions == false) _Fact('Nichts Veganes', theme.colorScheme.outline),
                       if (diet != Diet.vegan && summary?.ayranHomemade == true) _Fact('🥛 Ayran selbstgemacht', context.accent),
                       if (diet != Diet.vegan && summary?.ayranHomemade == false) _Fact('Ayran gekauft', theme.colorScheme.outline),
+                      if (diet == Diet.all && summary?.halal == true) _Fact('Halal laut Bewertungen', context.accent),
+                      if (diet == Diet.all && summary?.halal == false) _Fact('Nicht halal laut Bewertungen', theme.colorScheme.outline),
                       if (summary?.price case final price?) _Fact('💶 Meist ${formatPrice(price)}', theme.colorScheme.outline),
                       for (final special in summary?.specials ?? const <Ingredient>[]) _Fact('✨ ${special.label}', context.accent),
                     ]),
@@ -185,6 +189,18 @@ class _PlaceDetailState extends State<PlaceDetail> {
             _ActionButton(icon: Icons.directions, label: 'Route', onTap: () => _openRoute(place)),
           ],
         ),
+        if (photos.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 112,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photos.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => ReviewPhoto(photoId: photos[i], height: 112, width: 112),
+            ),
+          ),
+        ],
         if (ownReview != null) ...[
           const SizedBox(height: 20),
           SectionTitle(

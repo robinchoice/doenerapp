@@ -8,15 +8,26 @@ double? _doubleOrNull(Object? v) => (v as num?)?.toDouble();
 DateTime? _dateOrNull(Object? v) => v == null ? null : DateTime.parse(v as String);
 T? _enumOrNull<T extends Enum>(List<T> values, Object? name) => name == null ? null : values.byName(name as String);
 
+/// Skips names this build doesn't know, so later items can't break it.
 Map<RatingItem, T> _itemMap<T>(Object? json, T Function(Object? value) value) => {
-      for (final e in ((json as Map?) ?? const {}).entries) RatingItem.values.byName(e.key as String): value(e.value),
+      for (final e in ((json as Map?) ?? const {}).entries)
+        ?RatingItem.values.asNameMap()[e.key as String]: value(e.value),
     };
+
+/// Where the JSON carries [item]: shipped clients fail on names they don't know.
+enum _ItemKey { classic, newer, newest }
+
+_ItemKey _keyOf(RatingItem item) => RatingItem.newerItems.contains(item)
+    ? _ItemKey.newest
+    : RatingItem.newItems.contains(item)
+        ? _ItemKey.newer
+        : _ItemKey.classic;
 
 /// Ratings go in half steps. Shipped clients read whole numbers from
 /// `sauceRating`, `fleischRating`, `brotRating` and `items` (sauce, meat and
 /// bread as fields of their own, as before there were other items), so those
 /// carry rounded values and `ratings` the exact ones. [RatingItem.newItems]
-/// go in `newRatings`, see there.
+/// go in `newRatings`, [RatingItem.newerItems] in `newerRatings`, see there.
 /// {emoji: count} of [reactionEmojis], absent or empty when nobody reacted.
 Map<String, int> _reactionsFromJson(Object? j) => {
       if (j is Map)
@@ -35,6 +46,7 @@ Map<RatingItem, double> _ratingsFromJson(Json j) => {
               ..._itemMap(j['items'], (v) => (v as num).toDouble()),
             },
       ..._itemMap(j['newRatings'], (v) => (v as num).toDouble()),
+      ..._itemMap(j['newerRatings'], (v) => (v as num).toDouble()),
     };
 
 Json _ratingsToJson(Map<RatingItem, double> ratings) => {
@@ -43,10 +55,11 @@ Json _ratingsToJson(Map<RatingItem, double> ratings) => {
       'brotRating': ratings[RatingItem.brot]?.round(),
       'items': {
         for (final e in ratings.entries)
-          if (!RatingItem.classicItems.contains(e.key) && !RatingItem.newItems.contains(e.key)) e.key.name: e.value.round(),
+          if (!RatingItem.classicItems.contains(e.key) && _keyOf(e.key) == _ItemKey.classic) e.key.name: e.value.round(),
       },
-      'ratings': {for (final e in ratings.entries) if (!RatingItem.newItems.contains(e.key)) e.key.name: e.value},
-      'newRatings': {for (final e in ratings.entries) if (RatingItem.newItems.contains(e.key)) e.key.name: e.value},
+      'ratings': {for (final e in ratings.entries) if (_keyOf(e.key) == _ItemKey.classic) e.key.name: e.value},
+      'newRatings': {for (final e in ratings.entries) if (_keyOf(e.key) == _ItemKey.newer) e.key.name: e.value},
+      'newerRatings': {for (final e in ratings.entries) if (_keyOf(e.key) == _ItemKey.newest) e.key.name: e.value},
     };
 
 /// A score in half steps: `score` exact, `rating` rounded for shipped clients.
@@ -468,6 +481,7 @@ class PlaceSummaryDto {
 
   /// What most reviewers say — null if nobody did or it's a tie.
   final bool? ayranHomemade;
+  final bool? halal;
 
   /// Median of what reviewers paid for a Döner, in cents.
   final int? price;
@@ -487,6 +501,7 @@ class PlaceSummaryDto {
   const PlaceSummaryDto({
     this.items = const {},
     this.ayranHomemade,
+    this.halal,
     this.price,
     this.ingredients = const [],
     this.meats = const [],
@@ -502,8 +517,10 @@ class PlaceSummaryDto {
         items: {
           ..._itemMap(j['items'], (v) => ItemAverage.fromJson(v as Json)),
           ..._itemMap(j['newItems'], (v) => ItemAverage.fromJson(v as Json)),
+          ..._itemMap(j['newerItems'], (v) => ItemAverage.fromJson(v as Json)),
         },
         ayranHomemade: j['ayranHomemade'] as bool?,
+        halal: j['halal'] as bool?,
         price: j['price'] as int?,
         ingredients: _ingredientsFromJson(j) ?? const [],
         meats: _meatsFromJson(j) ?? const [],
@@ -515,9 +532,11 @@ class PlaceSummaryDto {
 
   Json toJson() => {
         // Shipped clients fail on items they don't know, see RatingItem.newItems.
-        'items': {for (final e in items.entries) if (!RatingItem.newItems.contains(e.key)) e.key.name: e.value.toJson()},
-        'newItems': {for (final e in items.entries) if (RatingItem.newItems.contains(e.key)) e.key.name: e.value.toJson()},
+        'items': {for (final e in items.entries) if (_keyOf(e.key) == _ItemKey.classic) e.key.name: e.value.toJson()},
+        'newItems': {for (final e in items.entries) if (_keyOf(e.key) == _ItemKey.newer) e.key.name: e.value.toJson()},
+        'newerItems': {for (final e in items.entries) if (_keyOf(e.key) == _ItemKey.newest) e.key.name: e.value.toJson()},
         'ayranHomemade': ayranHomemade,
+        'halal': halal,
         'price': price,
         ..._ingredientsToJson(ingredients),
         ..._meatsToJson(meats),
@@ -548,6 +567,9 @@ class ReviewDto {
   final Map<RatingItem, double> ratings;
   final bool? veganOptions;
   final bool? ayranHomemade;
+
+  /// Whether the meat is halal, as far as the reviewer knows.
+  final bool? halal;
 
   /// What the Döner cost, in cents.
   final int? price;
@@ -581,6 +603,7 @@ class ReviewDto {
     this.ratings = const {},
     this.veganOptions,
     this.ayranHomemade,
+    this.halal,
     this.price,
     this.ingredients,
     this.meats,
@@ -611,6 +634,7 @@ class ReviewDto {
         ratings: _ratingsFromJson(j),
         veganOptions: j['veganOptions'] as bool?,
         ayranHomemade: j['ayranHomemade'] as bool?,
+        halal: j['halal'] as bool?,
         price: j['price'] as int?,
         ingredients: _ingredientsFromJson(j),
         meats: _meatsFromJson(j),
@@ -638,6 +662,7 @@ class ReviewDto {
         ..._ratingsToJson(ratings),
         'veganOptions': veganOptions,
         'ayranHomemade': ayranHomemade,
+        'halal': halal,
         'price': price,
         ..._ingredientsToJson(ingredients),
         ..._meatsToJson(meats),
@@ -661,6 +686,9 @@ class UpsertReviewRequest {
   final bool? veganOptions;
   final bool? ayranHomemade;
 
+  /// Whether the meat is halal, as far as the reviewer knows.
+  final bool? halal;
+
   /// What the Döner cost, in cents.
   final int? price;
 
@@ -680,6 +708,7 @@ class UpsertReviewRequest {
     this.ratings = const {},
     this.veganOptions,
     this.ayranHomemade,
+    this.halal,
     this.price,
     this.ingredients,
     this.meats,
@@ -694,6 +723,7 @@ class UpsertReviewRequest {
         ratings: _ratingsFromJson(j),
         veganOptions: j['veganOptions'] as bool?,
         ayranHomemade: j['ayranHomemade'] as bool?,
+        halal: j['halal'] as bool?,
         price: j['price'] as int?,
         ingredients: _ingredientsFromJson(j),
         meats: _meatsFromJson(j),
@@ -708,6 +738,7 @@ class UpsertReviewRequest {
         ..._ratingsToJson(ratings),
         'veganOptions': veganOptions,
         'ayranHomemade': ayranHomemade,
+        'halal': halal,
         'price': price,
         ..._ingredientsToJson(ingredients),
         ..._meatsToJson(meats),
@@ -1007,13 +1038,20 @@ class RankingDto {
   /// The city's latest best-of list: vegan when ranking by the vegan score, else overall.
   final BestOfDto? bestOf;
 
-  const RankingDto({this.city, required this.by, required this.entries, this.bestOf});
+  /// What a Döner usually costs in [city]: the median of all prices reported
+  /// there, in cents, once there are [cityPriceMinReports] of them.
+  final int? cityPrice;
+  final int cityPriceReports;
+
+  const RankingDto({this.city, required this.by, required this.entries, this.bestOf, this.cityPrice, this.cityPriceReports = 0});
 
   factory RankingDto.fromJson(Json j) => RankingDto(
         city: j['city'] as String?,
         by: RankBy.parse(j['by'] as String) ?? (throw FormatException('Unknown ranking ${j['by']}')),
         entries: (j['entries'] as List).map((e) => RankingEntryDto.fromJson(e as Json)).toList(),
         bestOf: j['bestOf'] == null ? null : BestOfDto.fromJson(j['bestOf'] as Json),
+        cityPrice: j['cityPrice'] as int?,
+        cityPriceReports: j['cityPriceReports'] as int? ?? 0,
       );
 
   Json toJson() => {
@@ -1021,6 +1059,8 @@ class RankingDto {
         'by': by.key,
         'entries': entries.map((e) => e.toJson()).toList(),
         if (bestOf != null) 'bestOf': bestOf!.toJson(),
+        'cityPrice': cityPrice,
+        'cityPriceReports': cityPriceReports,
       };
 }
 

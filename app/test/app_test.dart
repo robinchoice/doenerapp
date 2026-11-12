@@ -41,6 +41,8 @@ Future<AppData> _openSheet(WidgetTester tester, AccountDto account, {PlaceSummar
 /// Scrolls the sheet to [finder] (its children are built lazily) and taps it.
 Future<void> _tapInSheet(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(finder, 200, scrollable: find.byType(Scrollable).last);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
@@ -108,7 +110,7 @@ void main() {
     );
 
     final empty = find.byIcon(Icons.restaurant_outlined);
-    expect(empty, findsNWidgets(25)); // Soße, Fleisch, Salat, Brot, Gesamt
+    expect(empty, findsNWidgets(30)); // Soße, Fleisch, Salat, Brot, Gesamt, Größe
     await tester.tap(empty.at(3)); // Soße: 4
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.restaurant_outlined).at(2)); // Fleisch: 2
@@ -172,18 +174,21 @@ void main() {
     await tester.tap(find.text('Halloumi'));
     await tester.pumpAndSettle();
     await _rate(tester, 'Halloumi', 5);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Ja').last);
+    await _rate(tester, 'Größe', 3);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Ja').at(1)); // vegan, ayran, halal
     await tester.pumpAndSettle();
     await _rate(tester, 'Ayran', 2);
     await tester.tap(find.widgetWithText(ChoiceChip, 'Nein').first);
     await tester.pumpAndSettle();
+    await _tapInSheet(tester, find.widgetWithText(ChoiceChip, 'Ja').last);
     await _tapInSheet(tester, find.text('Speichern'));
 
     final review = data.reviews['p1']!.dto;
-    expect(review.ratings, {RatingItem.sauce: 4, RatingItem.halloumi: 5, RatingItem.ayran: 2});
+    expect(review.ratings, {RatingItem.sauce: 4, RatingItem.halloumi: 5, RatingItem.ayran: 2, RatingItem.groesse: 3});
     expect(review.ayranHomemade, isTrue);
+    expect(review.halal, isTrue);
     expect(review.veganOptions, isFalse);
-    expect(review.rating, 4, reason: 'halloumi and ayran stay out of the Döner score');
+    expect(review.rating, 4, reason: 'halloumi, ayran and the size stay out of the Döner score');
     expect(review.ingredients, isNull, reason: 'not asked without expert mode');
   });
 

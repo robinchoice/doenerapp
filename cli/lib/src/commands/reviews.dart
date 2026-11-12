@@ -43,13 +43,15 @@ final reviews = <String, Command>{
     help: [
       ('review --place <placeId> --rate <punkt>=<1–5> …', 'Laden bewerten, ändert nur die genannten Angaben'),
       ('  [--price <euro>] [--text <text>]', 'Preis des Döners, Text'),
+      ('  [--halal ja|nein|unklar]', 'Ob das Fleisch halal ist, soweit du weißt'),
       ('  Punkte:', RatingItem.values.map((item) => item.name).join(', ')),
     ],
     options: (parser) => parser
       ..addOption('place')
       ..addMultiOption('rate', splitCommas: false)
       ..addOption('price')
-      ..addOption('text'),
+      ..addOption('text')
+      ..addOption('halal', allowed: ['ja', 'nein', 'unklar']),
     run: (ctx) async {
       requireLogin(ctx);
       final placeId = ctx.args.option('place') ?? (throw const Failure('--place <placeId> fehlt.', Exit.usage));
@@ -62,6 +64,12 @@ final reviews = <String, Command>{
         ratings: {...?previous?.ratings, ...ratings},
         veganOptions: previous?.veganOptions,
         ayranHomemade: previous?.ayranHomemade,
+        halal: switch (ctx.args.option('halal')) {
+          'ja' => true,
+          'nein' => false,
+          'unklar' => null,
+          _ => previous?.halal,
+        },
         price: centsOption(ctx, 'price') ?? previous?.price,
         ingredients: previous?.ingredients,
         meats: previous?.meats,

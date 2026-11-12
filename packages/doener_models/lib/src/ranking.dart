@@ -7,6 +7,9 @@ const rankingPriorWeight = 3;
 double weightedRating(double average, int count, double mean) =>
     (average * count + mean * rankingPriorWeight) / (count + rankingPriorWeight);
 
+/// A city's usual price shows once this many prices were reported there.
+const cityPriceMinReports = 5;
+
 /// The best-of list of a city ("Bestenliste"): reviews of one calendar year
 /// (Europe/Berlin), places with at least [bestOfMinReviews] of them, in the
 /// order of [weightedRating]. A city needs [bestOfMinPlaces] such places, the

@@ -36,7 +36,7 @@ Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Stan
 
 - Secret-Scan: Gitleaks 8.30.1 liest zusätzlich zu `--gitleaks-ignore-path` auch `.gitleaksignore` aus dem Checkout. `secrets.yml` ersetzt diese Datei deshalb ebenfalls durch die Fassung aus `CONFIG_REF`, bei Fork-PRs also aus dem Base-Commit.
 - Die Adresse `doener-api.pleasance.org` bleibt für ausgelieferte Mobile-Clients erhalten. API-Änderungen müssen mit ihnen kompatibel bleiben.
-- Ausgelieferte Builds bis 1.0.x scheitern an unbekannten Namen von Bewertungspunkten. Neue `RatingItem`s kommen deshalb in `RatingItem.newItems`, das JSON trägt sie getrennt (`newRatings`, `newItems`).
+- Ausgelieferte Builds bis 1.0.9 scheitern an unbekannten Namen von Bewertungspunkten, auch in `newRatings`/`newItems`. Neue `RatingItem`s kommen deshalb in `RatingItem.newerItems`, das JSON trägt sie in `newerRatings`/`newerItems`. Builds danach überspringen dort unbekannte Namen, die Liste reicht also für alle weiteren Punkte. Ältere Builds, die eine Bewertung bearbeiten, löschen deren neuere Punkte und Angaben wie `halal`, weil sie sie nicht mitschicken.
 - Google rechnet die Places-Suche nach den Feldern der Feldmaske ab. Ein Enterprise-Feld wie `regularOpeningHours` in `_searchFields` macht jede Suche teurer und schrumpft das Freikontingent von 5.000 auf 1.000 im Monat. Öffnungszeiten deshalb nur über Place Details (`_placeFields`). Die Tagesquoten im Google-Projekt (infra.md) passen zu `prefetchRequestsPerRun`, beide zusammen ändern.
 - Der Maps-JavaScript-Key der Web-Version (`GOOGLE_MAPS_WEB_KEY`) ist per Referrer auf die Domains beschränkt. Neue Domain: Referrer im Google-Projekt ergänzen.
 

@@ -439,7 +439,8 @@ class ReviewPhoto extends StatelessWidget {
   final String? photoId;
   final Uint8List? bytes;
   final double height;
-  const ReviewPhoto({super.key, this.photoId, this.bytes, this.height = 180});
+  final double width;
+  const ReviewPhoto({super.key, this.photoId, this.bytes, this.height = 180, this.width = double.infinity});
 
   @override
   Widget build(BuildContext context) {
@@ -457,7 +458,7 @@ class ReviewPhoto extends StatelessWidget {
         child: Image(
           image: image,
           height: height,
-          width: double.infinity,
+          width: width,
           fit: BoxFit.cover,
           errorBuilder: (context, _, _) => Container(
             height: height,

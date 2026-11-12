@@ -7,6 +7,7 @@ import 'package:shelf/shelf.dart';
 import 'agents.dart';
 import 'deps.dart';
 import 'places.dart' show rankByWeight;
+import 'ranking.dart' show usualPrice;
 
 const _scoreColumns = {BestOfCategory.overall: 'rating', BestOfCategory.vegan: 'vegan_rating'};
 const _escape = HtmlEscape();
@@ -120,6 +121,21 @@ Future<BestOfDto?> latestBestOf(Session db, String city, BestOfCategory category
 String _thousands(int n, {required bool english}) =>
     n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+$)'), (_) => english ? ',' : '.');
 
+String formatEuros(int cents, {required bool english}) {
+  final text = (cents / 100).toStringAsFixed(2);
+  return english ? '€$text' : '${text.replaceAll('.', ',')} €';
+}
+
+/// "A Döner mostly cost 7,50 € in Freiburg in 2026", or null without enough prices.
+Future<String?> usualPriceLine(Session db, String city, int year, {required bool english}) async {
+  final (price, reports) = await usualPrice(db, city, year: year);
+  if (price == null) return null;
+  final euros = formatEuros(price, english: english);
+  return english
+      ? 'A döner mostly cost $euros in $city in $year (median of $reports reported prices).'
+      : 'Ein Döner kostete $year in $city meist $euros (Median aus $reports Preisangaben).';
+}
+
 String formatScore(double value, {required bool english}) {
   final text = value.toStringAsFixed(1);
   return english ? text : text.replaceAll('.', ',');
@@ -197,6 +213,7 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
   final reviewCount = _thousands(overall.fold<int>(0, (sum, r) => sum + (r['count'] as int)), english: english);
   final otherYears = await query(deps.db, 'SELECT DISTINCT year FROM best_of WHERE city = @city AND year <> @year:int4 ORDER BY year DESC',
       {'city': city, 'year': year});
+  final priceLine = await usualPriceLine(deps.db, city, year, english: english);
   final title = t('Die besten Döner in $city $year', 'The best döner in $city $year');
   final top = [for (final r in overall.take(bestOfAwardedRanks)) '${r['rank']}. ${r['name']}'].join(' · ');
   final base = deps.config.publicBase(request.requestedUri);
@@ -217,6 +234,7 @@ Future<Response> bestOfPage(Deps deps, Request request, String slug, String year
   final body = '''<h1 class="display">${_escape.convert(title)}</h1>
 <div class="rule"></div>
 <p class="lead muted">${overall.isEmpty ? '' : t('In der Wertung: ${overall.length} Läden mit mindestens $bestOfMinReviews Bewertungen aus $year, zusammen $reviewCount.', 'Ranked: ${overall.length} shops with at least $bestOfMinReviews reviews from $year, $reviewCount in all.')}</p>
+${priceLine == null ? '' : '<p class="muted">${_escape.convert(priceLine)}</p>'}
 $sections
 <div class="method"><b>${t('So entsteht die Liste.', 'How the list is made.')}</b> ${t('Jede:r bewertet einmal pro Laden, eine neue Bewertung ersetzt die alte. Gezählt werden die Bewertungen aus $year, ein Laden braucht mindestens $bestOfMinReviews davon. Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit $rankingPriorWeight gedachten Bewertungen in Höhe des Stadtschnitts, so schlägt eine einzelne 5 nicht viele 4,5er. Angezeigt werden der echte Schnitt und die Anzahl. Ob jemand wirklich dort gegessen hat, prüfen wir nicht. Läden können sich keinen Platz kaufen. Zitate stammen aus Bewertungen, ohne Namen.', 'One review per person and shop; a new one replaces the old. Reviews from $year count, a shop needs at least $bestOfMinReviews of them. Sorted by weighted average: each shop starts with $rankingPriorWeight imagined reviews at the city average, so a single 5 can\'t beat many 4.5s. Shown are the real average and count. We don\'t check whether someone really ate there. Shops can\'t buy a place. Quotes come from reviews, without names.')}</div>
 <div class="ctas"><a class="btn btn-main" href="/app">${t('Selbst bewerten', 'Rate a shop')}</a><button class="btn btn-ghost" id="share" type="button">${t('Teilen', 'Share')}</button></div>
@@ -253,6 +271,7 @@ Future<List<PublicPage>> bestOfPublicPages(Session db, {required bool english}) 
     String line(Map<String, dynamic> r) => '${r['rank']}. ${r['name']}${r['address'] == null ? '' : ' – ${r['address']}'} · '
         '${t('Ø', 'Avg.')} ${formatScore(r['average'] as double, english: english)} · ${r['count']} ${t('Bewertungen', 'reviews')}';
     final top = [for (final r in of(BestOfCategory.overall).take(bestOfAwardedRanks)) '${r['rank']}. ${r['name']}'];
+    final priceLine = await usualPriceLine(db, city, year, english: english);
     pages.add((
       path: path,
       title: t('Die besten Döner in $city $year', 'The best döner in $city $year'),
@@ -262,6 +281,7 @@ Future<List<PublicPage>> bestOfPublicPages(Session db, {required bool english}) 
             'Angezeigt werden der echte Schnitt (Ø) und die Anzahl der Bewertungen.',
             'Shops with at least $bestOfMinReviews reviews from $year, sorted by weighted average. '
             'Shown are the real average (Avg.) and the number of reviews.'),
+        ?priceLine,
         for (final category in BestOfCategory.values)
           if (of(category).isNotEmpty)
             '## ${category == BestOfCategory.vegan ? 'Vegan' : t('Gesamt', 'Overall')}\n\n${of(category).map(line).join('\n')}',

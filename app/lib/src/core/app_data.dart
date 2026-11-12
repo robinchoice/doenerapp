@@ -143,7 +143,8 @@ class AppData extends ChangeNotifier {
     return news;
   }
 
-  Future<RankingDto> ranking(double lat, double lon, RankBy by, {String? city, int? maxPrice, Ingredient? ingredient}) async {
+  Future<RankingDto> ranking(double lat, double lon, RankBy by,
+      {String? city, int? maxPrice, Ingredient? ingredient, bool halal = false, Skewer? skewer}) async {
     final json = await _api.get('/ranking', query: {
       'lat': '$lat',
       'lon': '$lon',
@@ -151,6 +152,8 @@ class AppData extends ChangeNotifier {
       'city': ?city,
       if (maxPrice != null) 'maxPrice': '$maxPrice',
       'ingredient': ?ingredient?.name,
+      if (halal) 'halal': 'true',
+      'skewer': ?skewer?.name,
     });
     final ranking = RankingDto.fromJson(json as Map<String, dynamic>);
     await _storePlaces([for (final e in ranking.entries) e.place]);
@@ -280,6 +283,7 @@ class AppData extends ChangeNotifier {
       ratings: request.ratings,
       veganOptions: request.veganOptions,
       ayranHomemade: request.ayranHomemade,
+      halal: request.halal,
       price: request.price,
       ingredients: request.ingredients,
       meats: request.meats,

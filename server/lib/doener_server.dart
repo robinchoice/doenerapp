@@ -8,6 +8,7 @@ export 'src/db.dart' show openPool, migrate, runSchedule;
 export 'src/deps.dart' show Deps;
 export 'src/http.dart' show drain;
 export 'src/mailer.dart';
+export 'src/photo_metadata.dart' show stripStoredPhotos;
 export 'src/places.dart' show maintainPlaceCache;
 export 'src/prefetch.dart' show prefetchPlaces;
 export 'src/testflight.dart' show TestFlight;

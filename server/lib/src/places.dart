@@ -13,6 +13,7 @@ import 'deps.dart';
 import 'google_places.dart';
 import 'http.dart';
 import 'moderation.dart';
+import 'photo_metadata.dart';
 import 'push.dart';
 import 'social.dart';
 
@@ -862,5 +863,9 @@ T? plurality<T extends Object>(Iterable<T?> answers) {
   if (bytes.length > Validation.reviewPhotoMaxBytes) throw const ApiException(413, 'Foto zu groß');
   final type = Validation.photoType(bytes);
   if (type == null) throw const ApiException.badRequest('Foto muss JPEG, PNG oder WebP sein');
-  return (bytes: bytes, type: type);
+  try {
+    return (bytes: stripPhotoMetadata(bytes, type), type: type);
+  } on FormatException {
+    throw const ApiException.badRequest('Foto ist beschädigt');
+  }
 }

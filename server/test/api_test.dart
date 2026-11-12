@@ -1005,7 +1005,10 @@ void main() {
     });
 
     test('reviews carry a photo and tell who was there', () async {
-      final jpeg = [0xff, 0xd8, 0xff, 0xe0, 1, 2, 3];
+      // SOI, an EXIF segment (stands in for location and camera), a scan, EOI.
+      final exif = [0xff, 0xe1, 0x00, 0x0c, ...'Exif\x00\x00'.codeUnits, 1, 2, 3, 4];
+      final image = [0xff, 0xda, 0x00, 0x02, 9, 8, 7, 0xff, 0xd9];
+      final jpeg = [0xff, 0xd8, ...exif, ...image];
       final photo = base64.encode(jpeg);
       Future<(int, dynamic)> put(Map<String, dynamic> body) => call('PUT', '/places/place-kebap/review', body: body, token: bob);
       Future<ReviewDto> saved(Map<String, dynamic> body) async {
@@ -1021,7 +1024,7 @@ void main() {
       expect(response.statusCode, 200);
       expect(response.headers['content-type'], 'image/jpeg');
       expect(response.headers['cache-control'], contains('immutable'));
-      expect(await response.read().expand((chunk) => chunk).toList(), jpeg);
+      expect(await response.read().expand((chunk) => chunk).toList(), [0xff, 0xd8, ...image], reason: 'without metadata');
 
       expect((await saved({'sauceRating': 5})).photoId, first.photoId, reason: 'an edit without a photo keeps it');
       final replaced = await saved({'sauceRating': 5, 'photoBase64': photo});
@@ -1032,6 +1035,7 @@ void main() {
 
       expect((await put({'photoBase64': base64.encode([1, 2, 3])})).$1, 400, reason: 'not an image');
       expect((await put({'photoBase64': 'kein Base64!'})).$1, 400);
+      expect((await put({'photoBase64': base64.encode([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])})).$1, 400, reason: 'a broken JPEG');
       expect((await put({'photoBase64': base64.encode([...jpeg, ...List.filled(Validation.reviewPhotoMaxBytes, 0)])})).$1, 413);
 
       await call('POST', '/places/place-kebap/visits',
@@ -1047,6 +1051,15 @@ void main() {
       final item = FeedPage.fromJson(feed as Map<String, dynamic>).items.firstWhere((i) => i.type == FeedItemType.review);
       expect((item.photoId, item.onSite), (withCheckIn.photoId, true));
       expect((withCheckIn.regular, item.regular), (false, false));
+
+      // Photos stored before stripping lose their metadata once.
+      await db.execute(Sql.named('UPDATE review_photos SET data = @data:bytea WHERE id = @id:uuid'),
+          parameters: {'id': withCheckIn.photoId, 'data': jpeg});
+      await db.execute("INSERT INTO schedules (name, next_run_at) VALUES ('photo_metadata', now()) ON CONFLICT (name) DO NOTHING");
+      await stripStoredPhotos(db);
+      final stored = await db.execute(Sql.named('SELECT data FROM review_photos WHERE id = @id:uuid'), parameters: {'id': withCheckIn.photoId});
+      expect(stored.single.single, [0xff, 0xd8, ...image]);
+      expect(await db.execute("SELECT 1 FROM schedules WHERE name = 'photo_metadata'"), isEmpty, reason: 'it runs once');
 
       // Days count by when the server got the check-in: a backdated one or a second on the same day
       // doesn't make a regular, check-ins received on three days do.
@@ -1955,7 +1968,8 @@ void main() {
     await db.execute('ALTER TABLE reviews ADD COLUMN meat text');
     await db.execute('UPDATE reviews SET meat = meats[1]');
     await db.execute('ALTER TABLE reviews DROP COLUMN meats');
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 7 FROM schema_migrations)');
+    await db.execute("DELETE FROM schedules WHERE name = 'photo_metadata'");
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 8 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

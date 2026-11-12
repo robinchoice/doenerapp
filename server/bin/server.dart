@@ -101,6 +101,12 @@ Future<void> startServer() async {
       print('Best-of lists failed: $error');
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
+    try {
+      await runSchedule(db, 'photo_metadata', const Duration(days: 1), () => stripStoredPhotos(db));
+    } catch (error, stackTrace) {
+      print('Stripping stored photos failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
   }
   // One run at a time, so the shutdown knows which one to wait for.
   Future<void>? running;

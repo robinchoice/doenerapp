@@ -4,6 +4,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/google_places.dart';
 import 'package:doener_server/src/http.dart';
+import 'package:doener_server/src/photo_metadata.dart';
 import 'package:doener_server/src/places.dart';
 import 'package:doener_server/src/privacy.dart';
 import 'package:doener_server/src/social.dart';
@@ -276,5 +277,88 @@ void main() {
     expect(citySlug('Freiburg im Breisgau'), 'freiburg-im-breisgau');
     expect(citySlug('Göttingen'), 'goettingen');
     expect(citySlug(' Frankfurt (Oder) '), 'frankfurt-oder');
+  });
+
+  group('stripPhotoMetadata', () {
+    List<int> segment(int marker, List<int> payload) => [0xff, marker, (payload.length + 2) >> 8, (payload.length + 2) & 0xff, ...payload];
+    // Little-endian TIFF with GPS IFD pointer (0x8825) and orientation 6.
+    final tiff = [0x49, 0x49, 0x2a, 0, 8, 0, 0, 0, 2, 0, 0x25, 0x88, 4, 0, 1, 0, 0, 0, 40, 0, 0, 0, 0x12, 0x01, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    final scan = [...segment(0xda, [1, 2]), 5, 0xff, 0x00, 6, 0xff, 0xd3, 7];
+    final jpeg = [
+      0xff, 0xd8,
+      ...segment(0xe0, [...'JFIF\x00'.codeUnits, 1, 1]),
+      ...segment(0xe1, [...'Exif\x00\x00'.codeUnits, ...tiff]),
+      ...segment(0xe1, 'http://ns.adobe.com/xap/1.0/\x00<gps/>'.codeUnits),
+      ...segment(0xe2, [...'ICC_PROFILE\x00'.codeUnits, 1]),
+      ...segment(0xe2, [...'MPF\x00'.codeUnits, 1]),
+      ...segment(0xed, 'Photoshop 3.0\x00'.codeUnits),
+      ...segment(0xfe, 'comment'.codeUnits),
+      ...segment(0xdb, [0, 1, 2]),
+      ...scan,
+      ...segment(0xc4, [3]),
+      ...scan,
+      0xff, 0xd9,
+      0xff, 0xd8, 0xff, 0xe1, 0, 4, 1, 2, 0xff, 0xd9, // a second image after the first, as with Motion Photos
+    ];
+
+    test('keeps the image and its orientation in a JPEG, nothing else', () {
+      final stripped = stripPhotoMetadata(jpeg, 'image/jpeg');
+      expect(stripped, [
+        0xff, 0xd8,
+        ...segment(0xe0, [...'JFIF\x00'.codeUnits, 1, 1]),
+        ...segment(0xe1, [...'Exif\x00\x00'.codeUnits, 0x4d, 0x4d, 0, 0x2a, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0, 0, 0, 0, 0]),
+        ...segment(0xe2, [...'ICC_PROFILE\x00'.codeUnits, 1]),
+        ...segment(0xdb, [0, 1, 2]),
+        ...scan,
+        ...segment(0xc4, [3]),
+        ...scan,
+        0xff, 0xd9,
+      ]);
+      expect(stripPhotoMetadata(stripped, 'image/jpeg'), stripped, reason: 'stripping twice changes nothing');
+    });
+
+    test('drops an EXIF block without orientation completely', () {
+      final upright = [0xff, 0xd8, ...segment(0xe1, [...'Exif\x00\x00'.codeUnits, 0x4d, 0x4d, 0, 0x2a, 0, 0, 0, 8, 0, 0]), ...scan, 0xff, 0xd9];
+      expect(stripPhotoMetadata(upright, 'image/jpeg'), [0xff, 0xd8, ...scan, 0xff, 0xd9]);
+    });
+
+    test('rejects broken JPEGs', () {
+      expect(() => stripPhotoMetadata([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3], 'image/jpeg'), throwsFormatException);
+      expect(() => stripPhotoMetadata([0xff, 0xd8, ...scan], 'image/jpeg'), throwsFormatException, reason: 'no end');
+    });
+
+    List<int> chunk(String type, List<int> data) =>
+        [data.length >> 24, data.length >> 16 & 0xff, data.length >> 8 & 0xff, data.length & 0xff, ...type.codeUnits, ...data, 0, 0, 0, 0];
+
+    test('drops text, time and EXIF chunks from a PNG', () {
+      final signature = [0x89, ...'PNG\r\n\x1a\n'.codeUnits];
+      final png = [
+        ...signature,
+        ...chunk('IHDR', List.filled(13, 1)),
+        ...chunk('eXIf', [1, 2]),
+        ...chunk('tEXt', 'GPS\x0048.0'.codeUnits),
+        ...chunk('iTXt', [3]),
+        ...chunk('zTXt', [3]),
+        ...chunk('tIME', [3]),
+        ...chunk('IDAT', [4, 5]),
+        ...chunk('IEND', []),
+      ];
+      expect(stripPhotoMetadata(png, 'image/png'),
+          [...signature, ...chunk('IHDR', List.filled(13, 1)), ...chunk('IDAT', [4, 5]), ...chunk('IEND', [])]);
+    });
+
+    test('drops EXIF and XMP from a WebP and no longer announces them', () {
+      List<int> riffChunk(String fourcc, List<int> data) =>
+          [...fourcc.codeUnits, data.length & 0xff, data.length >> 8 & 0xff, 0, 0, ...data, if (data.length.isOdd) 0];
+      List<int> riff(List<int> body) =>
+          [...'RIFF'.codeUnits, (body.length + 4) & 0xff, (body.length + 4) >> 8 & 0xff, 0, 0, ...'WEBP'.codeUnits, ...body];
+      final webp = riff([
+        ...riffChunk('VP8X', [0x0c, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        ...riffChunk('VP8 ', [1, 2, 3]),
+        ...riffChunk('EXIF', [1, 2, 3, 4]),
+        ...riffChunk('XMP ', [5]),
+      ]);
+      expect(stripPhotoMetadata(webp, 'image/webp'), riff([...riffChunk('VP8X', List.filled(10, 0)), ...riffChunk('VP8 ', [1, 2, 3])]));
+    });
   });
 }

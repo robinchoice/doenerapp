@@ -444,6 +444,10 @@ final migrations = <List<String>>[
     'UPDATE reviews SET meats = ARRAY[meat] WHERE meat IS NOT NULL',
     'ALTER TABLE reviews DROP COLUMN meat',
   ],
+  [
+    // Photos stored before uploads lost their metadata get stripped once (stripStoredPhotos).
+    "INSERT INTO schedules (name, next_run_at) VALUES ('photo_metadata', now())",
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

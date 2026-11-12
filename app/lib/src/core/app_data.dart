@@ -282,7 +282,7 @@ class AppData extends ChangeNotifier {
       ayranHomemade: request.ayranHomemade,
       price: request.price,
       ingredients: request.ingredients,
-      meat: request.meat,
+      meats: request.meats,
       skewer: request.skewer,
       bread: request.bread,
       text: Validation.clean(request.text),

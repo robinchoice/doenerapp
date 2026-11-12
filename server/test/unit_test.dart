@@ -221,21 +221,21 @@ void main() {
 
   test('community summary of a place', () {
     expect(summarize(const []).items, isEmpty);
-    Map<String, dynamic> row({double? sauce, double? fleisch, Map<String, num>? items, bool? ayran, List<String>? ingredients, String? meat, String? bread}) => {
+    Map<String, dynamic> row({double? sauce, double? fleisch, Map<String, num>? items, bool? ayran, List<String>? ingredients, List<String>? meats, String? bread}) => {
           'sauce_rating': sauce,
           'fleisch_rating': fleisch,
           'brot_rating': null,
           'items': items,
           'ayran_homemade': ayran,
           'ingredients': ingredients,
-          'meat': meat,
+          'meats': meats,
           'skewer': null,
           'bread': bread,
         };
     final summary = summarize([
-      row(sauce: 5, fleisch: 3, items: {'ayran': 5}, ayran: true, ingredients: ['tomate', 'mais', 'granatapfel'], meat: 'kalb', bread: 'homemade'),
-      row(sauce: 4, ayran: false, ingredients: ['tomate', 'mais'], meat: 'kalb'),
-      row(items: {'falafel': 4}, meat: 'rind'),
+      row(sauce: 5, fleisch: 3, items: {'ayran': 5}, ayran: true, ingredients: ['tomate', 'mais', 'granatapfel'], meats: ['kalb', 'haehnchen'], bread: 'homemade'),
+      row(sauce: 4, ayran: false, ingredients: ['tomate', 'mais'], meats: ['kalb']),
+      row(items: {'falafel': 4}, meats: ['rind']),
     ]);
     expect(summary.items[RatingItem.sauce]!.average, 4.5);
     expect(summary.items[RatingItem.sauce]!.count, 2);
@@ -245,7 +245,7 @@ void main() {
     expect(summary.experts, 2);
     expect(summary.ingredients, [Ingredient.tomate, Ingredient.mais, Ingredient.granatapfel], reason: 'half of the experts is enough');
     expect(summary.specials, [Ingredient.mais, Ingredient.granatapfel]);
-    expect(summary.meat, Meat.kalb);
+    expect(summary.meats, [Meat.kalb], reason: 'only Kalb is named by at least half');
     expect(summary.bread, Bread.homemade);
   });
 

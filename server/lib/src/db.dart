@@ -438,6 +438,12 @@ final migrations = <List<String>>[
     'ALTER TABLE push_events ADD COLUMN source_id uuid',
     'CREATE UNIQUE INDEX push_events_source ON push_events (user_id, type, source_id)',
   ],
+  [
+    // Several meats per review (tester feedback of 12.11.2026).
+    'ALTER TABLE reviews ADD COLUMN meats text[]',
+    'UPDATE reviews SET meats = ARRAY[meat] WHERE meat IS NOT NULL',
+    'ALTER TABLE reviews DROP COLUMN meat',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

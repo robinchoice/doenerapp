@@ -410,8 +410,8 @@ class _IngredientsCard extends StatelessWidget {
       for (final group in IngredientGroup.values)
         if (summary.ingredients.where((i) => i.group == group).toList() case final list when list.isNotEmpty)
           (group.label, list.map((i) => i.isSpecial ? '${i.label} ✨' : i.label).join(' · ')),
-      if (diet == Diet.all && (summary.meat != null || summary.skewer != null))
-        ('Fleisch', [?summary.meat?.label, ?summary.skewer?.label].join(' · ')),
+      if (diet == Diet.all && (summary.meats.isNotEmpty || summary.skewer != null))
+        ('Fleisch', [...summary.meats.map((m) => m.label), ?summary.skewer?.label].join(' · ')),
       if (summary.bread case final bread?) ('Brot', bread.label),
     ];
     return GlassCard(

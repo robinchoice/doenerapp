@@ -66,6 +66,18 @@ Json _ingredientsToJson(List<Ingredient>? ingredients) => {
         'newIngredients': [for (final i in news) i.name],
     };
 
+/// Null if the reviewer said nothing about the meat. Shipped builds up to
+/// 1.0.x only read and send the single `meat`, which stays next to `meats`.
+List<Meat>? _meatsFromJson(Json j) => switch (j['meats']) {
+      final List names => [for (final name in names) Meat.values.byName(name as String)],
+      _ => switch (_enumOrNull(Meat.values, j['meat'])) { final meat? => [meat], null => null },
+    };
+
+Json _meatsToJson(List<Meat>? meats) => {
+      'meat': meats?.firstOrNull?.name,
+      'meats': meats?.map((m) => m.name).toList(),
+    };
+
 // MARK: - Auth
 
 /// [inviteCode] of a friend's link lets a new address in while sign-up is closed.
@@ -462,7 +474,7 @@ class PlaceSummaryDto {
 
   /// What most experts got with "mit allem".
   final List<Ingredient> ingredients;
-  final Meat? meat;
+  final List<Meat> meats;
   final Skewer? skewer;
   final Bread? bread;
 
@@ -477,7 +489,7 @@ class PlaceSummaryDto {
     this.ayranHomemade,
     this.price,
     this.ingredients = const [],
-    this.meat,
+    this.meats = const [],
     this.skewer,
     this.bread,
     this.experts = 0,
@@ -494,7 +506,7 @@ class PlaceSummaryDto {
         ayranHomemade: j['ayranHomemade'] as bool?,
         price: j['price'] as int?,
         ingredients: _ingredientsFromJson(j) ?? const [],
-        meat: _enumOrNull(Meat.values, j['meat']),
+        meats: _meatsFromJson(j) ?? const [],
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
         experts: j['experts'] as int,
@@ -508,7 +520,7 @@ class PlaceSummaryDto {
         'ayranHomemade': ayranHomemade,
         'price': price,
         ..._ingredientsToJson(ingredients),
-        'meat': meat?.name,
+        ..._meatsToJson(meats),
         'skewer': skewer?.name,
         'bread': bread?.name,
         'experts': experts,
@@ -540,7 +552,7 @@ class ReviewDto {
   /// What the Döner cost, in cents.
   final int? price;
   final List<Ingredient>? ingredients;
-  final Meat? meat;
+  final List<Meat>? meats;
   final Skewer? skewer;
   final Bread? bread;
   final String? text;
@@ -571,7 +583,7 @@ class ReviewDto {
     this.ayranHomemade,
     this.price,
     this.ingredients,
-    this.meat,
+    this.meats,
     this.skewer,
     this.bread,
     this.text,
@@ -601,7 +613,7 @@ class ReviewDto {
         ayranHomemade: j['ayranHomemade'] as bool?,
         price: j['price'] as int?,
         ingredients: _ingredientsFromJson(j),
-        meat: _enumOrNull(Meat.values, j['meat']),
+        meats: _meatsFromJson(j),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
         text: j['text'] as String?,
@@ -628,7 +640,7 @@ class ReviewDto {
         'ayranHomemade': ayranHomemade,
         'price': price,
         ..._ingredientsToJson(ingredients),
-        'meat': meat?.name,
+        ..._meatsToJson(meats),
         'skewer': skewer?.name,
         'bread': bread?.name,
         'text': text,
@@ -654,7 +666,7 @@ class UpsertReviewRequest {
 
   /// Set by experts: what came with "mit allem".
   final List<Ingredient>? ingredients;
-  final Meat? meat;
+  final List<Meat>? meats;
   final Skewer? skewer;
   final Bread? bread;
   final String? text;
@@ -670,7 +682,7 @@ class UpsertReviewRequest {
     this.ayranHomemade,
     this.price,
     this.ingredients,
-    this.meat,
+    this.meats,
     this.skewer,
     this.bread,
     this.text,
@@ -684,7 +696,7 @@ class UpsertReviewRequest {
         ayranHomemade: j['ayranHomemade'] as bool?,
         price: j['price'] as int?,
         ingredients: _ingredientsFromJson(j),
-        meat: _enumOrNull(Meat.values, j['meat']),
+        meats: _meatsFromJson(j),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
         bread: _enumOrNull(Bread.values, j['bread']),
         text: j['text'] as String?,
@@ -698,7 +710,7 @@ class UpsertReviewRequest {
         'ayranHomemade': ayranHomemade,
         'price': price,
         ..._ingredientsToJson(ingredients),
-        'meat': meat?.name,
+        ..._meatsToJson(meats),
         'skewer': skewer?.name,
         'bread': bread?.name,
         'text': text,

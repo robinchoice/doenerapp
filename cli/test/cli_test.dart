@@ -253,11 +253,11 @@ void main() {
     expect(review.json['review']['price'], 750);
     expect((await ali.cli(['reviews'])).out, endsWith(' Grill Eck – 4,5 · 7,50 € · „Lecker“'));
     // A second call only changes what it names, the meat stays as set in the app
-    await db.execute(Sql.named("UPDATE reviews SET meat = 'kalb' WHERE id = @id:uuid"), parameters: {'id': review.json['review']['id']});
+    await db.execute(Sql.named("UPDATE reviews SET meats = '{kalb}' WHERE id = @id:uuid"), parameters: {'id': review.json['review']['id']});
     final again = await ali.cli(['review', '--place', 'cli-rank', '--rate', 'salat=3', '--json']);
     expect(again.json['review']['ratings'], {'sauce': 4.5, 'fleisch': 4.0});
     expect(again.json['review']['newRatings'], {'salat': 3.0});
-    expect([again.json['review']['price'], again.json['review']['text'], again.json['review']['meat']], [750, 'Lecker', 'kalb']);
+    expect([again.json['review']['price'], again.json['review']['text'], again.json['review']['meats']], [750, 'Lecker', ['kalb']]);
 
     final feed = await ben.cli(['feed', '--json']);
     expect(feed.code, Exit.ok);

@@ -182,7 +182,7 @@ void main() {
       ratings: const {RatingItem.sauce: 4.5, RatingItem.brot: 3, RatingItem.ayran: 5},
       ayranHomemade: true,
       ingredients: const [Ingredient.roteZwiebel, Ingredient.mais, Ingredient.granatapfel],
-      meat: Meat.kalb,
+      meats: const [Meat.kalb, Meat.haehnchen],
       createdAt: DateTime.utc(2026, 10, 4),
       updatedAt: DateTime.utc(2026, 10, 4),
     );
@@ -192,16 +192,19 @@ void main() {
     expect(json['rating'], 5);
     expect(json['ingredients'], ['mais', 'granatapfel'], reason: 'older apps fail on new ingredients');
     expect(json['newIngredients'], ['roteZwiebel']);
+    expect(json['meat'], 'kalb', reason: 'older apps know one meat');
     final back = ReviewDto.fromJson(json);
     expect(back.ratings, review.ratings);
     expect(back.rating, 4.5);
     expect(back.ingredients, review.ingredients);
-    expect(back.meat, Meat.kalb);
+    expect(back.meats, [Meat.kalb, Meat.haehnchen]);
 
-    final legacy = ReviewDto.fromJson({...json}..remove('items')..remove('ratings')..remove('score')..remove('ingredients')..remove('meat'));
+    final legacy = ReviewDto.fromJson({...json}..remove('items')..remove('ratings')..remove('score')..remove('ingredients')..remove('meats'));
     expect(legacy.ratings, {RatingItem.sauce: 5, RatingItem.brot: 3}, reason: 'reviews stored by older builds');
     expect(legacy.rating, 5);
     expect(legacy.ingredients, [Ingredient.roteZwiebel]);
+    expect(legacy.meats, [Meat.kalb], reason: 'older apps send one meat');
+    expect(UpsertReviewRequest.fromJson(const {}).meats, isNull);
     expect(() => UpsertReviewRequest.fromJson({'items': {'zwiebel': 3}}), throwsArgumentError);
   });
 

@@ -966,6 +966,7 @@ void main() {
       expect(review.ratings, {RatingItem.brot: 3, RatingItem.falafel: 4, RatingItem.hummus: 5, RatingItem.ayran: 3});
       expect(review.veganOptions, isTrue, reason: 'Bob rated hummus');
       expect(review.ayranHomemade, isTrue, reason: 'only homemade ayran gets rated');
+      expect(review.meats, [Meat.kalb], reason: 'older apps send one meat');
 
       final place = PlaceDto.fromJson((await call('GET', '/places/place-kebap')).$2 as Map<String, dynamic>);
       expect(place.score(Diet.all), (average: 5.0, count: 1), reason: "only Anna's review rates the Döner");
@@ -978,7 +979,7 @@ void main() {
       expect(summary.ayranHomemade, isTrue);
       expect(summary.ingredients, [Ingredient.tomate, Ingredient.granatapfel]);
       expect(summary.specials, [Ingredient.granatapfel]);
-      expect(summary.meat, Meat.kalb);
+      expect(summary.meats, [Meat.kalb]);
       expect(summary.experts, 1);
 
       final (_, reviews) = await call('GET', '/places/place-kebap/reviews');
@@ -995,7 +996,12 @@ void main() {
       expect(await put({'items': {'zwiebel': 3}}), 400);
       expect(await put({'ingredients': ['ketchup']}), 400);
       expect(await put({}), 400, reason: 'nothing to save');
+      expect(await put({'meats': []}), 400, reason: 'no meat named is nothing');
       expect(await put({'veganOptions': false}), 200, reason: 'telling there is nothing vegan is enough');
+
+      final (_, several) = await call('PUT', '/places/place-kebap/review', token: bob, body: {'meats': ['haehnchen', 'kalb', 'kalb']});
+      expect(ReviewDto.fromJson(several as Map<String, dynamic>).meats, [Meat.kalb, Meat.haehnchen], reason: 'in menu order, once each');
+      expect(several['meat'], 'kalb', reason: 'older apps show the first');
     });
 
     test('reviews carry a photo and tell who was there', () async {
@@ -1946,7 +1952,10 @@ void main() {
     await db.execute('DROP FUNCTION in_quiet_hours');
     await db.execute('ALTER TABLE places DROP COLUMN hours_synced_at');
     await db.execute("DELETE FROM schedules WHERE name = 'place_prefetch'");
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 6 FROM schema_migrations)');
+    await db.execute('ALTER TABLE reviews ADD COLUMN meat text');
+    await db.execute('UPDATE reviews SET meat = meats[1]');
+    await db.execute('ALTER TABLE reviews DROP COLUMN meats');
+    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 7 FROM schema_migrations)');
     await migrate(db);
     await migrate(db);
 

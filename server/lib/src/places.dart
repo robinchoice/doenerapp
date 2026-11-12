@@ -110,7 +110,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       ayranHomemade: row['ayran_homemade'] as bool?,
       price: row['price'] as int?,
       ingredients: (row['ingredients'] as List?)?.map((i) => Ingredient.values.byName(i as String)).toList(),
-      meat: Meat.values.asNameMap()[row['meat']],
+      meats: (row['meats'] as List?)?.map((m) => Meat.values.byName(m as String)).toList(),
       skewer: Skewer.values.asNameMap()[row['skewer']],
       bread: Bread.values.asNameMap()[row['bread']],
       text: row['text'] as String?,
@@ -349,12 +349,13 @@ void mountPlaces(Router router, Deps deps) {
     final veganOptions = veganRated ? true : body.veganOptions;
     final ayranHomemade = ayranRated ? true : body.ayranHomemade;
     final photo = body.photoBase64 == null ? null : _decodePhoto(body.photoBase64!);
+    final meats = [for (final m in Meat.values) if (body.meats?.contains(m) ?? false) m.name];
     if (ratings.isEmpty &&
         veganOptions == null &&
         ayranHomemade == null &&
         body.price == null &&
         body.ingredients == null &&
-        body.meat == null &&
+        meats.isEmpty &&
         body.skewer == null &&
         body.bread == null &&
         text == null &&
@@ -368,9 +369,9 @@ void mountPlaces(Router router, Deps deps) {
       final row = await queryOne(
         tx,
         'INSERT INTO reviews (user_id, place_id, rating, vegetarian_rating, vegan_rating, sauce_rating, fleisch_rating, '
-        'brot_rating, vegan_options, ayran_homemade, price, ingredients, meat, skewer, bread, text) '
+        'brot_rating, vegan_options, ayran_homemade, price, ingredients, meats, skewer, bread, text) '
         'VALUES (@user:uuid, @place:uuid, @rating:float4, @vegetarian:float4, @vegan:float4, @sauce:float4, @fleisch:float4, '
-        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @price:int4, @ingredients:_text, @meat:text, @skewer:text, @bread:text, @text) '
+        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @price:int4, @ingredients:_text, @meats:_text, @skewer:text, @bread:text, @text) '
         // Older reviews may only have an overall rating, without sauce, meat or
         // bread. It stays until the review rates the Döner itself.
         'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = CASE WHEN num_nonnulls(EXCLUDED.sauce_rating, '
@@ -379,7 +380,7 @@ void mountPlaces(Router router, Deps deps) {
         'vegetarian_rating = EXCLUDED.vegetarian_rating, vegan_rating = EXCLUDED.vegan_rating, '
         'sauce_rating = EXCLUDED.sauce_rating, fleisch_rating = EXCLUDED.fleisch_rating, brot_rating = EXCLUDED.brot_rating, '
         'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, price = EXCLUDED.price, '
-        'ingredients = EXCLUDED.ingredients, meat = EXCLUDED.meat, skewer = EXCLUDED.skewer, bread = EXCLUDED.bread, '
+        'ingredients = EXCLUDED.ingredients, meats = EXCLUDED.meats, skewer = EXCLUDED.skewer, bread = EXCLUDED.bread, '
         'text = EXCLUDED.text, updated_at = now() RETURNING *',
         {
           'user': user.id,
@@ -395,7 +396,7 @@ void mountPlaces(Router router, Deps deps) {
           'ayran': ayranHomemade,
           'price': body.price,
           'ingredients': body.ingredients?.map((i) => i.name).toList(),
-          'meat': body.meat?.name,
+          'meats': meats.isEmpty ? null : meats,
           'skewer': body.skewer?.name,
           'bread': body.bread?.name,
           'text': text,
@@ -805,6 +806,7 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, {List<AwardDto> aw
     }
   }
   final experts = [for (final r in reviews) if (r['ingredients'] case final List list) list];
+  final meats = [for (final r in reviews) if (r['meats'] case final List list) list];
   return PlaceSummaryDto(
     items: {
       for (final item in RatingItem.values)
@@ -817,7 +819,11 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, {List<AwardDto> aw
       for (final i in Ingredient.values)
         if (experts.isNotEmpty && experts.where((list) => list.contains(i.name)).length * 2 >= experts.length) i,
     ],
-    meat: Meat.values.asNameMap()[plurality([for (final r in reviews) r['meat'] as String?])],
+    // Named by at least half of those who said which meat.
+    meats: [
+      for (final m in Meat.values)
+        if (meats.isNotEmpty && meats.where((list) => list.contains(m.name)).length * 2 >= meats.length) m,
+    ],
     skewer: Skewer.values.asNameMap()[plurality([for (final r in reviews) r['skewer'] as String?])],
     bread: Bread.values.asNameMap()[plurality([for (final r in reviews) r['bread'] as String?])],
     experts: experts.length,

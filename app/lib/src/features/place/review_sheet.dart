@@ -53,7 +53,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
   late _Answer? _vegan = _answer(_existing?.veganOptions);
   late _Answer? _ayran = _answer(_existing?.ayranHomemade);
   late final _ingredients = <Ingredient>{...?(_existing?.ingredients ?? widget.summary?.ingredients)};
-  late Meat? _meat = _existing?.meat ?? widget.summary?.meat;
+  late final _meats = <Meat>{...?(_existing?.meats ?? widget.summary?.meats)};
   late Skewer? _skewer = _existing?.skewer ?? widget.summary?.skewer;
   late Bread? _bread = _existing?.bread ?? widget.summary?.bread;
 
@@ -167,7 +167,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
             price: _cents,
             // Without expert mode, earlier answers stay as they were.
             ingredients: _expertTouched ? (_ingredients.toList()..sort((a, b) => a.index.compareTo(b.index))) : _existing?.ingredients,
-            meat: _expertTouched ? _meat : _existing?.meat,
+            meats: _expertTouched ? (_meats.toList()..sort((a, b) => a.index.compareTo(b.index))) : _existing?.meats,
             skewer: _expertTouched ? _skewer : _existing?.skewer,
             bread: _expertTouched ? _bread : _existing?.bread,
             text: Validation.clean(_text.text),
@@ -277,8 +277,19 @@ class _ReviewSheetState extends State<ReviewSheet> {
             ),
           ],
           if (_diet == Diet.all) ...[
-            label('Fleisch'),
-            pick(Meat.values, _meat, (m) => m.label, (m) => _meat = m),
+            label('Fleisch · mehrere möglich'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final m in Meat.values)
+                  FilterChip(
+                    label: Text(m.label),
+                    selected: _meats.contains(m),
+                    onSelected: (on) => _expertChange(() => on ? _meats.add(m) : _meats.remove(m)),
+                  ),
+              ],
+            ),
             label('Spieß'),
             pick(Skewer.values, _skewer, (s) => s.label, (s) => _skewer = s),
           ],

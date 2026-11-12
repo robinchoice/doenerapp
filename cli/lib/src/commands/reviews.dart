@@ -64,7 +64,7 @@ final reviews = <String, Command>{
         ayranHomemade: previous?.ayranHomemade,
         price: centsOption(ctx, 'price') ?? previous?.price,
         ingredients: previous?.ingredients,
-        meat: previous?.meat,
+        meats: previous?.meats,
         skewer: previous?.skewer,
         bread: previous?.bread,
         text: ctx.args.option('text') ?? previous?.text,

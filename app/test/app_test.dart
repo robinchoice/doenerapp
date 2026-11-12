@@ -191,19 +191,20 @@ void main() {
     final data = await _openSheet(
       tester,
       const AccountDto(id: 'u1', displayName: 'Robin', expertMode: true),
-      summary: const PlaceSummaryDto(ingredients: [Ingredient.tomate, Ingredient.mais], meat: Meat.kalb, experts: 2),
+      summary: const PlaceSummaryDto(ingredients: [Ingredient.tomate, Ingredient.mais], meats: [Meat.kalb], experts: 2),
     );
-    await tester.scrollUntilVisible(find.widgetWithText(ChoiceChip, 'Kalb'), 200, scrollable: find.byType(Scrollable).last);
+    await tester.scrollUntilVisible(find.widgetWithText(FilterChip, 'Kalb'), 200, scrollable: find.byType(Scrollable).last);
     expect(tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Mais')).selected, isTrue);
-    expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Kalb')).selected, isTrue);
+    expect(tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Kalb')).selected, isTrue);
 
     await _tapInSheet(tester, find.widgetWithText(FilterChip, 'Granatapfelkerne'));
+    await _tapInSheet(tester, find.widgetWithText(FilterChip, 'Hähnchen'));
     await _tapInSheet(tester, find.widgetWithText(ChoiceChip, 'Selbst gesteckt'));
     await _tapInSheet(tester, find.text('Speichern'));
 
     final review = data.reviews['p1']!.dto;
     expect(review.ingredients, [Ingredient.tomate, Ingredient.mais, Ingredient.granatapfel]);
-    expect(review.meat, Meat.kalb);
+    expect(review.meats, [Meat.kalb, Meat.haehnchen]);
     expect(review.skewer, Skewer.homemade);
   });
 

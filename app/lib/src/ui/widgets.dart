@@ -658,3 +658,20 @@ Future<T?> showAppSheet<T>(BuildContext context, WidgetBuilder builder) => showM
     ),
   ),
 );
+
+/// A sheet's form with its button pinned below, where an open keyboard can't hide it.
+class SheetForm extends StatelessWidget {
+  final List<Widget> children;
+  final Widget action;
+  const SheetForm({super.key, required this.children, required this.action});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Flexible(child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), children: children)),
+          Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 16), child: action),
+        ],
+      );
+}

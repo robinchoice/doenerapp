@@ -32,7 +32,8 @@ const _reloadDistance = 1000.0;
 /// Until they've done it, new users get two tasks to get going.
 class StartScreen extends StatefulWidget {
   final VoidCallback onOpenMap;
-  const StartScreen({super.key, required this.onOpenMap});
+  final VoidCallback onOpenRanking;
+  const StartScreen({super.key, required this.onOpenMap, required this.onOpenRanking});
 
   @override
   State<StartScreen> createState() => _StartScreenState();
@@ -291,6 +292,15 @@ class _StartScreenState extends State<StartScreen> {
               else ...[
                 const Divider(),
                 for (final (i, place) in _top.indexed) _TopTile(rank: i + 1, place: place, diet: diet),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: widget.onOpenRanking,
+                    icon: const Icon(Icons.arrow_forward),
+                    iconAlignment: IconAlignment.end,
+                    label: const Text('Ganze Rangliste'),
+                  ),
+                ),
               ],
               if (_trending.where((p) => diet != Diet.vegan || p.veganOptions != false).toList() case final trending
                   when trending.isNotEmpty) ...[

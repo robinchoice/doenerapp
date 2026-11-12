@@ -451,9 +451,11 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+  Widget build(BuildContext context) => SheetForm(
+        action: FilledButton(
+          onPressed: _sending || _message.text.trim().length < Validation.feedbackMin ? null : _send,
+          child: const Text('Senden'),
+        ),
         children: [
           Text('Feedback geben', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
@@ -471,11 +473,6 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
           ] else
             OutlinedButton.icon(onPressed: _pick, icon: const Icon(Icons.image_outlined), label: const Text('Screenshot anhängen (optional)')),
           if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _sending || _message.text.trim().length < Validation.feedbackMin ? null : _send,
-            child: const Text('Senden'),
-          ),
         ],
       );
 }

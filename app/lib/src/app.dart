@@ -292,6 +292,7 @@ class HomeShell extends StatefulWidget {
 /// Start · Ranking · 🥙 · Karte · Profil. The middle button is no tab: it
 /// checks in at the shop the user is standing at and is grey anywhere else.
 class _HomeShellState extends State<HomeShell> {
+  static const _rankingTab = 1;
   static const _checkInTab = 2;
   static const _mapTab = 3;
   int _tab = 0;
@@ -487,7 +488,10 @@ class _HomeShellState extends State<HomeShell> {
     final body = IndexedStack(
       index: _tab < _checkInTab ? _tab : _tab - 1,
       children: [
-        column(StartScreen(onOpenMap: () => setState(() => _tab = _mapTab))),
+        column(StartScreen(
+          onOpenMap: () => setState(() => _tab = _mapTab),
+          onOpenRanking: () => setState(() => _tab = _rankingTab),
+        )),
         column(const RankingScreen()),
         const MapScreen(),
         column(const ProfileScreen()),

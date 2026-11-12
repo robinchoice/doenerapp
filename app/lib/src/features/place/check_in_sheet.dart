@@ -30,7 +30,8 @@ class _CheckInSheetState extends State<CheckInSheet> {
     setState(() => _done = true);
     await context.read<AppData>().checkIn(_place, foodType: _foods[_selected].id);
     await Future<void>.delayed(const Duration(milliseconds: 1800));
-    if (mounted) Navigator.of(context).pop();
+    // Closed by hand meanwhile: popping now would close the app's screen behind it.
+    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) Navigator.of(context).pop();
   }
 
   @override

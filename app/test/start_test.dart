@@ -127,7 +127,8 @@ void main() {
   setUpAll(() => initializeDateFormatting('de'));
 
   testWidgets('start shows the best places around, marks friends and helps newcomers', (tester) async {
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}), position: const LatLng(48, 7.85));
+    var rankingOpened = false;
+    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () => rankingOpened = true), position: const LatLng(48, 7.85));
 
     expect(find.text('Kebap Haus'), findsOneWidget);
     expect(find.text('noch unbewertet'), findsOneWidget);
@@ -144,10 +145,14 @@ void main() {
     await tester.tap(find.text('Nur Freunde'));
     await tester.pumpAndSettle();
     expect(server.calls('/feed').last.queryParameters.containsKey('lat'), isFalse);
+
+    await tester.ensureVisible(find.text('Ganze Rangliste'));
+    await tester.tap(find.text('Ganze Rangliste'));
+    expect(rankingOpened, isTrue);
   });
 
   testWidgets('news show as a card that offers the mail and goes away when dismissed', (tester) async {
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}), position: const LatLng(48, 7.85));
+    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () {}), position: const LatLng(48, 7.85));
 
     expect(find.text('Neuigkeiten in der App'), findsOneWidget);
     expect(find.text('Eine Karte auf Start'), findsOneWidget);
@@ -169,7 +174,7 @@ void main() {
   });
 
   testWidgets('the bell shows what is new, marks it seen and offers less of it', (tester) async {
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}), position: const LatLng(48, 7.85));
+    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () {}), position: const LatLng(48, 7.85));
     expect(find.descendant(of: find.byType(InboxButton), matching: find.text('1')), findsOneWidget, reason: 'one since last time');
 
     await tester.runAsync(() async {
@@ -265,5 +270,30 @@ void main() {
 
     expect(server.calls('/places/p2/visits'), hasLength(1));
     expect(find.text('Einchecken'), findsNothing, reason: 'the sheet closes');
+  });
+
+  testWidgets('closing the check-in sheet during the confetti keeps the screen behind it', (tester) async {
+    await _pump(
+      tester,
+      Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => showAppSheet(context, (_) => const CheckInSheet(places: [_rated])),
+              child: const Text('Öffnen'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Öffnen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.tap(find.byTooltip('Schließen'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Öffnen'), findsOneWidget);
   });
 }

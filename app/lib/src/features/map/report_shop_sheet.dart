@@ -57,9 +57,11 @@ class _ReportShopSheetState extends State<ReportShopSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+    return SheetForm(
+      action: FilledButton(
+        onPressed: _busy || _name.text.trim().length < Validation.shopNameMin ? null : _send,
+        child: const Text('Senden'),
+      ),
       children: [
         Text('Laden fehlt?', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
@@ -88,11 +90,6 @@ class _ReportShopSheetState extends State<ReportShopSheet> {
             value: _attachLocation,
             onChanged: (v) => setState(() => _attachLocation = v),
           ),
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed: _busy || _name.text.trim().length < Validation.shopNameMin ? null : _send,
-          child: const Text('Senden'),
-        ),
       ],
     );
   }

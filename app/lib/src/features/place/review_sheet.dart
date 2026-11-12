@@ -300,9 +300,8 @@ class _ReviewSheetState extends State<ReviewSheet> {
     final keepsOld = _diet == Diet.all &&
         !RatingItem.classicItems.any((i) => _ratings.containsKey(i) || (_existing?.ratings.containsKey(i) ?? false));
     final score = _diet.score(_ratings)?.halfStep ?? (keepsOld ? _existing?.rating : null) ?? 0;
-    return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+    return SheetForm(
+      action: FilledButton(onPressed: _canSave ? _save : null, child: const Text('Speichern')),
       children: [
         Text(_existing == null ? 'Bewerten' : 'Bewertung bearbeiten', style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
         Text(widget.place.name, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.outline)),
@@ -436,7 +435,6 @@ class _ReviewSheetState extends State<ReviewSheet> {
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
             ),
           ),
-        FilledButton(onPressed: _canSave ? _save : null, child: const Text('Speichern')),
       ],
     );
   }

@@ -174,4 +174,4 @@ Uint8List _webp(List<int> b) {
 }
 
 bool _startsWith(List<int> bytes, String prefix) =>
-    bytes.length >= prefix.length && [for (var k = 0; k < prefix.length; k++) bytes[k] == prefix.codeUnitAt(k)].every((x) => x);
+    bytes.length >= prefix.length && Iterable.generate(prefix.length).every((k) => bytes[k] == prefix.codeUnitAt(k));

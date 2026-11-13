@@ -235,21 +235,18 @@ class RankBy {
 
   String get label => item?.label ?? (perPrice ? 'Preis-Leistung' : diet!.scoreLabel);
 
-  static RankBy? parse(String key) {
-    for (final diet in Diet.values) {
-      for (final by in [RankBy.score(diet), RankBy.value(diet)]) {
-        if (key == by.key) return by;
-      }
-    }
-    final item = RatingItem.values.asNameMap()[key];
-    return item == null ? null : RankBy.item(item);
-  }
+  static final _byKey = {
+    for (final by in [
+      for (final diet in Diet.values) ...[RankBy.score(diet), RankBy.value(diet)],
+      for (final item in RatingItem.values) RankBy.item(item),
+    ])
+      by.key: by,
+  };
+
+  static RankBy? parse(String key) => _byKey[key];
 
   /// Every key [parse] knows.
-  static List<String> get keys => [
-        for (final diet in Diet.values) ...[RankBy.score(diet).key, RankBy.value(diet).key],
-        for (final item in RatingItem.values) item.name,
-      ];
+  static List<String> get keys => [..._byKey.keys];
 
   /// The rankings someone with [diet] gets to see, the main score first.
   static List<RankBy> forDiet(Diet diet) => switch (diet) {

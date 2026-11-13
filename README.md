@@ -352,6 +352,18 @@ python3 -m http.server 8095 --directory build/design   # http://localhost:8095
 
 Die Werte bleiben im Browser bis „Zurücksetzen“. „Werte“ zeigt sie als Dart-Code zum Kopieren, der in `Brand` (`app/lib/src/ui/brand.dart`) die Standardwerte ersetzt.
 
+### Mangal-Eröffnung: Checkliste
+
+Flyer (A6), Theken-Aushang (A4), Druckhinweise und die Prüfung für einige hundert neue Konten stehen unter [docs/mangal](docs/mangal/README.md). Der Termin in Freiburg, Bertoldstraße 51, ist noch offen. Robin spricht Mangal selbst an. Keine Verlosung, keine Gratis-Döner. Robins Freigabe vom 13.11.2026 gilt für das Öffnen **am Eröffnungstag**.
+
+1. Vor dem Termin die im Bericht genannten Grenzen klären: gemeinsame IPs beim Login und bestätigtes Mail-Versandbudget. Google-Quoten prüfen. Offene Bewerbungen, die noch eine Freundesvermittlung oder TestFlight-Einladung brauchen, regulär freischalten.
+2. Die echte Google-placeId von Mangal Freiburg (Bertoldstraße 51, nicht einem anderen Mangal oder dem bisherigen Olivia) ermitteln. Mit dem Agenten-Testkonto den Ort über die API/CLI einmal laden und Details samt Status prüfen: geöffnet, bewertbar, richtige Adresse. Dadurch ist er vor dem Andrang im Cache. Solange es keinen bewertbaren Google-Ort gibt, nur die Übergangsfassung verwenden.
+3. Aus dem Repo `node tool/mangal-print.mjs 'ECHTE_GOOGLE_PLACE_ID'` ausführen. Ausgabe auf `/b/<placeId>` prüfen; alle vier PDFs unter `docs/mangal/` werden neu erzeugt. Ohne Argument entsteht nur die Übergangsfassung mit QR zur noch funktionierenden Testerbewerbung.
+4. Probeausdruck bei 100 % scannen, Ziel und Laden prüfen. Dann `flyer-a6-de.pdf` einseitig auf A6 und `poster-a4-de.pdf` auf A4 drucken; Mangal den Aushang geben.
+5. **Erst am Eröffnungstag:** `coolify-app pleasance doener-api set SIGNUP_OPEN=true`, danach `coolify-app pleasance doener-api restart`. Auf gesunden Neustart unter `https://doener-api.pleasance.org/api/v1/health` warten. Das Setzen allein aktiviert die Variable noch nicht. Im selben Zug den Registrierungsstatus in Kontor/infra.md nachziehen.
+6. Im privaten Handy-Browser ohne installierte App den gedruckten QR öffnen: „Jetzt bewerten“ → Onboarding → E-Mail/Code → Konto einrichten → Mangal-Bewertungsbogen. Das autorisierte Agenten-Testkonto `admin@pleasance.org` nutzen; andere Testpersonen prüfen ihre eigenen Konten selbst. Zusätzlich mehrere Geräte im selben Netz prüfen. Vor dem Essen keine Bewertung abgeben. Bei falschem Browser nach Mail-Link den QR erneut scannen.
+7. Erst danach Flyer verteilen. Während der Aktion Zustellung, HTTP 429/5xx und Google-Quota-Fehler beobachten. Bei gestörter Registrierung Verteilung pausieren; keine Mails durch wiederholtes Anfordern erzwingen. Kein Release-Tag und keine Store-Veröffentlichung nötig.
+
 ### Tests
 
 ```bash

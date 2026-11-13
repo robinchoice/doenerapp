@@ -325,6 +325,8 @@ void main() {
     test('rejects broken JPEGs', () {
       expect(() => stripPhotoMetadata([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3], 'image/jpeg'), throwsFormatException);
       expect(() => stripPhotoMetadata([0xff, 0xd8, ...scan], 'image/jpeg'), throwsFormatException, reason: 'no end');
+      expect(() => stripPhotoMetadata([0xff, 0xd8, 0xff, 0xe0, 0, 0, 1, 2], 'image/jpeg'), throwsFormatException, reason: 'length below 2');
+      expect(() => stripPhotoMetadata([...'RIFF'.codeUnits, 0, 0, 0, 0, ...'WEB'.codeUnits], 'image/webp'), throwsFormatException);
     });
 
     List<int> chunk(String type, List<int> data) =>

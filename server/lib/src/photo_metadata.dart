@@ -53,8 +53,9 @@ Uint8List _jpeg(List<int> b) {
       continue;
     }
     if (i + 3 >= b.length) throw const FormatException('Broken JPEG');
-    final end = i + 2 + u16(i + 2);
-    if (end > b.length) throw const FormatException('Broken JPEG');
+    final length = u16(i + 2);
+    final end = i + 2 + length;
+    if (length < 2 || end > b.length) throw const FormatException('Broken JPEG');
     final payload = b.sublist(i + 4, end);
     if (marker == 0xe1) {
       final orientation = _startsWith(payload, 'Exif\x00\x00') ? _orientation(payload.sublist(6)) : null;
@@ -148,6 +149,7 @@ Uint8List _png(List<int> b) {
 
 /// EXIF and XMP chunks go, and VP8X no longer announces them.
 Uint8List _webp(List<int> b) {
+  if (b.length < 12) throw const FormatException('Broken WebP');
   final out = BytesBuilder(copy: false)..add(b.sublist(0, 12));
   var i = 12;
   int size(int at) => b[at] | b[at + 1] << 8 | b[at + 2] << 16 | b[at + 3] << 24;

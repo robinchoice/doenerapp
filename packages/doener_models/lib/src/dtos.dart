@@ -81,8 +81,9 @@ Json _ingredientsToJson(List<Ingredient>? ingredients) => {
 
 /// Null if the reviewer said nothing about the meat. Shipped builds up to
 /// 1.0.x only read and send the single `meat`, which stays next to `meats`.
+/// Skips names this build doesn't know, so later meats can't break it.
 List<Meat>? _meatsFromJson(Json j) => switch (j['meats']) {
-      final List names => [for (final name in names) Meat.values.byName(name as String)],
+      final List names => [for (final name in names) ?Meat.values.asNameMap()[name]],
       _ => switch (_enumOrNull(Meat.values, j['meat'])) { final meat? => [meat], null => null },
     };
 

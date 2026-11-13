@@ -143,8 +143,10 @@ void mountRanking(Router router, Deps deps) {
       }
     }
 
-    final bestOf = await latestBestOf(deps.db, city, by.diet == Diet.vegan ? BestOfCategory.vegan : BestOfCategory.overall);
-    final (cityPrice, cityPriceReports) = await usualPrice(deps.db, city);
+    final (bestOf, (cityPrice, cityPriceReports)) = await (
+      latestBestOf(deps.db, city, by.diet == Diet.vegan ? BestOfCategory.vegan : BestOfCategory.overall),
+      usualPrice(deps.db, city),
+    ).wait;
     return json(RankingDto(city: city, by: by, bestOf: bestOf, cityPrice: cityPrice, cityPriceReports: cityPriceReports, entries: [
       for (final r in rows)
         RankingEntryDto(

@@ -49,6 +49,8 @@ const _assetLinks = [
       'package_name': 'com.robinchoice.doener',
       'sha256_cert_fingerprints': [
         '79:10:D1:31:7D:E1:F6:1A:B8:4A:1D:65:5B:14:A2:8B:29:52:0D:CA:6A:61:76:16:40:A5:B2:F1:86:22:FF:FF',
+        // Play app signing key (Play Console, App integrity).
+        '15:32:7A:B8:4E:3A:61:79:02:BF:46:4A:94:BC:B4:B5:23:60:87:53:E0:A1:00:0D:69:0C:60:CF:A9:15:2C:35',
       ],
     },
   },

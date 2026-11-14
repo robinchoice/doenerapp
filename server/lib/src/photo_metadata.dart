@@ -158,7 +158,7 @@ Uint8List _webp(List<int> b) {
   while (i + 8 <= riffEnd) {
     final fourcc = String.fromCharCodes(b.sublist(i, i + 4));
     final end = i + 8 + size(i + 4) + size(i + 4) % 2;
-    if (end > riffEnd) throw const FormatException('Broken WebP');
+    if (end > riffEnd || (fourcc == 'VP8X' && end == i + 8)) throw const FormatException('Broken WebP');
     if (fourcc == 'VP8X') {
       final chunk = b.sublist(i, end);
       chunk[8] &= ~0x0c; // EXIF and XMP flags

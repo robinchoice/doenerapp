@@ -361,6 +361,9 @@ void main() {
         ...riffChunk('XMP ', [5]),
       ]);
       expect(stripPhotoMetadata(webp, 'image/webp'), riff([...riffChunk('VP8X', List.filled(10, 0)), ...riffChunk('VP8 ', [1, 2, 3])]));
+      expect(() => stripPhotoMetadata(webp.sublist(0, 20), 'image/webp'), throwsFormatException, reason: 'cut off');
+      expect(() => stripPhotoMetadata(riff([...'VP8 '.codeUnits, 9, 0, 0, 0, 1]), 'image/webp'), throwsFormatException, reason: 'chunk too long');
+      expect(() => stripPhotoMetadata(riff(riffChunk('VP8X', [])), 'image/webp'), throwsFormatException, reason: 'empty VP8X');
     });
   });
 }

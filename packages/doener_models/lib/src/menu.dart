@@ -246,7 +246,7 @@ class RankBy {
   static RankBy? parse(String key) => _byKey[key];
 
   /// Every key [parse] knows.
-  static List<String> get keys => [..._byKey.keys];
+  static Iterable<String> get keys => _byKey.keys;
 
   /// The rankings someone with [diet] gets to see, the main score first.
   static List<RankBy> forDiet(Diet diet) => switch (diet) {

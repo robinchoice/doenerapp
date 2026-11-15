@@ -19,7 +19,7 @@ jobs:
         run: |
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
-          test "$(xcodebuild -version | head -n 1)" = "Xcode 27.1"
+          test "$(xcodebuild -version)" = $'Xcode 27.1\nBuild version 27A9275'
           test "$(xcrun --sdk iphoneos --show-sdk-version)" = "27.1"
       - uses: subosito/flutter-action@v2
         with:
@@ -47,6 +47,9 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
           cache: true
+
+      - name: Comments
+        run: bash scripts/check-comments.sh
 
       - name: Models
         working-directory: packages/doener_models

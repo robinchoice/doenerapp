@@ -15,7 +15,7 @@ const maxTesterRequestsPerHour = 30;
 void mountTesterRequests(Router router, Deps deps) {
   // POST /tester-requests {email, platform: ios|android, inviteCode?} — from the
   // landing page, no account needed. Robin gets a mail and lets the address in
-  // under Profil → Tester. The invite code tells whose link brought the person.
+  // under Profil → Testzugang. The invite code tells whose link brought the person.
   router.post('/tester-requests', (Request request) async {
     final body = await readJson(request);
     final email = body['email'];
@@ -104,7 +104,7 @@ Future<void> _mailTesterRequest(Deps deps, String to, String email, String platf
       to: to,
       subject: 'Testanfrage ${ios ? 'iOS' : 'Android'}: $email',
       text: '$email möchte die ${ios ? 'iOS' : 'Android'}-App testen${friend == null ? '' : ', gekommen über den Link von $friend'}.\n\n'
-          'Freischalten in der App unter Profil → Tester. Das legt das Konto an und schickt die Login-Mail, '
+          'Freischalten in der App unter Profil → Testzugang. Das legt das Konto an und schickt die Login-Mail, '
           '${ios ? 'Apple schickt die TestFlight-Einladung.' : 'mit dem Link zur APK.'}',
       replyTo: email,
     );
@@ -148,14 +148,14 @@ final _de = _Texts(
   h1Accent: 'deiner Stadt.',
   lead:
       'Bewertet nach Soße, Fleisch, Salat und Brot – von Leuten, die in deiner Gegend essen. '
-      'Und du siehst, wo deine Freunde gerade sitzen.',
+      'Und du siehst, wo deine Kontakte gerade sitzen.',
   ctaTest: 'Für den Test anmelden',
   ctaBrowser: 'Im Browser öffnen',
   stores: 'iPhone über TestFlight · Android zum Herunterladen · kostenlos',
   ranking: 'Ranking Freiburg',
   chips: ['Gesamt', 'Soße', 'Fleisch', 'Brot'],
   reviews: 'Bew.',
-  friends: 'Freunde',
+  friends: 'Kontakte',
   placeData: 'Ortsdaten: Google Maps',
   tabs: ['Start', 'Karte', 'Ranking', 'Profil'],
   decimal: ',',
@@ -173,11 +173,11 @@ final _de = _Texts(
     (
       '📍',
       'Einchecken',
-      'Ein Tipp vor Ort: Deine Freunde sehen, wo du gerade isst, und am Jahresende kommt dein Döner Wrapped.',
+      'Ein Tipp vor Ort: Deine Kontakte sehen, wo du gerade isst, und am Jahresende kommt dein Döner Wrapped.',
     ),
     (
       '👋',
-      'Freunde verbinden',
+      'Kontakte verbinden',
       'Per QR-Code verbinden, sehen, wer gerade wo isst, und auf ihre Bewertungen reagieren.',
     ),
   ],

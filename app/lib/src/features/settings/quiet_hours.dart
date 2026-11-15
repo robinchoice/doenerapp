@@ -175,7 +175,7 @@ class QuietHoursScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Was in der Ruhezeit passiert: Ein neuer Laden kommt danach. Check-ins von Freunden fallen weg, die sind bis dahin '
+              'Was in der Ruhezeit passiert: Ein neuer Laden kommt danach. Check-ins von Kontakten fallen weg, die sind bis dahin '
               'vorbei. Beides steht in den Mitteilungen auf Start. Es gilt die Uhrzeit dort, wo dein Handy gerade ist.',
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
             ),

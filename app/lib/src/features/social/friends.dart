@@ -127,10 +127,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Freunde'),
+        title: const Text('Kontakte'),
         actions: [
           IconButton(
-            tooltip: 'Freund hinzufügen',
+            tooltip: 'Kontakt hinzufügen',
             icon: const Icon(Icons.person_add_alt_1),
             onPressed: () => showAppSheet(context, (_) => const _FriendSearch()),
           ),
@@ -143,7 +143,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
             if (friends.error != null) ListTile(leading: const Icon(Icons.error_outline), title: Text(friends.error!)),
             ListTile(
               leading: const CircleAvatar(child: Icon(Icons.qr_code_2)),
-              title: const Text('Freunde einladen'),
+              title: const Text('Kontakte einladen'),
               subtitle: const Text('Wer deinen Link öffnet, ist sofort mit dir befreundet.'),
               onTap: () => showAppSheet(context, (_) => const InviteSheet()),
             ),
@@ -152,7 +152,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
               for (final f in friends.incoming)
                 ListTile(
                   title: Text(f.user.displayName),
-                  subtitle: const Text('Möchte dich als Freund hinzufügen'),
+                  subtitle: const Text('Möchte dich als Kontakt hinzufügen'),
                   onTap: () => showUserProfile(context, f.user),
                   trailing: FilledButton(onPressed: () => friends.accept(f.id), child: const Text('Annehmen')),
                 ),
@@ -166,11 +166,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   trailing: OutlinedButton(onPressed: () => friends.remove(f.id), child: const Text('Zurückziehen')),
                 ),
             ],
-            header('Freunde (${friends.accepted.length})'),
+            header('Kontakte (${friends.accepted.length})'),
             if (friends.accepted.isEmpty)
               ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-                title: const Text('Noch keine Freunde'),
+                title: const Text('Noch keine Kontakte'),
                 subtitle: const Text('Lade welche ein, dann seht ihr gegenseitig, wo ihr esst.'),
                 onTap: () => showAppSheet(context, (_) => const InviteSheet()),
               ),
@@ -260,7 +260,7 @@ class _FriendSearchState extends State<_FriendSearch> {
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
-        Text('Freund suchen', style: Theme.of(context).textTheme.titleLarge),
+        Text('Kontakt suchen', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         TextField(
           autofocus: true,

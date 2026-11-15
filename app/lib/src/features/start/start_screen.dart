@@ -228,7 +228,7 @@ class _StartScreenState extends State<StartScreen> {
       if (friends.accepted.isEmpty)
         _Task(
           icon: Icons.qr_code_2,
-          title: 'Hol deine Freunde per QR-Code',
+          title: 'Hol deine Kontakte per QR-Code',
           message: 'Dann siehst du, wo sie gerade Döner essen.',
           onTap: () => showAppSheet(context, (_) => const InviteSheet()),
         ),
@@ -239,164 +239,171 @@ class _StartScreenState extends State<StartScreen> {
         title: const Row(children: [BrandTile(size: 30), SizedBox(width: 10), Flexible(child: Text('Lieblingsdöner', overflow: TextOverflow.ellipsis))]),
         actions: const [InboxButton(), SizedBox(width: 8)],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (n) {
-            if (n.metrics.extentAfter < 400) _loadMore();
-            return false;
-          },
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (_live.isNotEmpty) ...[
-                SizedBox(
-                  height: 96,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _live.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 10),
-                    itemBuilder: (context, i) => SizedBox(width: 170, child: _LiveChip(status: _live[i])),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              NewsCard(key: _newsKey),
-              for (final task in tasks) Padding(padding: const EdgeInsets.only(bottom: 10), child: task),
-              if (_news.opened.isNotEmpty || _news.upcoming.isNotEmpty) ...[
-                _NewPlacesCard(news: _news),
-                const SizedBox(height: 10),
-              ],
-              if (tasks.isNotEmpty) const SizedBox(height: 10),
-              SectionTitle(
-                title: switch (diet) { Diet.all => 'Top 3 hier', Diet.vegetarian => 'Top 3 ohne Fleisch', Diet.vegan => 'Top 3 vegan' },
-                trailing: CityButton(label: visiting?.name ?? (location.position == null ? 'Freiburg' : 'Andere Stadt')),
-              ),
-              if (!_areaLoaded)
-                const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
-              else if (_top.isEmpty)
-                GlassCard(
-                  onTap: widget.onOpenMap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Hier kennt die App noch keine Döner-Läden. Schau auf der Karte, was es in der Nähe gibt.'),
-                      TextButton.icon(
-                        icon: const Icon(Icons.travel_explore),
-                        label: const Text('Oder schau, wo man anderswo am besten isst'),
-                        onPressed: () => showCityPicker(context),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                const Divider(),
-                for (final (i, place) in _top.indexed) _TopTile(rank: i + 1, place: place, diet: diet),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: widget.onOpenRanking,
-                    icon: const Icon(Icons.arrow_forward),
-                    iconAlignment: IconAlignment.end,
-                    label: const Text('Ganze Rangliste'),
-                  ),
-                ),
-              ],
-              if (_trending.where((p) => diet != Diet.vegan || p.veganOptions != false).toList() case final trending
-                  when trending.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                const SectionTitle(title: 'Gerade im Trend'),
-                SizedBox(
-                  height: 118,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: trending.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, i) => SizedBox(width: 170, child: _PlaceCard(place: trending[i], diet: diet)),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              SectionTitle(
-                title: _friendsOnly ? 'Deine Freunde' : visiting == null ? 'In deiner Gegend' : 'In ${visiting.name}',
-                trailing: FilterChip(
-                  label: const Text('Nur Freunde'),
-                  selected: _friendsOnly,
-                  onSelected: (value) {
-                    setState(() => _friendsOnly = value);
-                    _reloadFeed();
-                  },
-                ),
-              ),
-              if (_items.isNotEmpty) const Divider(),
-              for (final item in _items)
-                ActivityCard(
-                    type: item.type,
-                    title: item.user.displayName,
-                    tier: item.user.tier,
-                    onTitleTap: () => showUserProfile(context, item.user),
-                    subtitle: '${item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet:'} ${item.place.name}',
-                    timestamp: item.timestamp,
-                    score: item.headline(diet),
-                    ratings: item.ratings,
-                    diet: diet,
-                    text: item.text,
-                    foodType: item.foodType,
-                    photoId: item.photoId,
-                    onSite: item.onSite,
-                    regular: item.regular,
-                    highlight: item.fromFriend,
-                    footer: item.fromFriend
-                        ? ReactionBar(
-                            key: ValueKey(item.id),
-                            path: '/${item.type == FeedItemType.visit ? 'visits' : 'reviews'}/${item.id}',
-                            reactions: item.reactions,
-                            mine: item.myReaction,
-                            reactors: item.reactors,
-                          )
-                        : null,
-                  onTap: () => showPlaceDetail(context, item.place),
-                  menu: ContentMenu(
-                    user: item.user,
-                    reviewId: item.type == FeedItemType.review ? item.id : null,
-                    onBlocked: () => setState(() => _items.removeWhere((i) => i.user.id == item.user.id)),
-                    onRemoved: () => setState(() => _items.remove(item)),
-                  ),
-                ),
-              if (_loading)
-                const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-              else if (_error != null && _items.isEmpty)
-                EmptyState(
-                  icon: Icons.cloud_off,
-                  title: 'Nicht geladen',
-                  message: _error!,
-                  action: OutlinedButton(onPressed: _reloadFeed, child: const Text('Erneut versuchen')),
-                )
-              else if (_items.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    children: [
-                      Text(
-                        _friendsOnly
-                            ? 'Deine Freunde haben noch nichts eingecheckt oder bewertet.'
-                            : 'In deiner Gegend hat noch niemand bewertet. Fang du an!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Theme.of(context).colorScheme.outline),
-                      ),
-                      if (_friendsOnly) ...[
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          icon: const Icon(Icons.group_add),
-                          label: const Text('Freunde einladen'),
-                          onPressed: () => showAppSheet(context, (_) => const InviteSheet()),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (n) {
+                  if (n.metrics.extentAfter < 400) _loadMore();
+                  return false;
+                },
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (_live.isNotEmpty) ...[
+                      SizedBox(
+                        height: 96,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _live.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 10),
+                          itemBuilder: (context, i) => SizedBox(width: 170, child: _LiveChip(status: _live[i])),
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
+                    NewsCard(key: _newsKey),
+                    for (final task in tasks) Padding(padding: const EdgeInsets.only(bottom: 10), child: task),
+                    if (_news.opened.isNotEmpty || _news.upcoming.isNotEmpty) ...[
+                      _NewPlacesCard(news: _news),
+                      const SizedBox(height: 10),
+                    ],
+                    if (tasks.isNotEmpty) const SizedBox(height: 10),
+                    SectionTitle(
+                      title: switch (diet) { Diet.all => 'Top 3 hier', Diet.vegetarian => 'Top 3 ohne Fleisch', Diet.vegan => 'Top 3 vegan' },
+                      trailing: CityButton(label: visiting?.name ?? (location.position == null ? 'Freiburg' : 'Andere Stadt')),
+                    ),
+                    if (!_areaLoaded)
+                      const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+                    else if (_top.isEmpty)
+                      GlassCard(
+                        onTap: widget.onOpenMap,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Hier kennt die App noch keine Döner-Läden. Schau auf der Karte, was es in der Nähe gibt.'),
+                            TextButton.icon(
+                              icon: const Icon(Icons.travel_explore),
+                              label: const Text('Oder schau, wo man anderswo am besten isst'),
+                              onPressed: () => showCityPicker(context),
+                            ),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      const Divider(),
+                      for (final (i, place) in _top.indexed) _TopTile(rank: i + 1, place: place, diet: diet),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: widget.onOpenRanking,
+                          icon: const Icon(Icons.arrow_forward),
+                          iconAlignment: IconAlignment.end,
+                          label: const Text('Ganze Rangliste'),
+                        ),
+                      ),
+                    ],
+                    if (_trending.where((p) => diet != Diet.vegan || p.veganOptions != false).toList() case final trending
+                        when trending.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      const SectionTitle(title: 'Gerade im Trend'),
+                      SizedBox(
+                        height: 118,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: trending.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 12),
+                          itemBuilder: (context, i) => SizedBox(width: 170, child: _PlaceCard(place: trending[i], diet: diet)),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    SectionTitle(
+                      title: _friendsOnly ? 'Deine Kontakte' : visiting == null ? 'In deiner Gegend' : 'In ${visiting.name}',
+                      trailing: FilterChip(
+                        label: const Text('Nur Kontakte'),
+                        selected: _friendsOnly,
+                        onSelected: (value) {
+                          setState(() => _friendsOnly = value);
+                          _reloadFeed();
+                        },
+                      ),
+                    ),
+                    if (_items.isNotEmpty) const Divider(),
+                    for (final item in _items)
+                      ActivityCard(
+                          type: item.type,
+                          title: item.user.displayName,
+                          tier: item.user.tier,
+                          onTitleTap: () => showUserProfile(context, item.user),
+                          subtitle: '${item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet:'} ${item.place.name}',
+                          timestamp: item.timestamp,
+                          score: item.headline(diet),
+                          ratings: item.ratings,
+                          diet: diet,
+                          text: item.text,
+                          foodType: item.foodType,
+                          photoId: item.photoId,
+                          onSite: item.onSite,
+                          regular: item.regular,
+                          highlight: item.fromFriend,
+                          footer: item.fromFriend
+                              ? ReactionBar(
+                                  key: ValueKey(item.id),
+                                  path: '/${item.type == FeedItemType.visit ? 'visits' : 'reviews'}/${item.id}',
+                                  reactions: item.reactions,
+                                  mine: item.myReaction,
+                                  reactors: item.reactors,
+                                )
+                              : null,
+                        onTap: () => showPlaceDetail(context, item.place),
+                        menu: ContentMenu(
+                          user: item.user,
+                          reviewId: item.type == FeedItemType.review ? item.id : null,
+                          onBlocked: () => setState(() => _items.removeWhere((i) => i.user.id == item.user.id)),
+                          onRemoved: () => setState(() => _items.remove(item)),
+                        ),
+                      ),
+                    if (_loading)
+                      const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+                    else if (_error != null && _items.isEmpty)
+                      EmptyState(
+                        icon: Icons.cloud_off,
+                        title: 'Nicht geladen',
+                        message: _error!,
+                        action: OutlinedButton(onPressed: _reloadFeed, child: const Text('Erneut versuchen')),
+                      )
+                    else if (_items.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Column(
+                          children: [
+                            Text(
+                              _friendsOnly
+                                  ? 'Deine Kontakte haben noch nichts eingecheckt oder bewertet.'
+                                  : 'In deiner Gegend hat noch niemand bewertet. Fang du an!',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                            ),
+                            if (_friendsOnly) ...[
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                icon: const Icon(Icons.group_add),
+                                label: const Text('Kontakte einladen'),
+                                onPressed: () => showAppSheet(context, (_) => const InviteSheet()),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    const GoogleAttribution(),
+                  ],
                 ),
-              const GoogleAttribution(),
-            ],
+              ),
+            ),
           ),
         ),
       ),

@@ -42,7 +42,7 @@ class ContentMenu extends StatelessWidget {
     final ok = await _confirm(
       context,
       '${user.displayName} blockieren?',
-      'Ihr seht gegenseitig keine Bewertungen mehr und findet euch nicht in der Suche. Eine Freundschaft endet. '
+      'Ihr seht gegenseitig keine Bewertungen mehr und findet euch nicht in der Suche. Eine Verbindung endet. '
           'Freigeben kannst du in den Einstellungen.',
       'Blockieren',
     );
@@ -165,7 +165,7 @@ class _ReportSheetState extends State<_ReportSheet> {
   }
 }
 
-/// Settings → Blockierte Nutzer.
+/// Settings → Blockierte Konten.
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
 
@@ -205,7 +205,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   Widget build(BuildContext context) {
     final blocked = _blocked;
     return Scaffold(
-      appBar: AppBar(title: const Text('Blockierte Nutzer')),
+      appBar: AppBar(title: const Text('Blockierte Konten')),
       body: ListView(
         children: [
           Padding(

@@ -18,23 +18,23 @@ Future<FriendshipDto> _with(Context ctx) async {
   final user = ctx.args.option('user') ?? (throw const Failure('--user <id> fehlt, siehe `doener friends`.', Exit.usage));
   final friendships = parseList(await ctx.api.get('/friends'), FriendshipDto.fromJson);
   return friendships.where((f) => f.user.id == user).firstOrNull ??
-      (throw const Failure('Mit dieser Person gibt es keine Freundschaft und keine Anfrage.', Exit.error));
+      (throw const Failure('Mit dieser Person gibt es keine Verbindung und keine Anfrage.', Exit.error));
 }
 
 final friends = <String, Command>{
   'friends': Command(
-    help: [('friends', 'Freunde und offene Anfragen, mit der ID für die Befehle unten')],
+    help: [('friends', 'Kontakte und offene Anfragen, mit der ID für die Befehle unten')],
     run: (ctx) async {
       requireLogin(ctx);
       final friendships = parseList(await ctx.api.get('/friends'), FriendshipDto.fromJson);
       return (
         data: {'friends': [for (final friendship in friendships) friendship.toJson()]},
-        text: friendships.isEmpty ? 'Noch keine Freunde.' : friendships.map(_line).join('\n'),
+        text: friendships.isEmpty ? 'Noch keine Kontakte.' : friendships.map(_line).join('\n'),
       );
     },
   ),
   'users': Command(
-    help: [('users --search <name>', 'Nutzer suchen, für befriend')],
+    help: [('users --search <name>', 'Personen suchen, für befriend')],
     options: (parser) => parser..addOption('search'),
     run: (ctx) async {
       requireLogin(ctx);
@@ -48,7 +48,7 @@ final friends = <String, Command>{
   ),
   // Asking someone who already asked accepts, so the one command does both.
   'befriend': Command(
-    help: [('befriend --user <id>', 'Freundschaftsanfrage senden oder eine erhaltene annehmen')],
+    help: [('befriend --user <id>', 'Kontaktanfrage senden oder eine erhaltene annehmen')],
     options: (parser) => parser..addOption('user'),
     run: (ctx) async {
       requireLogin(ctx);
@@ -62,7 +62,7 @@ final friends = <String, Command>{
     },
   ),
   'unfriend': Command(
-    help: [('unfriend --user <id>', 'Freundschaft beenden, eine Anfrage zurückziehen oder ablehnen')],
+    help: [('unfriend --user <id>', 'Verbindung beenden, eine Anfrage zurückziehen oder ablehnen')],
     options: (parser) => parser..addOption('user'),
     run: (ctx) async {
       requireLogin(ctx);
@@ -72,7 +72,7 @@ final friends = <String, Command>{
       return (
         data: {'ok': true},
         text: switch ((friendship.status, friendship.direction)) {
-          (FriendshipStatus.accepted, _) => 'Freundschaft mit $name beendet.',
+          (FriendshipStatus.accepted, _) => 'Verbindung mit $name beendet.',
           (FriendshipStatus.pending, FriendshipDirection.outgoing) => 'Anfrage an $name zurückgezogen.',
           (FriendshipStatus.pending, FriendshipDirection.incoming) => 'Anfrage von $name abgelehnt.',
         },
@@ -82,7 +82,7 @@ final friends = <String, Command>{
   // Muted friends stay friends, only their check-ins send no push.
   for (final (name, muted) in const [('mute', true), ('unmute', false)])
     name: Command(
-      help: [('$name --user <id>', muted ? 'Keine Pushes mehr, wenn dieser Freund eincheckt' : 'Wieder Pushes von diesem Freund')],
+      help: [('$name --user <id>', muted ? 'Keine Pushes mehr, wenn dieser Kontakt eincheckt' : 'Wieder Pushes von diesem Kontakt')],
       options: (parser) => parser..addOption('user'),
       run: (ctx) async {
         requireLogin(ctx);

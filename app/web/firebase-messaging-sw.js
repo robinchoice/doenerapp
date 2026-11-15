@@ -12,9 +12,9 @@ firebase.initializeApp({
 
 // Same as neutralPushText in packages/doener_models.
 const neutral = {
-  friend_request: 'Du hast eine Freundschaftsanfrage. Öffne die App für Details.',
+  friend_request: 'Du hast eine Kontaktanfrage. Öffne die App für Details.',
   reaction: 'Jemand hat auf deinen Post reagiert. Öffne die App für Details.',
-  friend_check_in: 'Ein Freund ist gerade beim Döner. Öffne die App für Details.',
+  friend_check_in: 'Ein Kontakt ist gerade beim Döner. Öffne die App für Details.',
   new_place: 'Ein neuer Döner hat aufgemacht. Öffne die App für Details.',
 };
 

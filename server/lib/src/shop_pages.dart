@@ -33,7 +33,7 @@ Future<Response> reviewLinkPage(Deps deps, Request request, String placeId) asyn
       '<p>Gib Soße, Fleisch, Salat und Brot eine Note. Aus allen Bewertungen entsteht das Ranking'
       '${city == null ? ' deiner Stadt' : ' von ${_escape.convert(city)}'}.</p>'
       '<a class="button" href="/app?review=$placeId">Jetzt bewerten</a>'
-      '<a class="button secondary" href="/#test">Noch kein Konto? Als Tester bewerben</a>'
+      '<a class="button secondary" href="/#test">Noch kein Konto? Zum Testen bewerben</a>'
       '${name == null ? '' : '<p class="source">Ortsdaten: Google Maps</p>'}';
   return _html(
     200,

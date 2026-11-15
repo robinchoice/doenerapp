@@ -32,7 +32,7 @@ const SCREENS = [
   ['2-ranking', 'Die besten Läden deiner Stadt', (d) => [d.tab.ranking]],
   ['3-laden', 'Alles über einen Laden: Bewertungen, Preise, Öffnungszeiten', (d) => [d.tab.ranking, d.shop]],
   ['4-bewerten', 'Bewerten: Soße, Fleisch, Salat, Brot', (d) => [d.tab.ranking, d.shop, d.rate]],
-  ['5-profil', 'Deine Läden, Check-ins und Freunde', (d) => [d.tab.profil]],
+  ['5-profil', 'Deine Läden, Check-ins und Kontakte', (d) => [d.tab.profil]],
 ];
 
 const TYPES = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.html': 'text/html', '.json': 'application/json', '.wasm': 'application/wasm', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png' };

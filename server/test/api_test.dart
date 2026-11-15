@@ -1963,7 +1963,7 @@ void main() {
     final list = await (await get('/bestenliste/teststadt/2026.md?lang=en')).readAsString();
     expect(list, contains('1. Grill 1 – Hauptstr. 1 · Avg. 5.0 · 10 reviews'));
     expect(list, isNot(contains('längste Bewertung')), reason: 'no quotes from single reviews');
-    expect(await (await get('/datenschutz.md')).readAsString(), allOf(contains('## 1. Verantwortlicher'), isNot(contains('<'))));
+    expect(await (await get('/datenschutz.md')).readAsString(), allOf(contains('## 1. Verantwortlich'), isNot(contains('<'))));
 
     // Accept: text/markdown gets the Markdown under the page's own URL, everyone else the HTML.
     const md = {'accept': 'text/markdown'};

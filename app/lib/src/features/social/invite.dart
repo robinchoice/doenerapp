@@ -96,7 +96,7 @@ class InviteSheet extends StatelessWidget {
         shrinkWrap: true,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [
-          Text('Freunde einladen', style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
+          Text('Kontakte einladen', style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
           const SizedBox(height: 8),
           const Text(
             'Teil deinen Link oder lass den QR-Code scannen. Wer ihn öffnet und sich anmeldet, ist sofort mit dir befreundet.',

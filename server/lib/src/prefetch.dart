@@ -103,7 +103,7 @@ final prefetchAreas = [
 
 /// One run searches with at most this many requests. Together with the
 /// users' tile searches it stays within the project's daily SearchText quota
-/// (infra.md), which keeps the searches inside Google's free Pro requests.
+/// in the Google project, which keeps the searches inside Google's free Pro requests.
 const prefetchRequestsPerRun = 110;
 
 /// Areas are searched in blocks of 8 × 8 tiles (about 27 × 17 km). Where a

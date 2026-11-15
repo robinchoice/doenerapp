@@ -92,7 +92,7 @@ Future<void> showPushSignal(RemoteMessage message, {bool setUp = false}) async {
     notificationDetails: const NotificationDetails(
       android: AndroidNotificationDetails(
         'push',
-        'Freunde und neue Läden',
+        'Kontakte und neue Läden',
         importance: Importance.high,
         priority: Priority.high,
         actions: [AndroidNotificationAction(lessAction, 'Weniger davon', showsUserInterface: true)],

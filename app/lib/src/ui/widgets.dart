@@ -347,7 +347,7 @@ class ActivityCard extends StatelessWidget {
                         Flexible(child: NameLink(title, onTap: onTitleTap)),
                         if (highlight) ...[
                           const SizedBox(width: 6),
-                          Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund'),
+                          Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Kontakt'),
                         ],
                         if (onSite) ...[const SizedBox(width: 8), OnSiteBadge(regular: regular)],
                       ]),

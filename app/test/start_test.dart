@@ -9,6 +9,8 @@ import 'package:doener_app/src/features/ranking/ranking_screen.dart';
 import 'package:doener_app/src/features/settings/quiet_hours.dart';
 import 'package:doener_app/src/features/social/friends.dart';
 import 'package:doener_app/src/features/start/start_screen.dart';
+import 'package:doener_app/src/features/profile/profile_screen.dart';
+import 'package:doener_app/src/features/settings/settings_screen.dart';
 import 'package:doener_app/src/ui/widgets.dart';
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
@@ -126,6 +128,69 @@ Future<FakeServer> _pump(WidgetTester tester, Widget child, {LatLng? position}) 
 void main() {
   setUpAll(() => initializeDateFormatting('de'));
 
+  testWidgets('regression: start stays bounded and keeps its filter across window resizing', (tester) async {
+    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () {}));
+    await tester.ensureVisible(find.text('Nur Kontakte'));
+    await tester.tap(find.text('Nur Kontakte'));
+    await tester.pumpAndSettle();
+    final calls = server.calls('/feed').length;
+    for (final size in [const Size(1200, 900), const Size(390, 700), const Size(900, 390)]) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = const FakeViewPadding(left: 30, right: 20, bottom: 24);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(RefreshIndicator)).width, lessThanOrEqualTo(720));
+      tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.widgetWithText(FilterChip, 'Nur Kontakte'), 150, scrollable: find.byType(Scrollable).first);
+      expect(tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Nur Kontakte')).selected, isTrue);
+      expect(server.calls('/feed').length, calls);
+    }
+  });
+
+  testWidgets('regression: profile stays inside safe areas and readable width after resizing', (tester) async {
+    await _pump(tester, const ProfileScreen());
+    for (final size in [const Size(1200, 900), const Size(320, 700), const Size(900, 390)]) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = const FakeViewPadding(left: 30, right: 20, bottom: 24);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final rect = tester.getRect(find.byType(RefreshIndicator));
+      expect(rect.width, lessThanOrEqualTo(720));
+      expect(rect.left, greaterThanOrEqualTo(30));
+      expect(rect.right, lessThanOrEqualTo(size.width - 20));
+    }
+  });
+
+  testWidgets('regression: feedback keeps its draft and send action when resized with keyboard', (tester) async {
+    await _pump(
+      tester,
+      Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(onPressed: () => showAppSheet(context, (_) => const FeedbackSheet()), child: const Text('Open feedback')),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open feedback'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Feedback draft survives resizing');
+    for (final size in [const Size(1200, 900), const Size(390, 700), const Size(900, 390)]) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = const FakeViewPadding(left: 30, right: 20, bottom: 24);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, 'Feedback draft survives resizing');
+      final send = tester.getRect(find.widgetWithText(FilledButton, 'Senden'));
+      expect(send.bottom, lessThanOrEqualTo(size.height - 160));
+      expect(send.left, greaterThanOrEqualTo(30));
+      expect(send.right, lessThanOrEqualTo(size.width - 20));
+    }
+  });
+
   testWidgets('start shows the best places around, marks friends and helps newcomers', (tester) async {
     var rankingOpened = false;
     final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () => rankingOpened = true), position: const LatLng(48, 7.85));
@@ -133,7 +198,7 @@ void main() {
     expect(find.text('Kebap Haus'), findsOneWidget);
     expect(find.text('noch unbewertet'), findsOneWidget);
     expect(find.text('Bewerte deinen Stammladen'), findsOneWidget);
-    expect(find.text('Hol deine Freunde per QR-Code'), findsOneWidget);
+    expect(find.text('Hol deine Kontakte per QR-Code'), findsOneWidget);
     expect(find.text('Dönerneuling · Eingecheckt bei Kebap Haus', findRichText: true), findsOneWidget, reason: 'the tier leads the line');
     expect(find.text('Dönerneuling · Bewertet: Kebap Haus', findRichText: true), findsOneWidget);
     expect(find.byIcon(Icons.group), findsOneWidget, reason: 'only Tom is a friend');
@@ -142,7 +207,7 @@ void main() {
     expect(find.text('🗓️ Bald: Grillhaus Dreisam. Laut Google am 15. Oktober'), findsOneWidget);
     expect(server.calls('/feed').single.queryParameters['lat'], '48.0');
 
-    await tester.tap(find.text('Nur Freunde'));
+    await tester.tap(find.text('Nur Kontakte'));
     await tester.pumpAndSettle();
     expect(server.calls('/feed').last.queryParameters.containsKey('lat'), isFalse);
 
@@ -196,7 +261,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(server.calls('/me/mutes/u2'), hasLength(1));
-    expect(find.text('Tom ist stumm. Rückgängig unter Freunde.'), findsOneWidget);
+    expect(find.text('Tom ist stumm. Rückgängig unter Kontakte.'), findsOneWidget);
   });
 
   testWidgets('quiet hours: days and the summary in the settings', (tester) async {

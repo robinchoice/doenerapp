@@ -229,7 +229,7 @@ void mountSocial(Router router, Deps deps) {
     if (other == me.id) throw const ApiException.badRequest('Du kannst dich nicht selbst hinzufügen');
     if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE id = @id:uuid', {'id': other}) == null ||
         await isBlocked(deps, me.id, other)) {
-      throw const ApiException.notFound('Nutzer nicht gefunden');
+      throw const ApiException.notFound('Konto nicht gefunden');
     }
 
     final inserted = await deps.db.execute(
@@ -246,7 +246,7 @@ void mountSocial(Router router, Deps deps) {
         type: 'friend_request',
         sourceId: inserted.single.single as String,
         title: '${me.displayName} möchte mit dir befreundet sein',
-        body: 'Öffne die Freundschaftsanfragen in der App.',
+        body: 'Öffne die Kontaktanfragen in der App.',
       );
     }
     // If they already asked me, asking back means accepting.
@@ -283,7 +283,7 @@ void mountSocial(Router router, Deps deps) {
       'DELETE FROM friendships WHERE id = @id:uuid AND (requester_id = @me:uuid OR addressee_id = @me:uuid) RETURNING id',
       {'id': requireUuid(id), 'me': me.id},
     );
-    if (row == null) throw const ApiException.notFound('Freundschaft nicht gefunden');
+    if (row == null) throw const ApiException.notFound('Verbindung nicht gefunden');
     return noContent();
   });
 
@@ -477,9 +477,9 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
       : '${escape.convert(inviter.displayName)} lädt dich zu Lieblingsdöner ein';
   final content = inviter == null
       ? '<p>Der Link wurde zurückgesetzt oder ist falsch.</p><a class="button" href="/">Zu Lieblingsdöner</a>'
-      : '<p>Sieh, wo deine Freunde gerade Döner essen – und iss mit. Die App ist noch im Test: '
+      : '<p>Sieh, wo deine Kontakte gerade Döner essen – und iss mit. Die App ist noch im Test: '
           'Bewirb dich, dann schalten wir dich frei.</p>'
-          '<a class="button" href="/?von=$code#test">Als Tester bewerben</a>'
+          '<a class="button" href="/?von=$code#test">Zum Testen bewerben</a>'
           '<a class="button secondary" href="/app?invite=$code">Ich habe schon ein Konto</a>';
 
   return Response(
@@ -493,7 +493,7 @@ Future<Response> invitePage(Deps deps, Request request, String code) async {
 ${inviter == null ? '' : '<script>if (localStorage.getItem("FlutterSecureStorage.session_token")) location.replace("/app?invite=$code");</script>'}
 <title>$title</title>
 <meta property="og:title" content="$title">
-<meta property="og:description" content="Sieh, wo deine Freunde gerade Döner essen – und iss mit.">
+<meta property="og:description" content="Sieh, wo deine Kontakte gerade Döner essen – und iss mit.">
 <meta property="og:image" content="$base/icons/Icon-512.png">
 ${inviter == null ? '' : '<meta property="og:url" content="$base/i/$code">'}
 <style>

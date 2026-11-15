@@ -38,10 +38,10 @@ class FoodItem {
 /// The level next to someone's name, by how many places they reviewed.
 enum Tier {
   doenerneuling(0, 'Dönerneuling'),
-  doenerfreund(3, 'Dönerfreund'),
+  doenerfreund(3, 'Dönerliebe'),
   doenerfan(10, 'Dönerfan'),
   doenerprofi(25, 'Dönerprofi'),
-  doenermeister(50, 'Dönermeister'),
+  doenermeister(50, 'Dönergröße'),
   doenerlegende(100, 'Dönerlegende');
 
   final int reviewedPlaces;

@@ -194,7 +194,7 @@ class _NewsAdminScreenState extends State<NewsAdminScreen> {
                 const Center(child: CircularProgressIndicator())
               else ...[
                 Text(
-                  'Erscheint als Karte auf Start, auf Wunsch auch per Mail an ${list.subscribers} Abonnenten.',
+                  'Erscheint als Karte auf Start, auf Wunsch auch per Mail an ${list.subscribers} Adressen.',
                   style: TextStyle(color: theme.colorScheme.outline),
                 ),
                 const SizedBox(height: 12),
@@ -290,7 +290,7 @@ class _NewsEditorState extends State<NewsEditor> {
   }
 
   Future<void> _publish() async {
-    final mail = _byMail ? 'Geht per Mail an ${widget.subscribers} Abonnenten. ' : '';
+    final mail = _byMail ? 'Geht per Mail an ${widget.subscribers} Adressen. ' : '';
     final app = _inApp ? 'Erscheint sofort als Karte auf Start. ' : '';
     final ok = await showDialog<bool>(
       context: context,
@@ -365,7 +365,7 @@ class _NewsEditorState extends State<NewsEditor> {
               contentPadding: EdgeInsets.zero,
               value: _byMail,
               onChanged: (v) => setState(() => _byMail = v!),
-              title: Text('Per Mail an ${widget.subscribers} Abonnenten'),
+              title: Text('Per Mail an ${widget.subscribers} Adressen'),
               subtitle: const Text('Nur wer „Neuigkeiten per Mail“ eingeschaltet hat.'),
             ),
             Align(

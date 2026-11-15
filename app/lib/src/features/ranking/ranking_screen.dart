@@ -201,9 +201,9 @@ class _RankingScreenState extends State<RankingScreen> {
                       [
                         if (_hint(by).isNotEmpty) _hint(by),
                         if (_maxPrice != null) 'Nur Läden, deren Döner laut Bewertungen meist höchstens ${formatPrice(_maxPrice!)} kostet',
-                        if (_ingredient case final i?) 'Nur Läden, bei denen die meisten Experten ${i.label} im Döner hatten',
+                        if (_ingredient case final i?) 'Nur Läden, bei denen die meisten Personen im Detailmodus ${i.label} im Döner hatten',
                         if (_halal) 'Nur Läden, deren Fleisch laut den meisten Bewertungen halal ist',
-                        if (_homemadeSkewer) 'Nur Läden, deren Spieß laut den meisten Experten selbst gesteckt ist',
+                        if (_homemadeSkewer) 'Nur Läden, deren Spieß laut den meisten Personen im Detailmodus selbst gesteckt ist',
                       ].join(' · '),
                       style: TextStyle(color: Theme.of(context).colorScheme.outline, fontSize: 12),
                     ),
@@ -234,7 +234,7 @@ class _RankingScreenState extends State<RankingScreen> {
                   EmptyState(
                     icon: Icons.search_off,
                     title: 'Nichts mit ${_ingredient!.label} gefunden',
-                    message: 'Zutaten kommen von Experten in den Bewertungen. Schalt den Expertenmodus in den Einstellungen ein '
+                    message: 'Zutaten stammen aus Detailangaben in den Bewertungen. Schalt den Detailmodus in den Einstellungen ein '
                         'und trag beim nächsten Döner ein, was drin war.',
                     action: OutlinedButton(
                       onPressed: () => setState(() {
@@ -263,7 +263,7 @@ class _RankingScreenState extends State<RankingScreen> {
                     title: 'Nichts gefunden',
                     message: _halal
                         ? 'Ob das Fleisch halal ist, kommt aus den Bewertungen. Sag beim nächsten Döner, was du weißt.'
-                        : 'Den Spieß tragen Experten in ihre Bewertungen ein. Schalt den Expertenmodus in den Einstellungen ein.',
+                        : 'Den Spieß tragen Personen im Detailmodus in ihre Bewertungen ein. Schalt den Detailmodus in den Einstellungen ein.',
                     action: OutlinedButton(
                       onPressed: () => _filter(() => _halal = _homemadeSkewer = false),
                       child: const Text('Alle Läden'),
@@ -342,7 +342,7 @@ class _IngredientPicker extends StatelessWidget {
           Text('Mit Zutat 🧅', style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
           const SizedBox(height: 4),
           Text(
-            'Nur Läden, bei denen die meisten Experten sie im Döner hatten.',
+            'Nur Läden, bei denen die meisten Personen im Detailmodus sie im Döner hatten.',
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
             textAlign: TextAlign.center,
           ),

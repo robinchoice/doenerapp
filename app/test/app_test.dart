@@ -61,6 +61,16 @@ Future<AppData> _appData() async {
 }
 
 void main() {
+  testWidgets('regression: sender wraps in narrow windows', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(220, 300);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: PleasanceFooter())));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('ein Werkzeug von'), findsOneWidget);
+  });
+
   test('map cache keeps places the user interacted with', () async {
     final data = await _appData();
     data.places['p2'] = const PlaceDto(placeId: 'p2', name: 'Anderer Laden', latitude: 48, longitude: 7.8);

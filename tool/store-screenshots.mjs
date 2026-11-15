@@ -20,7 +20,7 @@ const HEADLINES = {
   '3-ranking': 'Die besten Läden deiner Stadt',
   '4-laden': 'Alles über einen Laden: Bewertungen, Preise, Öffnungszeiten',
   '5-bewerten': 'Bewerten: Soße, Fleisch, Salat, Brot',
-  '6-freunde': 'Sehen, wo deine Freunde essen',
+  '6-freunde': 'Sehen, wo deine Kontakte essen',
 };
 
 // Play Store: PNG, at least 1080 px per side, aspect ratio within 2:1.

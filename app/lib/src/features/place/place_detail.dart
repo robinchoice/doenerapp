@@ -272,8 +272,7 @@ class _PlaceDetailState extends State<PlaceDetail> {
         if (mapsAvailable)
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            // A rounded clip on this map makes iOS skip drawing the sheets above it wherever they
-            // cover the big map (Flutter 3.47 engine bug, undone by flutter/flutter#190003).
+            // On iOS, clipping this embedded map hides overlapping sheets on the main map.
             clipBehavior: !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS ? Clip.none : Clip.antiAlias,
             child: SizedBox(
               height: 160,
@@ -417,7 +416,7 @@ class _IngredientsCard extends StatelessWidget {
     if (summary.experts == 0) {
       return GlassCard(
         child: Text(
-          'Noch hat niemand eingetragen, was „mit allem“ hier heißt. Im Expertenmodus fragt die Bewertung danach.',
+          'Noch hat niemand eingetragen, was „mit allem“ hier heißt. Im Detailmodus fragt die Bewertung danach.',
           style: TextStyle(color: theme.colorScheme.outline),
         ),
       );
@@ -481,7 +480,7 @@ class ReviewCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (friend) ...[const SizedBox(width: 4), Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Freund')],
+                if (friend) ...[const SizedBox(width: 4), Icon(Icons.group, size: 14, color: context.accent, semanticLabel: 'Kontakt')],
                 const SizedBox(width: 6),
                 TierLabel(Tier.forReviewedPlaces(review.userReviewedPlaces)),
                 if (menu != null) ...[const Spacer(), menu!],

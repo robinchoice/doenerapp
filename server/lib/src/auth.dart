@@ -36,7 +36,7 @@ String randomCode() => _random.nextInt(1000000).toString().padLeft(6, '0');
 /// the message carries both languages.
 /// The app offers the tester request on the landing page for it.
 const signupClosed = ApiException.forbidden(
-  'Die Registrierung ist noch geschlossen, für diese Adresse gibt es noch kein Konto. Bewirb dich als Tester.\n'
+  'Die Registrierung ist noch geschlossen, für diese Adresse gibt es noch kein Konto. Bewirb dich zum Testen.\n'
   'Sign-up is still closed, there is no account for this address yet. Apply as a tester.',
 );
 

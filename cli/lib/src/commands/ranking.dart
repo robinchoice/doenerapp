@@ -7,7 +7,7 @@ String _line(int i, RankingEntryDto entry) => [
   '${'${i + 1}.'.padLeft(3)} ${entry.place.name} – ${decimal(entry.average)} (${reviewCount(entry.count)})',
   if (entry.price case final price?) euros(price),
   if (entry.friends.isNotEmpty)
-    'Freunde: ${[for (final friend in entry.friends) '${friend.user.displayName} ${decimal(friend.rating)}'].join(', ')}',
+    'Kontakte: ${[for (final friend in entry.friends) '${friend.user.displayName} ${decimal(friend.rating)}'].join(', ')}',
 ].join(' · ');
 
 /// The city ranking as on the ranking tab: the city around the position or
@@ -19,7 +19,7 @@ final ranking = Command(
     ('  [--by overall|vegetarian|vegan|<punkt>]', 'Wonach, sonst overall, Punkte wie bei review'),
     ('  [--by value|vegetarianValue|veganValue]', 'Preis-Leistung: Note pro Euro, nur Läden mit Preis'),
     ('  [--max-price <euro>]', 'Nur Läden, deren Döner meist höchstens so viel kostet'),
-    ('  [--ingredient <zutat>]', 'Nur Läden, bei denen die meisten Experten sie hatten (z. B. roteZwiebel)'),
+    ('  [--ingredient <zutat>]', 'Nur Läden, bei denen die meisten Personen im Detailmodus sie hatten (z. B. roteZwiebel)'),
     ('  [--halal]', 'Nur Läden, deren Fleisch laut den meisten Bewertungen halal ist'),
     ('  [--skewer homemade|industrial]', 'Nur Läden mit selbst gestecktem Spieß bzw. Fertigspieß, laut den meisten'),
   ],

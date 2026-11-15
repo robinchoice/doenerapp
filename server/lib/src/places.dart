@@ -529,7 +529,7 @@ void mountPlaces(Router router, Deps deps) {
       'FROM users u WHERE u.id = @id:uuid AND ${notBlocked('u.id')}',
       params,
     );
-    if (user == null) throw const ApiException.notFound('Nutzer nicht gefunden');
+    if (user == null) throw const ApiException.notFound('Konto nicht gefunden');
     final close = params['id'] == me.id ||
         await queryOne(
               deps.db,

@@ -112,6 +112,24 @@ Future<(FakeServer, Database)> _pumpApp(
 void main() {
   setUpAll(() => initializeDateFormatting('de'));
 
+  testWidgets('regression: floating feedback stays outside side safe areas after drag and resize', (tester) async {
+    await _pumpApp(tester, loggedIn: true, name: 'Robin', invitePromptDone: true);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(900, 500);
+    tester.view.padding = const FakeViewPadding(left: 40, right: 50);
+    await tester.pumpAndSettle();
+    final button = find.widgetWithIcon(FloatingActionButton, Icons.bug_report_outlined);
+    expect(tester.getRect(button).right, lessThanOrEqualTo(850));
+    await tester.drag(button, const Offset(-1200, 0));
+    await tester.pumpAndSettle();
+    expect(tester.getRect(button).left, greaterThanOrEqualTo(40));
+    tester.view.physicalSize = const Size(390, 700);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(button).left, greaterThanOrEqualTo(40));
+    expect(tester.getRect(button).right, lessThanOrEqualTo(340));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('tabs retain their state across window sizes and a short rail scrolls', (tester) async {
     await _pumpApp(tester, loggedIn: true, name: 'Robin', invitePromptDone: true);
     await tester.tap(find.text('Ranking').last);

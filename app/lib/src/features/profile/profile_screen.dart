@@ -63,78 +63,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await data.sync();
-          await data.refreshMine();
-        },
-        child: ListView(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await data.sync();
+                await data.refreshMine();
+              },
+              child: ListView(
                 children: [
-                  ProfileHeader(
-                    name: user?.displayName ?? 'Döner-Fan',
-                    reviewedPlaces: reviews.length,
-                    since: since,
-                    checkIns: data.visits.length,
-                    friends: friends.accepted.length,
-                    own: true,
-                  ),
-                  const SizedBox(height: 8),
-                  _MenuRow(
-                    icon: Icons.group,
-                    label: 'Freunde',
-                    trailing: [
-                      if (friends.incoming.isNotEmpty) Badge(backgroundColor: needsGlow, textColor: ink, label: Text('${friends.incoming.length}')),
-                      const SizedBox(width: 8),
-                      Text('${friends.accepted.length}', style: TextStyle(color: theme.colorScheme.outline)),
-                    ],
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
-                  ),
-                  _MenuRow(icon: Icons.qr_code_2, label: 'Freunde einladen', onTap: () => showAppSheet(context, (_) => const InviteSheet())),
-                  if (user?.admin ?? false)
-                    _MenuRow(
-                      icon: Icons.person_add_alt,
-                      label: 'Tester',
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _TestersScreen())),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ProfileHeader(
+                          name: user?.displayName ?? 'Döner-Fan',
+                          reviewedPlaces: reviews.length,
+                          since: since,
+                          checkIns: data.visits.length,
+                          friends: friends.accepted.length,
+                          own: true,
+                        ),
+                        const SizedBox(height: 8),
+                        _MenuRow(
+                          icon: Icons.group,
+                          label: 'Kontakte',
+                          trailing: [
+                            if (friends.incoming.isNotEmpty) Badge(backgroundColor: needsGlow, textColor: ink, label: Text('${friends.incoming.length}')),
+                            const SizedBox(width: 8),
+                            Text('${friends.accepted.length}', style: TextStyle(color: theme.colorScheme.outline)),
+                          ],
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendsScreen())),
+                        ),
+                        _MenuRow(icon: Icons.qr_code_2, label: 'Kontakte einladen', onTap: () => showAppSheet(context, (_) => const InviteSheet())),
+                        if (user?.admin ?? false)
+                          _MenuRow(
+                            icon: Icons.person_add_alt,
+                            label: 'Testzugang',
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _TestersScreen())),
+                          ),
+                        if (user?.admin ?? false)
+                          _MenuRow(
+                            icon: Icons.campaign_outlined,
+                            label: 'Neuigkeiten',
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewsAdminScreen())),
+                          ),
+                        _MenuRow(
+                          icon: Icons.storefront,
+                          label: 'Meine Läden',
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPlacesScreen())),
+                        ),
+                        // The year in review only makes sense at its end.
+                        _MenuRow(
+                          icon: Icons.auto_awesome,
+                          label: 'Döner Wrapped ${DateTime.now().year}',
+                          trailing: [
+                            if (!december) Text('ab 1. Dezember', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+                          ],
+                          onTap: december
+                              ? () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WrappedScreen()))
+                              : null,
+                        ),
+                        if (user != null)
+                          ProfileTabs(
+                            user: UserDto(id: user.id, displayName: user.displayName, reviewedPlaces: reviews.length),
+                            own: true,
+                            reviews: reviews,
+                            visits: data.visits,
+                          ),
+                      ],
                     ),
-                  if (user?.admin ?? false)
-                    _MenuRow(
-                      icon: Icons.campaign_outlined,
-                      label: 'Neuigkeiten',
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewsAdminScreen())),
-                    ),
-                  _MenuRow(
-                    icon: Icons.storefront,
-                    label: 'Meine Läden',
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPlacesScreen())),
                   ),
-                  // The year in review only makes sense at its end.
-                  _MenuRow(
-                    icon: Icons.auto_awesome,
-                    label: 'Döner Wrapped ${DateTime.now().year}',
-                    trailing: [
-                      if (!december) Text('ab 1. Dezember', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
-                    ],
-                    onTap: december
-                        ? () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WrappedScreen()))
-                        : null,
-                  ),
-                  if (user != null)
-                    ProfileTabs(
-                      user: UserDto(id: user.id, displayName: user.displayName, reviewedPlaces: reviews.length),
-                      own: true,
-                      reviews: reviews,
-                      visits: data.visits,
-                    ),
+                  const PleasanceFooter(),
                 ],
               ),
             ),
-            const PleasanceFooter(),
-          ],
+          ),
         ),
       ),
     );
@@ -228,7 +235,7 @@ class _TestersScreenState extends State<_TestersScreen> {
     final theme = Theme.of(context);
     final requests = _requests;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tester')),
+      appBar: AppBar(title: const Text('Testzugang')),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

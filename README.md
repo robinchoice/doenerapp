@@ -2,7 +2,7 @@
 
 **Der beste Döner der Stadt – empfohlen von Leuten in deiner Umgebung.**
 
-Eine lokale Döner-Community für iOS, Android und Web aus einer Codebase. Wer in der Nähe Döner isst, bewertet die Läden nach Soße, Fleisch, Salat und Brot. Daraus entstehen das Ranking der Stadt und die Trends im Umkreis. Freunde verbinden sich per QR-Code und sehen, wo der andere gerade isst.
+Eine lokale Döner-Community für iOS, Android und Web aus einer Codebase. Wer in der Nähe Döner isst, bewertet die Läden nach Soße, Fleisch, Salat und Brot. Daraus entstehen das Ranking der Stadt und die Trends im Umkreis. Kontakte verbinden sich per QR-Code und sehen, wo die andere Person gerade isst.
 
 Die App wird gerade auf diese Ausrichtung umgebaut. Was beschlossen, aber noch nicht gebaut ist, steht unter [Umbau](#umbau). Alle anderen Abschnitte beschreiben den Stand im Code.
 
@@ -10,7 +10,7 @@ Die App wird gerade auf diese Ausrichtung umgebaut. Was beschlossen, aber noch n
 
 ## Überblick
 
-Lieblingsdöner zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Freunden, wo man gerade isst. Jedes Profil ist öffentlich: Stufe, Bewertungen und die persönliche Bestenliste.
+Lieblingsdöner zeigt die besten Döner-Läden der Umgebung und das Ranking der Stadt, gebildet aus den Bewertungen nach Soße/Fleisch/Salat/Brot. Ein Check-in vor Ort zeigt den Kontakten, wo man gerade isst. Jedes Profil ist öffentlich: Stufe, Bewertungen und die persönliche Bestenliste.
 
 **Stack:**
 - App: Flutter (iOS, Android, Web), Google Maps (google_maps_flutter), sembast als lokaler Store
@@ -18,8 +18,8 @@ Lieblingsdöner zeigt die besten Döner-Läden der Umgebung und das Ranking der 
 - Geteilt: `packages/doener_models` – DTOs, Validierung und Gamification-Regeln für App und Server
 - Läden: Google Places API (New), serverseitig abgefragt und gecacht
 - Login: E-Mail-Code bzw. Magic-Link, kein Passwort; Pflicht, samt eigenem Anzeigenamen statt „Döner-Fan-1234“
-- Registrierung geschlossen wie in starter („Registrierung öffnen“): Bestehende Konten melden sich an, neue nur über `SIGNUP_ALLOWLIST`, eine Einladung von Robin (Profil → Tester, für `ADMIN_EMAILS`) oder als Admin selbst, sonst könnte niemand einladen. Der Einladungslink eines Freundes verbindet nur bestehende Konten, so können Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026). Wer kein Konto hat, bewirbt sich auf der Landingpage. Dorthin führen die Einladungsseite, die Bewertungsseite `/b/` und die Meldung beim Login; die Bewerbung merkt sich, über wessen Link sie kam. Wer vor der Schließung (15.10.2026, 16:30) über die Landingpage um einen Test gebeten hat, kommt ebenfalls herein, bis die Anfrage nach 90 Tagen gelöscht ist. Fremde bekommen eine Meldung auf Deutsch und Englisch, es geht keine Mail raus. Geöffnet wird mit `SIGNUP_OPEN=true`, das entscheidet Robin.
-- Freischalten: Unter Profil → Tester sieht Robin die Bewerbungen. „Freischalten“ legt das Konto an, schickt die Login-Mail und bei iPhones die TestFlight-Einladung in die externe Gruppe „Erste Tester“ (App Store Connect API, `ASC_*`). Wer über den Link eines Freundes kam, ist danach mit ihm befreundet. Ablehnen löscht die Anfrage ohne Mail. Android-Tester bekommen in der Login-Mail den Link zur APK (`/android`)
+- Registrierung geschlossen wie in starter („Registrierung öffnen“): Bestehende Konten melden sich an, neue nur über `SIGNUP_ALLOWLIST`, eine Einladung von Robin (Profil → Testzugang, für `ADMIN_EMAILS`) oder als Admin selbst, sonst könnte niemand einladen. Der Einladungslink eines Kontakts verbindet nur bestehende Konten, so können Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026). Wer kein Konto hat, bewirbt sich auf der Landingpage. Dorthin führen die Einladungsseite, die Bewertungsseite `/b/` und die Meldung beim Login; die Bewerbung merkt sich, über wessen Link sie kam. Wer vor der Schließung (15.10.2026, 16:30) über die Landingpage um einen Test gebeten hat, kommt ebenfalls herein, bis die Anfrage nach 90 Tagen gelöscht ist. Fremde bekommen eine Meldung auf Deutsch und Englisch, es geht keine Mail raus. Geöffnet wird mit `SIGNUP_OPEN=true`, das entscheidet Robin.
+- Freischalten: Unter Profil → Testzugang sieht Robin die Bewerbungen. „Freischalten“ legt das Konto an, schickt die Login-Mail und bei iPhones die TestFlight-Einladung in die externe Gruppe „Erste Tester“ (App Store Connect API, `ASC_*`). Wer über den Link eines Kontakts kam, ist danach mit ihm befreundet. Ablehnen löscht die Anfrage ohne Mail. Android-Tester bekommen in der Login-Mail den Link zur APK (`/android`)
 - Android ohne Play: `/android` leitet auf die APK im GitHub-Release `android-latest`, die Landingpage verlinkt sie bei Android. `mobile.yml` aktualisiert sie wie bei TestFlight nur bei Release-Tags `v*` und Läufen von Hand, dazu `version.json` mit der Build-Nummer. `GET /api/v1/android` liefert sie (10 Minuten gecacht), die App zeigt auf Start „Neue Version der App“, wenn ihre Build-Nummer kleiner ist. Aus Play installierte Apps fragen nicht. Den App-Signaturschlüssel für Play erzeugt Google (Robins Entscheidung vom 13.11.2026). Die APK ist mit dem Upload-Key signiert, deshalb lässt sich die Play-Version nicht über die APK installieren: Wer wechselt, deinstalliert die APK einmal.
 - Update-Pflicht (wie starter, „Update-Pflicht“): Release-Builds kennen ihre Build-Nummer (`--dart-define=BUILD_NUMBER`, dieselbe wie `--build-number`) und senden sie mit der Plattform als `X-App-Build` und `X-App-Platform` an jede Anfrage. Liegt sie unter `MIN_BUILD_IOS` bzw. `MIN_BUILD_ANDROID` (Coolify, leer = kein Minimum), antwortet `/api/v1/*` außer Feedback mit 426, `code: 'UPDATE_REQUIRED'` und dem Link zum Update (iOS `APP_DOWNLOAD_URL`, Android `/android`, aus Play installierte Apps nehmen Play). Die App fragt beim Start `GET /api/v1/app` und zeigt bei 426, auch später, nur noch „Update nötig“. Web, lokale Builds und Builds vor dieser Änderung senden nichts und werden nie gesperrt. Ein Minimum erst anheben, wenn ein neuerer Build bei allen Testern ankommt, bei iOS also in „Erste Tester“ (Release-Tag), bei Android im Release `android-latest`.
 - Neue iOS-Builds: Nur Release-Tags `v*` gehen an die externen Tester, weil jede Zuordnung allen eine Mail schickt. Der Job `testflight-release` in `mobile.yml` wartet, bis Apple den Build verarbeitet hat, gibt ihn an „Erste Tester“ und reicht ihn zur Beta-Prüfung ein (`server/tool/testflight_release.dart`). Weitere Builds einer freigegebenen Version lässt Apple sofort durch, TestFlight aktualisiert bei den Testern von selbst.
@@ -64,12 +64,12 @@ Ein Bogen, alle Punkte 1–5 in halben Schritten und optional. Ein Tipp auf die 
 - „Vegane Optionen?“ (Ja/Nein/Weiß nicht): Bei Ja lassen sich veganer Döner (Seitan oder Soja), vegane Soße und Hummus bewerten. „Nein“ zeigt der Laden als „Nichts Veganes“
 - „Selbstgemachter Ayran?“: Bewertet wird nur selbstgemachter, „gekauft“ steht trotzdem am Laden
 - „Fleisch halal?“ (Ja/Nein/Weiß nicht, nur bei Ernährung „Alles“): Der Laden zeigt „Halal laut Bewertungen“ oder „Nicht halal laut Bewertungen“, wenn die Mehrheit es sagt. Geprüft wird das nicht
-- Expertenmodus (Einstellungen): fragt ab, was in „mit allem“ steckt (Salat, Besonderheiten wie Granatapfelkerne oder Mais, Soßen), dazu Fleisch (mehrere möglich), Spieß (selbst gesteckt oder Fertigspieß) und Brot. Vorausgefüllt mit dem, was andere angegeben haben. Der Laden zeigt jede Fleischsorte, die mindestens die Hälfte genannt hat. Ausgelieferte Builds bis 1.0.x kennen nur eine Sorte (`meat`), die API schickt ihnen die erste und nimmt ihre eine als Liste an; bearbeiten sie eine Bewertung mit mehreren, bleibt nur ihre eine
+- Detailmodus (Einstellungen): fragt ab, was in „mit allem“ steckt (Salat, Besonderheiten wie Granatapfelkerne oder Mais, Soßen), dazu Fleisch (mehrere möglich), Spieß (selbst gesteckt oder Fertigspieß) und Brot. Vorausgefüllt mit dem, was andere angegeben haben. Der Laden zeigt jede Fleischsorte, die mindestens die Hälfte genannt hat. Ausgelieferte Builds bis 1.0.x kennen nur eine Sorte (`meat`), die API schickt ihnen die erste und nimmt ihre eine als Liste an; bearbeiten sie eine Bewertung mit mehreren, bleibt nur ihre eine
 - Eine Bewertung pro Nutzer und Laden, eine neue ersetzt die alte. Die Angaben (vegan, Ayran, Zutaten) hängen an der Bewertung, pro Laden zählt die Mehrheit
 - Optional ein Foto (Kamera oder Galerie, JPEG, PNG oder WebP bis 3 MB). Es bleibt beim Bearbeiten, bis es ersetzt oder entfernt wird, und wartet wie die Bewertung offline in der Queue. Der Server speichert es in Postgres, jedes neue Foto bekommt eine neue ID und ist darüber dauerhaft cachebar. Vorher entfernt er die Metadaten (`photo_metadata.dart`): Aufnahmeort, Zeit, Kamera, Vorschaubilder und an das Bild gehängte weitere Bilder oder Videos, denn `/photos/<id>` sieht jeder. JPEGs behalten nur die Ausrichtung. Android-Fotos aus der Galerie bringen sonst ihre GPS-Daten mit, `image_picker` kopiert sie beim Verkleinern. Ältere Fotos bereinigt der Zeitplan `photo_metadata` einmal
 - Wer im Laden schon einmal eingecheckt hat, bekommt das Häkchen „vor Ort“, wer an mindestens drei verschiedenen Tagen eingecheckt hat, das Abzeichen „Stammgast“ (`regularVisits` in `packages/doener_models`). Der Server leitet beides beim Lesen aus den Check-ins ab und zählt die Tage nach dem Eingang beim Server (deutsche Zeit), zurückdatierte Check-ins zählen also nicht extra
 - Durchschnitt und Anzahl berechnet der Server beim Lesen. Die Noten einer Bewertung (Döner, ohne Fleisch, vegan) leitet er beim Speichern aus den Punkten ab (`Diet.score` in `packages/doener_models`)
-- In der Laden-Ansicht: unter den Knöpfen die Fotos aller Bewertungen als Streifen, die neuesten zuerst, dann Chips für vegane Optionen, Ayran, Halal und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Expertenmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen, die von Freunden zuerst. Ein Info-Knopf dort und im Ranking erklärt, wer bewertet, was „vor Ort“ und „Stammgast“ prüfen und wie das Ranking sortiert (Pflichtangabe nach § 5b UWG)
+- In der Laden-Ansicht: unter den Knöpfen die Fotos aller Bewertungen als Streifen, die neuesten zuerst, dann Chips für vegane Optionen, Ayran, Halal und Besonderheiten (für alle sichtbar), „Was es hier gibt“ mit den Durchschnitten aller Punkte, im Detailmodus „Mit allem heißt hier …“, dazu die eigene Bewertung und die der anderen, die von Kontakten zuerst. Ein Info-Knopf dort und im Ranking erklärt, wer bewertet, was „vor Ort“ und „Stammgast“ prüfen und wie das Ranking sortiert (Pflichtangabe nach § 5b UWG)
 - Aushang für den Laden: Unten in der Laden-Ansicht öffnet „Aushang zum Bewerten“ eine Druckseite (`/aushang/<placeId>`) mit QR-Code. Er führt auf `/b/<placeId>`: Mit installierter App öffnet sich direkt deren Bewertungsbogen, sonst eine Seite, die in die Web-App führt (`/app?review=<placeId>`). Auch ohne Konto bleibt der Wunsch über Onboarding und Login erhalten. Ist der Laden inzwischen aus dem 30-Tage-Cache gefallen, zeigt `/b/` ihn ohne Namen, und `/places/:placeId` lädt ihn für angemeldete Nutzer einzeln bei Google nach (nur offene Döner-Läden)
 
 ### Ernährung
@@ -84,22 +84,22 @@ In den Einstellungen: Alles, Vegetarisch oder Vegan. Gespeichert am Account, gil
 
 ### Profil
 
-Ein Profil für alle, ein Tipp auf einen Namen (Feed, Laden, Freundesliste, Suche) öffnet es. Es zeigt Name, Stufe, „Seit [Monat Jahr]“ ab dem ersten Check-in oder der ersten Bewertung, die Zahl der bewerteten Läden und drei Tabs:
+Ein Profil für alle, ein Tipp auf einen Namen (Feed, Laden, Kontaktliste, Suche) öffnet es. Es zeigt Name, Stufe, „Seit [Monat Jahr]“ ab dem ersten Check-in oder der ersten Bewertung, die Zahl der bewerteten Läden und drei Tabs:
 - **Top 5:** die persönliche Bestenliste, die bestbewerteten Läden der Person, gerechnet mit der Ernährung dessen, der schaut
 - **Bewertungen:** alle Bewertungen der Person
-- **Check-ins:** nur für Freunde und einen selbst, für alle anderen gesperrt
+- **Check-ins:** nur für Kontakte und einen selbst, für alle anderen gesperrt
 
-Am fremden Profil stehen „Als Freund hinzufügen“ und ⋮ zum Blockieren. Das eigene Profil zeigt zusätzlich die Reaktionen der Freunde unter Bewertungen und Check-ins, wie viele Läden bis zur nächsten Stufe fehlen, die Zahl der Check-ins und Freunde, noch nicht übertragene Einträge (markiert) und das Menü mit Freunden, „Meine Läden“ (alle besuchten oder bewerteten Läden, sortierbar nach Bewertung, Besuchen oder zuletzt besucht) und Wrapped.
+Am fremden Profil stehen „Als Kontakt hinzufügen“ und ⋮ zum Blockieren. Das eigene Profil zeigt zusätzlich die Reaktionen der Kontakte unter Bewertungen und Check-ins, wie viele Läden bis zur nächsten Stufe fehlen, die Zahl der Check-ins und Kontakte, noch nicht übertragene Einträge (markiert) und das Menü mit Kontakten, „Meine Läden“ (alle besuchten oder bewerteten Läden, sortierbar nach Bewertung, Besuchen oder zuletzt besucht) und Wrapped.
 
 Die Stufe steht neben dem Namen und richtet sich nach bewerteten Läden (`Tier` in `packages/doener_models`):
 
 | Stufe | Ab bewerteten Läden |
 |---|---|
 | Dönerneuling | 0 |
-| Dönerfreund | 3 |
+| Dönerliebe | 3 |
 | Dönerfan | 10 |
 | Dönerprofi | 25 |
-| Dönermeister | 50 |
+| Dönergröße | 50 |
 | Dönerlegende | 100 |
 
 ### Döner Wrapped
@@ -110,21 +110,21 @@ Nur im Dezember, sonst ausgegraut. Jahresrückblick auf 5 Seiten auf dunklem Gru
 
 Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freiburg):
 
-- Ganz oben die Freunde, die gerade essen
+- Ganz oben die Kontakte, die gerade essen
 - Die neueste Neuigkeit zur App als Karte, bis man sie ausblendet (siehe „Neuigkeiten“)
-- Startaufgaben, bis sie erledigt sind: „Bewerte deinen Stammladen“ (führt zur Karte) und „Hol deine Freunde per QR-Code“
+- Startaufgaben, bis sie erledigt sind: „Bewerte deinen Stammladen“ (führt zur Karte) und „Hol deine Kontakte per QR-Code“
 - „Neu in [Stadt]“: Läden, die in den letzten 30 Tagen aufgemacht haben, und Eröffnungen, die Google angekündigt hat („Bald: … Laut Google am 15. Oktober“)
 - „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
 - „Gerade im Trend“: meiste Check-ins und Bewertungen der letzten 7 Tage, Check-ins zählen anonym
-- Feed: Check-ins und Bewertungen der Freunde (mit Linie in der Akzentfarbe) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Freunde. Der Filter „Nur Freunde“ blendet die anderen aus, die eigene Aktivität steht im Profil
-- Reaktionen: Unter Check-ins und Bewertungen von Freunden reagiert man mit 🤤, 🥙 oder 🙋, eine Reaktion pro Person und Post, ein zweiter Tipp nimmt sie zurück. Angezeigt wird die Zahl je Emoji, darunter, wer reagiert hat: mit Namen nur eigene Freunde („Tom 🤤, Anna 🥙 und 2 weitere“), so verrät der Post nicht, wer mit wem befreundet ist. Reagieren dürfen nur Freunde der Person, die Ladenseite zeigt keine Reaktionen. Wer gepostet hat, sieht sie im eigenen Profil und bekommt einen abschaltbaren Push
+- Feed: Check-ins und Bewertungen der Kontakte (mit Linie in der Akzentfarbe) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Kontakte. Der Filter „Nur Kontakte“ blendet die anderen aus, die eigene Aktivität steht im Profil
+- Reaktionen: Unter Check-ins und Bewertungen von Kontakten reagiert man mit 🤤, 🥙 oder 🙋, eine Reaktion pro Person und Post, ein zweiter Tipp nimmt sie zurück. Angezeigt wird die Zahl je Emoji, darunter, wer reagiert hat: mit Namen nur eigene Kontakte („Tom 🤤, Anna 🥙 und 2 weitere“), so verrät der Post nicht, wer mit wem befreundet ist. Reagieren dürfen nur Kontakte der Person, die Ladenseite zeigt keine Reaktionen. Wer gepostet hat, sieht sie im eigenen Profil und bekommt einen abschaltbaren Push
 
 ### Ranking
 
 Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens im Umkreis von 20 km. Gerankt wird der Laden, umschaltbar per Chips: zuerst die Note zur Ernährung, dann Preis-Leistung, dann einzelne Punkte (bei „Alles“ Soße, Fleisch, Salat, Brot, Größe, Falafel, Halloumi, Vegan, Pizza, Pide, Lahmacun, Seele, Ayran).
 
 - Sortiert wird nach gewichtetem Schnitt: Jeder Laden startet mit drei Bewertungen in Höhe des Stadtschnitts (`weightedRating` in `packages/doener_models`). So schlägt eine einzelne 5 nicht viele 4,5er
-- Angezeigt werden echter Schnitt und Anzahl, dazu die Freunde, die den Laden bewertet haben, mit ihrer Note, und der Median der Preisangaben
+- Angezeigt werden echter Schnitt und Anzahl, dazu die Kontakte, die den Laden bewertet haben, mit ihrer Note, und der Median der Preisangaben
 - Preisfilter „bis 6/7/8 €“: nur Läden, deren Median-Preis darunter liegt, in der Reihenfolge des ganzen Rankings. Läden ohne Preisangabe fallen dann heraus
 - Zutatenfilter (z. B. „Mit Rote Zwiebel“): nur Läden, bei denen mindestens die Hälfte der Experten die Zutat angekreuzt hat, wie beim Laden unter „Mit allem heißt hier …“. Läden ohne Expertenangaben fallen dann heraus
 - „Halal“ und „Selbst gesteckter Spieß“ (nur bei „Alles“): nur Läden, bei denen mehr Bewertungen Ja bzw. selbst gesteckt sagen als das Gegenteil
@@ -145,19 +145,19 @@ Am 1. Januar friert der Server für jede Stadt die Bestenliste des Vorjahres ein
 - Siegel zum Drucken unter `/siegel/<placeId>`, 15 × 5 cm, mit QR-Code auf `/b/<placeId>`. Druck und Versand an die Läden sind noch offen
 - In der App: Zeile über dem Ladennamen, Link zur Liste und „Siegel drucken“ in der Laden-Ansicht, Banner mit den Top 3 über dem Ranking. Gezeigt wird immer das neueste Jahr. Die Karte bleibt unverändert
 
-### Freunde
+### Kontakte
 
-- Persönlicher Einladungslink samt QR-Code (Profil, Freunde-Liste, letzter Onboarding-Schritt): Wer ihn öffnet und sich anmeldet, ist sofort befreundet, eine offene Anfrage gilt damit als angenommen. Der Link lässt sich zurücksetzen.
-- Ist die iOS-App installiert, öffnet der Link sie direkt (Universal Links, Domains in `app/ios/Runner/Runner.entitlements`). Ohne App führt er auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau. Wer im Browser angemeldet ist, geht weiter in die Web-App und ist befreundet, alle anderen bewerben sich als Tester (siehe Registrierung).
-- Freunde per Namenssuche finden (ab 2 Zeichen); wer eine offene Anfrage zurückschickt, nimmt sie damit an
+- Persönlicher Einladungslink samt QR-Code (Profil, Kontakte-Liste, letzter Onboarding-Schritt): Wer ihn öffnet und sich anmeldet, ist sofort befreundet, eine offene Anfrage gilt damit als angenommen. Der Link lässt sich zurücksetzen.
+- Ist die iOS-App installiert, öffnet der Link sie direkt (Universal Links, Domains in `app/ios/Runner/Runner.entitlements`). Ohne App führt er auf eine Einladungsseite (`/i/<code>`) mit Chat-Vorschau. Wer im Browser angemeldet ist, geht weiter in die Web-App und ist befreundet, alle anderen bewerben sich zum Testen (siehe Registrierung).
+- Kontakte per Namenssuche finden (ab 2 Zeichen); wer eine offene Anfrage zurückschickt, nimmt sie damit an
 
 ### Push
 
 Über Firebase Cloud Messaging für iOS, Android und Web (Firebase im GCP-Projekt `doener-app-510118`). Vier Arten, jede mit Schalter unter Einstellungen → Benachrichtigungen:
-- **Freunde checken ein:** „Lena isst gerade 🌯“, darunter „bei X (Nr. 2 in Freiburg)“ mit dem Platz im Döner-Ranking der Stadt. Nur für Check-ins, die gerade passieren, und pro Person höchstens alle 3 Stunden. Einzelne Freunde lassen sich in der Freundesliste mit der Glocke stummschalten
+- **Kontakte checken ein:** „Lena isst gerade 🌯“, darunter „bei X (Nr. 2 in Freiburg)“ mit dem Platz im Döner-Ranking der Stadt. Nur für Check-ins, die gerade passieren, und pro Person höchstens alle 3 Stunden. Einzelne Kontakte lassen sich in der Kontaktliste mit der Glocke stummschalten
 - **Neue Läden in deiner Stadt:** sobald ein angekündigter Laden aufmacht, einmal an alle in der Stadt. Die Stadt nimmt der Server vom nächsten Laden zur Position, die das Gerät mit seinem Token schickt
-- **Freundschaftsanfragen:** wenn jemand dich hinzufügen möchte, einmal pro neuer Anfrage, höchstens alle 30 Minuten von derselben Person
-- **Reaktionen auf deine Posts:** wenn Freunde auf eigene Check-ins oder Bewertungen reagieren. Ein Emoji-Wechsel oder Löschen löst keinen Push aus; auch Zurücknehmen und erneutes Reagieren meldet sich pro Person und Post höchstens alle 30 Minuten. Reaktionen auf denselben Post ersetzen die Meldung, innerhalb von 30 Minuten mit gemeinsamem Titel
+- **Kontaktanfragen:** wenn jemand dich hinzufügen möchte, einmal pro neuer Anfrage, höchstens alle 30 Minuten von derselben Person
+- **Reaktionen auf deine Posts:** wenn Kontakte auf eigene Check-ins oder Bewertungen reagieren. Ein Emoji-Wechsel oder Löschen löst keinen Push aus; auch Zurücknehmen und erneutes Reagieren meldet sich pro Person und Post höchstens alle 30 Minuten. Reaktionen auf denselben Post ersetzen die Meldung, innerhalb von 30 Minuten mit gemeinsamem Titel
 
 Die neuen Arten gehen nur an Geräte, die beim Anmelden ihres Tokens `socialPushes: true` melden. Ältere Builds behalten ihre bisherigen Push-Arten, damit „Weniger davon“ dort keine falsche Kategorie abschaltet.
 
@@ -166,11 +166,11 @@ Ein Tipp auf den Push öffnet bei Anfragen und Reaktionen die Glocke, sonst den 
 Faire Benachrichtigungen nach starter (AGENTS.md, „Benachrichtigungen“), alles pro Konto auf dem Server und damit auf allen Geräten gleich:
 - **Pausieren** unter Einstellungen → Benachrichtigungen: 1 Stunde, bis morgen 8 Uhr, 1 Woche oder bis zum Fortsetzen (`push_paused_until`, „bis zum Fortsetzen“ ist das Jahr 9999). Neuigkeiten per Mail sind nicht betroffen
 - **Ruhezeiten:** ein Zeitfenster mit Wochentagen, voreingestellt jeden Tag 22–8 Uhr. Ein Fenster über Mitternacht gehört zu dem Tag, an dem es beginnt (SQL-Funktion `in_quiet_hours`). Es gilt die Zeitzone, die das Gerät mit seinem Token meldet, sonst `Europe/Berlin`
-- In Ruhezeit oder Pause fallen Check-ins von Freunden weg, sie sind bis dahin vorbei. Neue Läden, Freundschaftsanfragen und Reaktionen warten (`push_events.pending`) und gehen danach raus (`pushPending`, jede Minute), außer man hat sie schon in der Glocke gesehen oder es ist mehr als ein Tag vergangen. Zurückgezogene oder erledigte Anfragen und entfernte Reaktionen werden vor dem Versand verworfen
-- **Zusammenfassen:** Checken mehrere Freunde innerhalb von 30 Minuten ein, ändert der Server das Ereignis („Anna und Carl essen gerade 🥙“, ab drei „Anna und 2 weitere …“) und schickt das Signal mit derselben ID noch einmal, das Gerät ersetzt die Meldung
+- In Ruhezeit oder Pause fallen Check-ins von Kontakten weg, sie sind bis dahin vorbei. Neue Läden, Kontaktanfragen und Reaktionen warten (`push_events.pending`) und gehen danach raus (`pushPending`, jede Minute), außer man hat sie schon in der Glocke gesehen oder es ist mehr als ein Tag vergangen. Zurückgezogene oder erledigte Anfragen und entfernte Reaktionen werden vor dem Versand verworfen
+- **Zusammenfassen:** Checken mehrere Kontakte innerhalb von 30 Minuten ein, ändert der Server das Ereignis („Anna und Carl essen gerade 🥙“, ab drei „Anna und 2 weitere …“) und schickt das Signal mit derselben ID noch einmal, das Gerät ersetzt die Meldung
 - **„Weniger davon“** hängt an jeder Meldung (Android-Aktion, iOS-Kategorie `push`, im Web eine Aktion des Service Workers, die `/app?less=<art>:<id>` öffnet) und an Check-ins, neuen Läden, Anfragen und Reaktionen in der Glocke: den Freund stummschalten oder die Art abschalten
 
-**Die Glocke** oben auf Start (`GET /me/inbox`) zeigt die letzten 7 Tage: Check-ins und Bewertungen von Freunden, Reaktionen auf eigene Posts, offene Freundschaftsanfragen, neue Läden in der eigenen Stadt und Neuigkeiten. Sie entsteht aus diesen Daten selbst, nicht aus den Pushes, und funktioniert so auch ohne Push. Die Zahl an der Glocke zählt, was seit dem letzten Öffnen dazukam; das Öffnen (`POST /me/inbox/seen`) gilt auf allen Geräten.
+**Die Glocke** oben auf Start (`GET /me/inbox`) zeigt die letzten 7 Tage: Check-ins und Bewertungen von Kontakten, Reaktionen auf eigene Posts, offene Kontaktanfragen, neue Läden in der eigenen Stadt und Neuigkeiten. Sie entsteht aus diesen Daten selbst, nicht aus den Pushes, und funktioniert so auch ohne Push. Die Zahl an der Glocke zählt, was seit dem letzten Öffnen dazukam; das Öffnen (`POST /me/inbox/seen`) gilt auf allen Geräten.
 
 Ein Push ist nur ein Signal: Er trägt die Art (`friend_check_in`, `new_place`, `friend_request`, `reaction`) und eine Ereignis-ID, keine Namen und Läden. Den Text legt der Server 7 Tage lang in `push_events` ab, das Gerät holt ihn über `GET /push-events/:id` mit seinem Geräteschlüssel (`Authorization: Push …`, beim Token gemeldet, auf dem iPhone nach dem ersten Entsperren lesbar) und zeigt die Meldung selbst an: Android und iOS mit `flutter_local_notifications`, das Web im Service Worker `firebase-messaging-sw.js`. Scheitert der Abruf, steht nur die Art da („Ein Freund ist gerade beim Döner …“). Ausgelieferte Versionen ohne Schlüssel bekommen immer diesen neutralen Text als normale Benachrichtigung. Zustellung ohne Garantie: Android weckt die App in der Regel für jedes Signal, aber nicht nach einem erzwungenen Stopp und nicht zuverlässig bei aggressivem Energiesparen. iOS stellt Hintergrund-Pushes nur zu, wenn es will, gedrosselt und gar nicht mehr, nachdem man die App weggewischt hat. Browser nur, solange sie laufen; ist der Tab gerade offen und sichtbar, zeigt das Web wie bisher keine Meldung.
 
@@ -186,7 +186,7 @@ Was neu ist in der App, steht als Karte auf Start und geht auf Wunsch per Mail r
 
 ### Melden und Blockieren
 
-Pflicht für die Stores, weil Bewertungen mit Text, Foto und Namen für alle im Umkreis sichtbar sind. Das ⋮ an fremden Bewertungen (Laden, Start) und an Check-ins von Freunden bietet:
+Pflicht für die Stores, weil Bewertungen mit Text, Foto und Namen für alle im Umkreis sichtbar sind. Das ⋮ an fremden Bewertungen (Laden, Start) und an Check-ins von Kontakten bietet:
 - **Bewertung melden** mit Grund und optionalem Hinweis. Der Server speichert die Meldung (eine pro Person und Bewertung) und mailt sie an `FEEDBACK_EMAIL`, Antworten gehen an die meldende Person
 - **Blockieren**: Beide sehen die Bewertungen des anderen nicht mehr, finden sich nicht in der Suche und können sich nicht befreunden, eine Freundschaft endet. Ins Ranking zählen die Bewertungen weiter. Freigeben unter Einstellungen → Blockierte Nutzer
 - **Bewertung entfernen** nur für Admins (`ADMIN_EMAILS`), so wird eine gemeldete Bewertung gelöscht
@@ -199,7 +199,7 @@ Für die Testphase liegt ein Käfer-Knopf über allen Screens, auch über Sheets
 
 `/` (Deutsch) und `/en` (Englisch) zeigen eine statische Seite vom Server (`server/lib/src/landing.dart`), die Web-App läuft unter `/app`. Wer im Browser schon angemeldet ist oder mit Parametern kommt (`?invite=…`), wird sofort nach `/app` weitergeleitet. Die Rangliste im Handy auf der Seite ist ein Beispiel, keine echten Daten.
 
-Über das Formular fragt man den Test an: iPhone (TestFlight) oder Android (Download) und eine E-Mail. Bei Android steht darunter der Download der APK (`/android`), die Registrierung bleibt trotzdem zu: Anmelden geht erst nach der Freischaltung. Der Server speichert die Anfrage 90 Tage, einmal pro Adresse und Plattform, und mailt sie an `FEEDBACK_EMAIL`. Freigeschaltet wird unter Profil → Tester (siehe „Überblick“).
+Über das Formular fragt man den Test an: iPhone (TestFlight) oder Android (Download) und eine E-Mail. Bei Android steht darunter der Download der APK (`/android`), die Registrierung bleibt trotzdem zu: Anmelden geht erst nach der Freischaltung. Der Server speichert die Anfrage 90 Tage, einmal pro Adresse und Plattform, und mailt sie an `FEEDBACK_EMAIL`. Freigeschaltet wird unter Profil → Testzugang (siehe „Überblick“).
 
 ### Für Agenten
 
@@ -225,7 +225,7 @@ server/                       Dart-API + Auslieferung der Web-App
 ├── lib/src/auth.dart         Magic-Link-Login, Sitzungen, Account
 ├── lib/src/places.dart       Läden, Bewertungen, Besuche, Top, Trend und Neueröffnungen im Umkreis
 ├── lib/src/ranking.dart      Ranking pro Stadt
-├── lib/src/social.dart       Feed, Live-Status, Freunde, Feedback, Ladenmeldungen
+├── lib/src/social.dart       Feed, Live-Status, Kontakte, Feedback, Ladenmeldungen
 ├── lib/src/google_places.dart
 ├── lib/src/db.dart           SQL-Migrationen (nur anhängen, nie ändern)
 └── tool/seed_dev.dart        Test-Läden in Freiburg für Entwicklung ohne Google-Key
@@ -247,14 +247,14 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/auth/verify` | Code oder Link-Token einlösen → Sitzung |
 | POST | `/auth/invite` | Admin legt ein Tester-Konto an und mailt den Login-Code |
 | POST | `/auth/logout` | Sitzung beenden |
-| GET | `/auth/me` | Aktueller User mit Ernährung und Expertenmodus |
-| PATCH | `/users/me` | Anzeigename, Ernährung oder Expertenmodus ändern |
+| GET | `/auth/me` | Aktueller User mit Ernährung und Detailmodus |
+| PATCH | `/users/me` | Anzeigename, Ernährung oder Detailmodus ändern |
 | DELETE | `/users/me` | Account löschen |
 | GET | `/places?minLat&minLon&maxLat&maxLon` | Läden im Kartenausschnitt |
 | GET | `/places/top?lat&lon[&by]` | Beste im Umkreis von 10 km (gewichtet) nach `overall`, `vegetarian` oder `vegan`, mit unbewerteten aufgefüllt |
 | GET | `/places/new?lat&lon` | Im Umkreis neu eröffnete (30 Tage) und von Google angekündigte Läden |
 | GET | `/places/trending?lat&lon` | Meiste Check-ins und Bewertungen im Umkreis in 7 Tagen |
-| GET | `/ranking?lat&lon&by[&city][&maxPrice][&ingredient][&halal][&skewer]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan`, Preis-Leistung (`value`, `vegetarianValue`, `veganValue`) oder einem Punkt (`sauce`, `groesse`, `ayran` …), mit Freunden, Median-Preis, üblichem Preis der Stadt (`cityPrice`) und den Top 3 der neuesten Bestenliste; `city` statt der Stadt am Standort, `maxPrice` in Cent, `ingredient` eine Zutat wie `roteZwiebel`, `halal=true`, `skewer=homemade\|industrial` |
+| GET | `/ranking?lat&lon&by[&city][&maxPrice][&ingredient][&halal][&skewer]` | Ranking der Stadt nach `overall`, `vegetarian`, `vegan`, Preis-Leistung (`value`, `vegetarianValue`, `veganValue`) oder einem Punkt (`sauce`, `groesse`, `ayran` …), mit Kontakten, Median-Preis, üblichem Preis der Stadt (`cityPrice`) und den Top 3 der neuesten Bestenliste; `city` statt der Stadt am Standort, `maxPrice` in Cent, `ingredient` eine Zutat wie `roteZwiebel`, `halal=true`, `skewer=homemade\|industrial` |
 | GET | `/cities` | Städte mit bewerteten Läden samt Mittelpunkt, die meisten zuerst |
 | GET | `/places/search?q[&lat&lon]` | Alle bekannten Läden nach Namen, mit Position die nächsten zuerst |
 | GET | `/places/:placeId` | Laden (Google Place ID); fehlt er im Cache oder fehlen Öffnungszeiten, lädt der Server sie für Angemeldete bei Google nach |
@@ -263,14 +263,14 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | PUT | `/places/:placeId/review` | Eigene Bewertung speichern, optional mit Foto (`photoBase64`) oder ohne das bisherige (`removePhoto`) |
 | GET | `/photos/:id` | Foto einer Bewertung (ohne Login) |
 | POST | `/places/:placeId/visits` | Check-in (idempotent über Client-ID) |
-| GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten, Check-ins und Bewertungen mit den Reaktionen der Freunde |
-| GET | `/users/:id/profile` | Öffentliches Profil: Stufe und Bewertungen, für Freunde auch die Check-ins |
+| GET | `/me/visits`, `/me/reviews`, `/me/places` | Eigene Daten, Check-ins und Bewertungen mit den Reaktionen der Kontakte |
+| GET | `/users/:id/profile` | Öffentliches Profil: Stufe und Bewertungen, für Kontakte auch die Check-ins |
 | DELETE | `/me/live-status` | Live-Status beenden |
-| GET | `/feed?cursor[&lat&lon]` | Check-ins und Bewertungen der Freunde, mit `lat`/`lon` auch alle Bewertungen im Umkreis (Keyset-Pagination) |
-| GET | `/feed/live` | Live-Status der Freunde |
-| PUT/DELETE | `/visits/:id/reaction`, `/reviews/:id/reaction` | Auf den Post eines Freundes reagieren (`emoji`) oder die Reaktion zurücknehmen |
+| GET | `/feed?cursor[&lat&lon]` | Check-ins und Bewertungen der Kontakte, mit `lat`/`lon` auch alle Bewertungen im Umkreis (Keyset-Pagination) |
+| GET | `/feed/live` | Live-Status der Kontakte |
+| PUT/DELETE | `/visits/:id/reaction`, `/reviews/:id/reaction` | Auf den Post eines Kontakts reagieren (`emoji`) oder die Reaktion zurücknehmen |
 | GET | `/users/search?q` | Nutzer suchen |
-| GET | `/friends` | Freundschaften |
+| GET | `/friends` | Verbindungen |
 | POST | `/friends/requests` | Anfrage senden |
 | POST | `/friends/:id/accept` | Anfrage annehmen |
 | DELETE | `/friends/:id` | Freundschaft entfernen |
@@ -356,7 +356,7 @@ Die Werte bleiben im Browser bis „Zurücksetzen“. „Werte“ zeigt sie als 
 
 Flyer (A6), Theken-Aushang (A4), Druckhinweise und die Prüfung für einige hundert neue Konten stehen unter [docs/mangal](docs/mangal/README.md). Der Termin in Freiburg, Bertoldstraße 51, ist noch offen. Robin spricht Mangal selbst an. Keine Verlosung, keine Gratis-Döner. Robins Freigabe vom 13.11.2026 gilt für das Öffnen **am Eröffnungstag**.
 
-1. Vor dem Termin die im Bericht genannten Grenzen klären: gemeinsame IPs beim Login und bestätigtes Mail-Versandbudget. Google-Quoten prüfen. Offene Bewerbungen, die noch eine Freundesvermittlung oder TestFlight-Einladung brauchen, regulär freischalten.
+1. Vor dem Termin die im Bericht genannten Grenzen klären: gemeinsame IPs beim Login und bestätigtes Mail-Versandbudget. Google-Quoten prüfen. Offene Bewerbungen, die noch eine Kontaktsvermittlung oder TestFlight-Einladung brauchen, regulär freischalten.
 2. Die echte Google-placeId von Mangal Freiburg (Bertoldstraße 51, nicht einem anderen Mangal oder dem bisherigen Olivia) ermitteln. Mit dem Agenten-Testkonto den Ort über die API/CLI einmal laden und Details samt Status prüfen: geöffnet, bewertbar, richtige Adresse. Dadurch ist er vor dem Andrang im Cache. Solange es keinen bewertbaren Google-Ort gibt, nur die Übergangsfassung verwenden.
 3. Aus dem Repo `node tool/mangal-print.mjs 'ECHTE_GOOGLE_PLACE_ID'` ausführen. Ausgabe auf `/b/<placeId>` prüfen; alle vier PDFs unter `docs/mangal/` werden neu erzeugt. Ohne Argument entsteht nur die Übergangsfassung mit QR zur noch funktionierenden Testerbewerbung.
 4. Probeausdruck bei 100 % scannen, Ziel und Laden prüfen. Dann `flyer-a6-de.pdf` einseitig auf A6 und `poster-a4-de.pdf` auf A4 drucken; Mangal den Aushang geben.
@@ -366,12 +366,28 @@ Flyer (A6), Theken-Aushang (A4), Druckhinweise und die Prüfung für einige hund
 
 ### Tests
 
+Vorab `bash scripts/check-comments.sh` ausführen.
+
 ```bash
 cd packages/doener_models && dart test
 cd server && TEST_DB_PORT=5434 TEST_DB_USER=doener TEST_DB_PASSWORD=doener dart test   # legt DB doener_test neu an
 cd cli && TEST_DB_PORT=5434 TEST_DB_USER=doener TEST_DB_PASSWORD=doener dart test      # legt DB doener_cli_test neu an
 cd app && flutter test
 ```
+
+### Fenstergrößen, Tablets und Foldables
+
+Das native iOS-Target unterstützt iPhone und iPad (`TARGETED_DEVICE_FAMILY = "1,2"`), alle iPad-Orientierungen und Fenster/Split View ohne `UIRequiresFullScreen`. Mehrere iOS-Szenen sind deaktiviert. Android hat keine Orientierungs-, Seitenverhältnis- oder Resize-Sperre, behandelt Größenänderungen in `configChanges` und nutzt `adjustResize` für die Tastatur.
+
+Start und Profil bleiben bei höchstens 720 logischen Pixeln lesbar und beachten Safe Areas. Der Absender bricht um. Feedback nutzt die gemeinsame scrollbare Sheet-Hülle mit Safe Areas, Tastaturabstand und erreichbarem Absenden. Größenwechsel ersetzen keine Route oder Formular-Controller.
+
+Vor einer Gerätefreigabe mit Demodaten prüfen:
+
+- Login, Karte, Start, Profil und geöffnetes Feedback schmal/breit, im Hoch-/Querformat und Split View bedienen; mehrfach verkleinern und vergrößern. Route, Eingaben, Feedback-Entwurf und Kartenposition/Zoom müssen erhalten bleiben.
+- Bei offener Tastatur im flachen Querformat alle Felder und Aktionen erreichen; keine Überläufe oder Bedienelemente unter Kameraausschnitt, Systemleisten oder Home-Indikator. Bei Foldables auch Scharnier/Trennbereich und Auf-/Zuklappen prüfen.
+- `flutter test` in `app` prüft Resize-Stressfälle mit simulierten Safe Areas und Tastatur. Zusätzlich native App und Browser auf iPad, Android-Tablet/Foldable (Emulator und echtes Gerät) sowie iPhone Duo mit Xcode 27.1 prüfen. Automatisierte Layouttests und der native CI-Probe-Build ersetzen diese Geräteprüfungen nicht; offene Prüfungen ausdrücklich benennen.
+
+Ein Mehrspalten- oder neues Navigationskonzept braucht vorher Mockupfreigabe.
 
 ### Konfiguration
 
@@ -427,6 +443,8 @@ cd app && flutter test
 - Verteilen: Die CI baut die Datei bei jedem Lauf zur Probe, veröffentlicht sie aber nicht. Release-Artefakte erst, wenn die CLI an Menschen außerhalb des Repos geht.
 
 ## Deployment
+
+Push-Commits mit `[no-store-upload]` überspringen den Mobile-Workflow; CI einschließlich nativem iOS-Probe-Build und Web/API-Deploy laufen weiter. Damit lassen sich ausdrücklich auf Web/API begrenzte Freigaben einhalten.
 
 | Workflow | Auslöser | Macht |
 |---|---|---|
@@ -499,17 +517,17 @@ Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit 
 ### Leitlinie
 
 - **Kern:** Bewertungen und das Ranking der Stadt, nicht Menge oder Spiel.
-- **Zwei Ebenen:** Bewertungen (ab Phase 2 auch Fragen) sieht jeder im Umkreis von 10 km, mit Namen. Check-ins sehen nur Freunde. Freunde verbinden sich per QR-Code oder Einladungslink.
-- **Nach dem Check-in:** Freunde bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren im Feed mit 🤤, 🥙 oder 🙋, auch auf Bewertungen. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
+- **Zwei Ebenen:** Bewertungen (ab Phase 2 auch Fragen) sieht jeder im Umkreis von 10 km, mit Namen. Check-ins sehen nur Kontakte. Kontakte verbinden sich per QR-Code oder Einladungslink.
+- **Nach dem Check-in:** Kontakte bekommen einen Push mit dem Platz im Ranking („Tom isst gerade 🥙 bei X (Nr. 2 in Freiburg)“) und reagieren im Feed mit 🤤, 🥙 oder 🙋, auch auf Bewertungen. Nach etwa 30 Minuten fragt die App „Wie war's bei X?“. Wer den Laden schon bewertet hat, bekommt „Bleibt's bei 4,5?“.
 - **Bewertung:** optional mit Foto. Bewerten darf jeder, wer eingecheckt hat, bekommt das Häkchen „vor Ort“. Den Spruch unter dem Laden liefert ab Phase 2 die Bewertung mit den meisten Upvotes.
-- **Push für direkte soziale Aktivität und neue Läden:** Check-ins von Freunden (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Außerdem Freundschaftsanfragen und Reaktionen auf eigene Posts. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Freunde einzeln stummschaltbar, dazu Pause und Ruhezeiten. Was man verpasst hat, steht in der Glocke auf Start.
+- **Push für direkte soziale Aktivität und neue Läden:** Check-ins von Kontakten (pro Person höchstens alle 3 Stunden) und „Neuer Döner hat in Freiburg aufgemacht“ an alle in der Stadt, sobald ein angekündigter Laden offen ist. Außerdem Kontaktanfragen und Reaktionen auf eigene Posts. Dazu als Ausnahme die eigene Bewertungserinnerung. Antworten, neue Fragen, Upvotes und Ranking-Änderungen zeigt nur die App. Jede Art ist abschaltbar, Kontakte einzeln stummschaltbar, dazu Pause und Ruhezeiten. Was man verpasst hat, steht in der Glocke auf Start.
 - **Belohnung:** Ab Phase 2 zählen die Upvotes zur Stufe.
 - **Texte:** Einladung „Welcher Döner ist der beste in [Stadt]? Lieblingsdöner weiß es, und du siehst, wo ich gerade esse: [Link]“, App-Store-Untertitel „Der beste Döner deiner Stadt“.
 
 ### Phase 2 – Community
 
 - Fragen an den Umkreis, Antworten mit verlinktem Laden
-- Kommentare unter Freunden an Check-ins und Bewertungen im Feed, wie bei Instagram, schon mit dem Release Redesign und Rebrand. Sie bleiben am Post und erscheinen nicht auf der Ladenseite, damit sie Laden und Bewertungen nicht überfluten (Tester-Feedback vom 23.10. und 12.11.2026)
+- Kommentare unter Kontakten an Check-ins und Bewertungen im Feed, wie bei Instagram, schon mit dem Release Redesign und Rebrand. Sie bleiben am Post und erscheinen nicht auf der Ladenseite, damit sie Laden und Bewertungen nicht überfluten (Tester-Feedback vom 23.10. und 12.11.2026)
 - Up- und Downvotes, ab −5 ausgeblendet, Upvotes neben dem Namen
 - Kenner des Monats 👑 (meiste Upvotes in der Stadt)
 - Favoriten werden zur Merkliste „Will ich probieren“

@@ -134,7 +134,7 @@ class ProfileHeader extends StatelessWidget {
             children: [
               stat(reviewedPlaces, 'Läden bewertet'),
               if (checkIns != null) ...[const VerticalDivider(width: 1), stat(checkIns!, 'Check-ins')],
-              if (friends != null) ...[const VerticalDivider(width: 1), stat(friends!, 'Freunde')],
+              if (friends != null) ...[const VerticalDivider(width: 1), stat(friends!, 'Kontakte')],
             ],
           ),
         ),
@@ -240,7 +240,7 @@ class _ProfileTabsState extends State<ProfileTabs> {
               Icon(Icons.lock_outline, color: theme.colorScheme.outline),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Check-ins von ${widget.user.displayName} sehen nur Freunde.', style: TextStyle(color: theme.colorScheme.outline)),
+                child: Text('Check-ins von ${widget.user.displayName} sehen nur Kontakte.', style: TextStyle(color: theme.colorScheme.outline)),
               ),
             ],
           ),
@@ -270,7 +270,7 @@ class _ProfileTabsState extends State<ProfileTabs> {
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: theme.dividerColor)),
           ),
-          child: Row(
+          child: Wrap(
             children: [
               for (final (i, label) in tabs.indexed)
                 Padding(
@@ -347,7 +347,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         },
         child: const Text('Anfrage annehmen'),
       ),
-      null => FilledButton(onPressed: () => friends.request(widget.user.id), child: const Text('Als Freund hinzufügen')),
+      null => FilledButton(onPressed: () => friends.request(widget.user.id), child: const Text('Als Kontakt hinzufügen')),
     };
   }
 

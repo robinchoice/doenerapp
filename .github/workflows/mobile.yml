@@ -25,7 +25,7 @@ env:
 
 jobs:
   ios:
-    if: inputs.platform != 'android'
+    if: inputs.platform != 'android' && (startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[no-store-upload]'))
     runs-on: xcode-27
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
@@ -36,7 +36,7 @@ jobs:
         run: |
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
-          test "$(xcodebuild -version | head -n 1)" = "Xcode 27.1"
+          test "$(xcodebuild -version)" = $'Xcode 27.1\nBuild version 27A9275'
           test "$(xcrun --sdk iphoneos --show-sdk-version)" = "27.1"
 
       - uses: subosito/flutter-action@v2
@@ -143,6 +143,7 @@ jobs:
           dart run tool/testflight_release.dart $((GITHUB_RUN_NUMBER + 10))
 
   android:
+    if: startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[no-store-upload]')
     runs-on: ubuntu-latest
     permissions:
       contents: write

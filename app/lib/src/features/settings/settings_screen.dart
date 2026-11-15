@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    final ok = await _confirm('Account löschen', 'Dein Account, alle Besuche, Bewertungen und Freundschaften werden endgültig gelöscht.');
+    final ok = await _confirm('Account löschen', 'Dein Account, alle Besuche, Bewertungen und Verbindungen werden endgültig gelöscht.');
     if (!ok || !mounted) return;
     try {
       final data = context.read<AppData>();
@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.block),
-              title: const Text('Blockierte Nutzer'),
+              title: const Text('Blockierte Konten'),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BlockedUsersScreen())),
             ),
             ListTile(leading: const Icon(Icons.logout), title: const Text('Abmelden'), onTap: _logout),
@@ -239,8 +239,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               SwitchListTile(
-                title: const Text('Freunde checken ein'),
-                subtitle: const Text('Wo deine Freunde gerade essen, höchstens alle 3 Stunden pro Person. Einzelne stellst du unter Freunde stumm.'),
+                title: const Text('Kontakte checken ein'),
+                subtitle: const Text('Wo deine Kontakte gerade essen, höchstens alle 3 Stunden pro Person. Einzelne stellst du unter Kontakte stumm.'),
                 value: session.user!.pushFriends,
                 onChanged: (value) => _updatePush(pushFriends: value),
               ),
@@ -251,14 +251,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) => _updatePush(pushNewPlaces: value),
               ),
               SwitchListTile(
-                title: const Text('Freundschaftsanfragen'),
-                subtitle: const Text('Wenn dich jemand als Freund hinzufügen möchte.'),
+                title: const Text('Kontaktanfragen'),
+                subtitle: const Text('Wenn dich jemand als Kontakt hinzufügen möchte.'),
                 value: session.user!.pushFriendRequests,
                 onChanged: (value) => _updatePush(pushFriendRequests: value),
               ),
               SwitchListTile(
                 title: const Text('Reaktionen auf deine Posts'),
-                subtitle: const Text('Wenn Freunde auf deine Check-ins oder Bewertungen reagieren.'),
+                subtitle: const Text('Wenn Kontakte auf deine Check-ins oder Bewertungen reagieren.'),
                 value: session.user!.pushReactions,
                 onChanged: (value) => _updatePush(pushReactions: value),
               ),
@@ -278,7 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             header('Bewerten'),
             SwitchListTile(
-              title: const Text('Expertenmodus'),
+              title: const Text('Detailmodus'),
               subtitle: const Text('Fragt beim Bewerten, was in „mit allem“ steckt, dazu Fleisch, Spieß und Brot. Zeigt am Laden die ganze Zutatenliste.'),
               value: session.expertMode,
               onChanged: (value) => _updateSettings(expertMode: value),
@@ -311,7 +311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(
-                'Beim Bewerten, Speichern und wenn ihr Freunde werdet. Ist die Vibration am Handy aus, bleibt es still.',
+                'Beim Bewerten, Speichern und wenn ihr Kontakte werdet. Ist die Vibration am Handy aus, bleibt es still.',
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
               ),
             ),

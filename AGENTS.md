@@ -11,11 +11,14 @@
 ## Checks
 
 ```sh
+bash scripts/check-comments.sh &&
 (cd packages/doener_models && dart pub get && dart analyze && dart test) &&
 (cd server && dart pub get && dart analyze && dart test) &&
 (cd cli && dart pub get && dart analyze && dart test && mkdir -p build && dart compile exe bin/doener.dart -o build/doener) &&
 (cd app && flutter pub get && flutter analyze && flutter test)
 ```
+
+Bei Layoutänderungen die Geräteprüfkriterien in README.md, „Fenstergrößen, Tablets und Foldables“, anwenden. Resize-Tests ersetzen keine Geräte-/Simulatorprüfung; offene Plattformchecks im Abschluss nennen.
 
 Server- und CLI-Tests brauchen Postgres über `TEST_DB_PORT` (README, „Tests“), sonst überspringen sie sich.
 
@@ -24,6 +27,7 @@ Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Stan
 ## Deploy
 
 - Ein Push auf `main`, der `server/`, `packages/`, `app/`, `updates/` oder das `Dockerfile` ändert, baut per `deploy.yml` das Image `ghcr.io/robinchoice/doener-api` (Web-Build und Server) und deployt es über die Coolify-API.
+- Push-Commits mit `[no-store-upload]` überspringen Mobile-Builds und Store-Uploads; der native iOS-Probe-Build in der CI und der Web/API-Deploy laufen weiter.
 - `mobile.yml` baut die iOS-App für TestFlight und die Android-App für den internen Play-Test bei jedem Push auf `main`, der `app/`, `packages/` oder `mobile.yml` ändert. Das Repo ist öffentlich, die Actions-Minuten kosten nichts.
 - Externe Tester (TestFlight-Gruppe „Erste Tester“, Public Link) bekommen nicht jeden Build: TestFlight mailt allen bei jedem Build, der der Gruppe zugeordnet wird. Zugeordnet und zur Beta-Prüfung eingereicht wird nur der Build eines Release-Tags `v*` (Job `testflight-release` in `mobile.yml`, `server/tool/testflight_release.dart`), und den setzt ein Agent nur auf Robins Anstoß. Alle anderen Builds landen nur in der internen Gruppe „Doener App Pioniere“.
 - Außerdem bei Tags `v*` und von Hand: `gh workflow run Mobile` baut iOS und Android, `gh workflow run Mobile -f platform=android` nur Android.
@@ -49,6 +53,10 @@ Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Stan
 
 ## Konventionen
 
+- Regressionstests: Ein Bugfix kommt mit einem Test, der ohne den Fix fehlschlägt, benannt nach dem Symptom (`test('regression: …')` bzw. `testWidgets('regression: …')`). Keine Ticketnummern.
+- Kommentare beschreiben die Regel, nicht ihre Geschichte; die steht im Git. `scripts/check-comments.sh` prüft Kommentare in Dart unter `app/lib` und `server/lib`: keine Issue-/PR-Nummern, externen Pfade, fehlenden Markdown-Dateien oder Savor-/Thread-/Session-IDs. Verlaufserzählung gibt eine Warnung. Fehlalarme durch Umformulieren lösen.
+- Deutsche Texte ohne Gendern: keine Sternchen, kein „jede und jeder“ und kein generisches Maskulinum, sondern Formulierungen, die kein Gendern brauchen: „Kontakte“, „An 12 Adressen senden“, „Zum Testen einladen“. Das gilt für App, Web, Mails, Rechtsseiten, Store-Texte und Bildunterschriften. Bezeichner im Code bleiben. Wo Deutsch und Englisch vorhanden sind, beide pflegen.
+
 - Das Repo ist öffentlich, auch seine CI-Logs. `secrets.yml` scannt jeden Push und PR mit gitleaks (README, „Secret-Scan“). Fehlalarme eng abfangen, per Fingerprint in `.gitleaksignore` oder per Pfad und Regel in `.gitleaks.toml`, nie eine Regel ganz abschalten. Ein echter Fund ist schon öffentlich: das Secret sofort rotieren.
 - Keine Secrets im Client: Alles in Web-Bundle und App lässt sich auslesen, mit LLMs auch aus kompilierten Apps. Berechtigungen prüft nur der Server. Die Maps- und Firebase-Keys im Client sind per Referrer, Bundle-ID bzw. Paketname beschränkt. Release-Builds der App laufen mit `--obfuscate --split-debug-info`, das macht sie kleiner und nimmt Klassen- und Funktionsnamen heraus, ist aber kein Schutz. Weitere Verschleierung (String-Verschlüsselung, kommerzielle Tools) nicht. Stacktraces symbolisieren: README, „Deployment“.
 - Für Agenten lesbar (README, „Für Agenten“): Jede öffentliche Seite mit eigenem Inhalt steht in `publicPages` in `server/lib/src/agents.dart`, mit Titel, Beschreibung und Inhalt als Markdown, auf Deutsch und Englisch. Daraus entstehen `/llms.txt`, `/llms-full.txt` und `<seite>.md`. Eine neue öffentliche Seite kommt im selben Zug dazu. Hinein kommt nur, was jeder ohne Login sieht: keine einzelnen Bewertungen (auch keine Zitate), keine Profile, keine Einladungen, nichts unter `/app` oder `/api`.
@@ -56,11 +64,14 @@ Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Stan
 
 ## Abweichungen vom Standard
 
+- Das App-Dock der Pleasance-Familie (starter f3aa569, 72884da, e8cb5f0) bleibt bis zur Mockupfreigabe im laufenden Redesign offen: Der bisher seitlich angeordnete Absender müsste sichtbar umgebaut und um einen neuen Interaktionsablauf ergänzt werden.
+- knip wird nicht übernommen, weil es den Dart-/Flutter-Stack nicht prüft.
+
 - Update-Mails heißen hier „Neuigkeiten“ und erscheinen auch als Karte auf Start (Robins Entscheidung vom 22.10.2026). Opt-in auf der Karte und in den Einstellungen statt unter dem Login, ohne Bestätigungsmail, weil die Adresse durch den Login bestätigt ist. Nur Deutsch, ohne Bild, wie die App. Admin-Seite in der App (Profil → Neuigkeiten) statt `/admin/updates`, Entwürfe als `updates/*.md` mit `# Titel`. Der Versand läuft in der API (siehe Zeitpläne unten). Veröffentlichen darf nur ein Admin, kein Agent.
 
 - Passkeys aus starter bleiben vorerst aus: Für den bisherigen reinen Dart-Server ist keine ausreichend geprüfte, gepflegte WebAuthn-Bibliothek gefunden. `passkeys_server` 1.0.0 prüft in `verifyRegistration`/`verifyLogin` weder Origin noch Ceremony-Typ oder User-Presence-/User-Verification-Flags; die letzte Änderung stammt vom 01.10.2025. Das gepflegte [`fido2`](https://pub.dev/packages/fido2) 2.0.1 benötigt dagegen Rust und eine native FFI-Bibliothek im Server-Image. Robin hat am 25.10.2026 entschieden, Passkeys bis zum Öffnen der Registrierung zurückzustellen (Wiedervorlage im Backlog). Dann neu prüfen, ob es eine reine Dart-Bibliothek mit vollständigen Prüfungen gibt, sonst fido2 freigeben lassen und starter 48d8aa7, c12ba8f, 8e26694 und 86a7828 übernehmen. Keine eigene WebAuthn-Kryptografie und kein Ausweichen auf eine alte Bibliotheksversion.
-- Registrierung: Neue Konten nur über `SIGNUP_ALLOWLIST` und Robins Freischaltung (Profil → Tester statt `/invite`, Bewerbungen von der Landingpage). Freundes-Links verbinden nur bestehende Konten, damit Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026, nimmt die vom Vormittag zurück). Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`.
-- TestFlight: Das Freischalten unter Profil → Tester lädt iPhones über die App Store Connect API in „Erste Tester“ ein, der Key liegt dafür auch in Coolify (`ASC_*`).
+- Registrierung: Neue Konten nur über `SIGNUP_ALLOWLIST` und Robins Freischaltung (Profil → Testzugang statt `/invite`, Bewerbungen von der Landingpage). Freundes-Links verbinden nur bestehende Konten, damit Tester niemanden weiter hereinholen (Robins Entscheidung vom 15.10.2026, nimmt die vom Vormittag zurück). Der Server prüft bei `/auth/login` (keine Mail an Fremde) und noch einmal bei `/auth/verify`.
+- TestFlight: Das Freischalten unter Profil → Testzugang lädt iPhones über die App Store Connect API in „Erste Tester“ ein, der Key liegt dafür auch in Coolify (`ASC_*`).
 
 - Zeitpläne laufen in der API statt in einem eigenen Worker: Jede Instanz fragt jede Minute `runSchedule` (Tabelle `schedules`), der atomare Claim lässt genau eine den Job ausführen. Ein neuer Job bekommt seine Zeile per Migration. Ein Worker als zweite Coolify-Anwendung bräuchte Kopien von DB-Zugang und Google-Key, die Agenten über die Coolify-API nicht lesen können.
 - Benachrichtigungen (starter 18ad613, Robins Freigabe vom 25.10.2026 mit Glocke): Pause, Ruhezeiten, Zusammenfassen und „Weniger davon“ wie in starter, dazu die Glocke auf Start (README, „Push“). Abweichend: Gelesen ist ein Zeitpunkt pro Konto (`inbox_seen_at`) statt ein Zustand pro Meldung, und „erst im Web, dann aufs Handy“ gilt nur für Pushes, die auf das Ende der Ruhezeit warten. Eine Verzögerung jedes Pushes würde „Freund isst gerade“ entwerten. Das Gerät meldet nur die Zeitzone, keine Sprache, weil die App nur Deutsch kann. Die Kappung bleibt bei höchstens einem Push alle 3 Stunden pro Freund, Robin hat keine wählbare Häufigkeit gewollt (Variante 1).

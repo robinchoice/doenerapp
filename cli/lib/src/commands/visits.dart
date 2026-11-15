@@ -25,7 +25,7 @@ final visits = <String, Command>{
   ),
   'checkin': Command(
     help: [
-      ('checkin --place <placeId>', 'Jetzt im Laden einchecken, Freunde sehen es live'),
+      ('checkin --place <placeId>', 'Jetzt im Laden einchecken, Kontakte sehen es live'),
       ('  [--food <essen>]', 'Was es gibt: ${FoodItem.all.map((food) => food.id).join(', ')}'),
     ],
     options: (parser) => parser

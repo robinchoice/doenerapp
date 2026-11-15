@@ -75,7 +75,7 @@ void mountModeration(Router router, Deps deps) {
     final other = requireUuid(id);
     if (other == me.id) throw const ApiException.badRequest('Du kannst dich nicht selbst blockieren');
     if (await queryOne(deps.db, 'SELECT 1 FROM users WHERE id = @id:uuid', {'id': other}) == null) {
-      throw const ApiException.notFound('Nutzer nicht gefunden');
+      throw const ApiException.notFound('Konto nicht gefunden');
     }
     await deps.db.runTx((tx) async {
       await tx.execute(

@@ -22,7 +22,7 @@ String _line(FeedItem item) {
 /// also everyone's reviews around it. Pages through [FeedPage.cursor].
 final feed = Command(
   help: [
-    ('feed [--lat <breite> --lon <länge>]', 'Was Freunde gegessen und bewertet haben, mit Position auch Bewertungen in der Nähe'),
+    ('feed [--lat <breite> --lon <länge>]', 'Was Kontakte gegessen und bewertet haben, mit Position auch Bewertungen in der Nähe'),
     ('  [--limit <1–50>] [--cursor <cursor>]', 'Anzahl, sonst 20, und die nächste Seite'),
   ],
   options: (parser) => parser
@@ -45,7 +45,7 @@ final feed = Command(
     return (
       data: page.toJson(),
       text: [
-        if (page.items.isEmpty) 'Noch nichts von deinen Freunden.',
+        if (page.items.isEmpty) 'Noch nichts von deinen Kontakten.',
         ...page.items.map(_line),
         if (page.cursor case final cursor?) '\nWeiter mit --cursor $cursor',
       ].join('\n'),

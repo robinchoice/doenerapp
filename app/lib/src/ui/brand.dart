@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// Pleasance family band, see DESIGN.md in the starter: glow for gradient
+// Pleasance family band: glow for gradient
 // surfaces and dark backgrounds, deep for text on light ones.
 const glow = [
   Color(0xFFF2545B),
@@ -83,7 +83,7 @@ Color get nightMuted => brand.nightMuted;
 const nightLine = Color(0x14FFFFFF);
 const tileColor = Color(0xFF121117);
 
-// Signal colours, see DESIGN.md in the starter: the same in every product, never the product colour.
+// Signal colours: the same in every product, never the product colour.
 // Filled counters take glow with ink text, text and lines on paper take deep.
 const needsGlow = Color(0xFFF4B44C);
 const needsDeep = Color(0xFF8F5A0C);
@@ -253,18 +253,19 @@ class PleasanceFooter extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(border: Border(top: BorderSide(color: theme.dividerColor))),
-      child: Row(
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
         children: [
           Text('ein Werkzeug von', style: theme.textTheme.bodySmall?.copyWith(color: color)),
-          const SizedBox(width: 8),
           SvgPicture.asset(
             'assets/pleasance-wordmark.svg',
             height: 13,
             colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             semanticsLabel: 'Pleasance',
           ),
-          const SizedBox(width: 16),
-          const Expanded(child: Align(alignment: Alignment.centerRight, heightFactor: 1, child: _BandLine())),
+          const _BandLine(),
         ],
       ),
     );

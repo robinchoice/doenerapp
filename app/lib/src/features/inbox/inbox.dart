@@ -153,7 +153,7 @@ class _InboxScreenState extends State<InboxScreen> {
             else if (inbox.items.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('In den letzten 7 Tagen ist nichts passiert. Hier steht, was deine Freunde machen und was neu ist.',
+                child: Text('In den letzten 7 Tagen ist nichts passiert. Hier steht, was deine Kontakte machen und was neu ist.',
                     textAlign: TextAlign.center),
               ),
             for (final item in inbox?.items ?? const <InboxItemDto>[])
@@ -252,13 +252,13 @@ class _LessSheetState extends State<LessSheet> {
         case _Less.mute:
           await session.api.put('/me/mutes/${widget.userId}', null);
           unawaited(friends.load());
-          message = '${widget.userName} ist stumm. Rückgängig unter Freunde.';
+          message = '${widget.userName} ist stumm. Rückgängig unter Kontakte.';
         case _Less.friends:
           await session.updateSettings(pushFriends: false);
-          message = 'Keine Pushes mehr, wenn Freunde einchecken.';
+          message = 'Keine Pushes mehr, wenn Kontakte einchecken.';
         case _Less.requests:
           await session.updateSettings(pushFriendRequests: false);
-          message = 'Keine Pushes mehr zu Freundschaftsanfragen.';
+          message = 'Keine Pushes mehr zu Kontaktanfragen.';
         case _Less.reactions:
           await session.updateSettings(pushReactions: false);
           message = 'Keine Pushes mehr zu Reaktionen.';
@@ -281,9 +281,9 @@ class _LessSheetState extends State<LessSheet> {
     final options = [
       if (widget.aboutFriend && widget.userId != null)
         (_Less.mute, '${widget.userName} stummschalten', 'Keine Pushes mehr, wenn ${widget.userName} eincheckt. Die anderen schon.'),
-      if (widget.aboutFriend) (_Less.friends, 'Keine Check-ins von Freunden mehr', 'Schaltet „Freunde checken ein“ aus.'),
+      if (widget.aboutFriend) (_Less.friends, 'Keine Check-ins von Kontakten mehr', 'Schaltet „Kontakte checken ein“ aus.'),
       if (widget.type == 'friend_request')
-        (_Less.requests, 'Keine Freundschaftsanfragen mehr', 'Schaltet Pushes zu Freundschaftsanfragen aus.'),
+        (_Less.requests, 'Keine Kontaktanfragen mehr', 'Schaltet Pushes zu Kontaktanfragen aus.'),
       if (widget.type == 'reaction') (_Less.reactions, 'Keine Reaktionen mehr', 'Schaltet Pushes zu Reaktionen auf deine Posts aus.'),
       if (widget.type == 'new_place') (_Less.places, 'Keine neuen Läden mehr', 'Schaltet „Neue Läden in deiner Stadt“ aus.'),
     ];

@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? 'Wir haben dir einen 6-stelligen Code geschickt. Du kannst auch einfach auf den Link in der Mail tippen.'
                       : expired
                           ? 'Deine Sitzung ist abgelaufen. Ungesendete Einträge bleiben gespeichert, bis du dich wieder anmeldest.'
-                          : 'Kein Passwort nötig – wir schicken dir einen Code per Mail. Damit sehen deine Freunde, wo du Döner isst.',
+                          : 'Kein Passwort nötig – wir schicken dir einen Code per Mail. Damit sehen deine Kontakte, wo du Döner isst.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
                 ),
@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   OutlinedButton.icon(
                     onPressed: _applyAsTester,
                     icon: const Icon(Icons.science_outlined),
-                    label: const Text('Als Tester bewerben'),
+                    label: const Text('Zum Testen bewerben'),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -226,7 +226,7 @@ class _ChooseNameScreenState extends State<ChooseNameScreen> {
         body: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Text('Unter diesem Namen sehen dich deine Freunde, wenn du eincheckst.'),
+            const Text('Unter diesem Namen sehen dich deine Kontakte, wenn du eincheckst.'),
             const SizedBox(height: 16),
             TextField(
               controller: _name,

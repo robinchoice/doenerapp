@@ -98,7 +98,7 @@ class _FeedbackButton extends StatefulWidget {
 }
 
 class _FeedbackButtonState extends State<_FeedbackButton> {
-  static const _size = 40.0;
+  static const _size = kMinInteractiveDimension;
   final _screen = GlobalKey();
   Offset? _position;
   bool _open = false;
@@ -132,7 +132,7 @@ class _FeedbackButtonState extends State<_FeedbackButton> {
     return LayoutBuilder(builder: (context, constraints) {
       final padding = MediaQuery.paddingOf(context);
       final position = _position ?? Offset(constraints.maxWidth - _size - 8, constraints.maxHeight * 0.6);
-      final left = clampDouble(position.dx, 0, max(0.0, constraints.maxWidth - _size));
+      final left = clampDouble(position.dx, padding.left, max(padding.left, constraints.maxWidth - _size - padding.right));
       final top = clampDouble(position.dy, padding.top, max(padding.top, constraints.maxHeight - _size - padding.bottom));
       return Stack(
         children: [

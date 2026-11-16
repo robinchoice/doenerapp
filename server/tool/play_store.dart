@@ -8,7 +8,7 @@
 //
 // status                  tracks with their releases
 // listing                 name, texts, contact, icon, feature graphic, screenshots (de-DE, en-US)
-// release <versionCode>   that bundle to production and into review
+// release <versionCode>   that bundle as production draft, Robin sends it for review in the Play Console
 import 'dart:convert';
 import 'dart:io';
 
@@ -106,14 +106,15 @@ Future<void> release(String versionCode) => edit((id) async {
         'releases': [
           {
             'versionCodes': [versionCode],
-            'status': 'completed',
+            // Play accepts only draft releases until the app is published.
+            'status': 'draft',
             'releaseNotes': [
               for (final MapEntry(key: language, value: text) in _releaseNotes.entries) {'language': language, 'text': text},
             ],
           },
         ],
       });
-      print('production: $versionCode, sent for review');
+      print('production: $versionCode as draft');
     });
 
 Future<void> main(List<String> args) async {

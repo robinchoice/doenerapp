@@ -1,0 +1,9 @@
+Lieblingsdöner is a native Flutter app for rating döner shops in Germany. The app is in German.
+
+Sign-in uses a one-time code sent by email. For the review, enter the demo address, tap "Code schicken" and enter the demo password as the code; no email is sent to that address. Sign-up is still closed for new addresses (they can apply on the landing page), the demo account always works.
+
+Shops come from Google Places around the device's location, rated by people nearby. Outside Germany there are few or no ratings: use "Andere Stadt" on the start screen or move the map to Freiburg im Breisgau, Germany, to see the ranking with real ratings.
+
+Core flows: Start shows friends' activity and the top 3 nearby. Karte (map) shows shops, tap one to see its ratings. Bewerten rates sauce, meat, salad and bread separately. Einchecken (middle button) checks in when you are at a shop. Profil > "Freunde einladen" connects friends by QR code or link.
+
+User-generated content: every rating and check-in has a ⋮ menu to report the rating or block the user; reports reach us by email and admins can remove ratings. Account deletion: Profil > gear icon (Einstellungen) > "Account löschen".

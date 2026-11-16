@@ -1,0 +1,57 @@
+{
+  "bundle_id": "com.robinchoice.doener",
+  "version": "pubspec:app/pubspec.yaml",
+  "locales": ["de-DE", "en-US"],
+  "texts": "docs/store",
+  "urls": {
+    "privacy": "https://doener-api.pleasance.org/datenschutz",
+    "support": "https://pleasance.org",
+    "marketing": "https://doener-api.pleasance.org"
+  },
+  "category": "FOOD_AND_DRINK",
+  "content_rights": "USES_THIRD_PARTY_CONTENT",
+  "copyright": "{year} Pleasance",
+  "release_type": "MANUAL",
+  "price": "free",
+  "age_rating": {
+    "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+    "contests": "NONE",
+    "gamblingSimulated": "NONE",
+    "gunsOrOtherWeapons": "NONE",
+    "horrorOrFearThemes": "NONE",
+    "matureOrSuggestiveThemes": "NONE",
+    "medicalOrTreatmentInformation": "NONE",
+    "profanityOrCrudeHumor": "NONE",
+    "sexualContentGraphicAndNudity": "NONE",
+    "sexualContentOrNudity": "NONE",
+    "violenceCartoonOrFantasy": "NONE",
+    "violenceRealistic": "NONE",
+    "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+    "advertising": false,
+    "ageAssurance": false,
+    "gambling": false,
+    "healthOrWellnessTopics": false,
+    "lootBox": false,
+    "messagingAndChat": false,
+    "parentalControls": false,
+    "unrestrictedWebAccess": false,
+    "userGeneratedContent": true,
+    "socialMedia": true
+  },
+  "screenshots": {
+    "APP_IPHONE_67": "docs/store/ios/{locale}/iphone",
+    "APP_IPAD_PRO_3GEN_129": "docs/store/ios/{locale}/ipad"
+  },
+  "review": {
+    "notes": "docs/store/review-notes.txt",
+    "contact_from_app": "6819013473",
+    "demo_required": true,
+    "demo_password_secret": "DOENER_REVIEW_PASSWORD"
+  },
+  "privacy": "Antworten im Savor-Dokument „Lieblingsdöner in den Stores: Robins Klickliste“.",
+  "play": {
+    "package": "com.robinchoice.doener",
+    "key_secret": "GOOGLE_DOENER_PLAY_KEY_BASE64",
+    "tool": "cd server && with-secret GOOGLE_DOENER_PLAY_KEY_BASE64 -- dart run tool/play_store.dart listing | release <versionCode>"
+  }
+}

@@ -1,7 +1,7 @@
 // App Store screenshots: photographs the design studio's demo app (`?bare`,
 // made-up data) at iPhone 6.9" and iPad 13" size, puts a headline above each
-// screen and writes docs/store/ios/de-DE/{iphone,ipad}/. `server/tool/app_store.dart
-// screenshots` uploads them. The map stays out: the studio has no Google key.
+// screen and writes docs/store/ios/de-DE/{iphone,ipad}/. `store-submit
+// doenerapp --prepare` uploads them. The map stays out: the studio has no Google key.
 // Clicks are coordinates in the layout, check the pictures after UI changes.
 //
 //   (cd app && flutter build web -t lib/design_main.dart -o build/design)

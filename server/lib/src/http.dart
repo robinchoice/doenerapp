@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
@@ -35,12 +36,12 @@ Future<Map<String, dynamic>> readJson(Request request) async {
   if (length != null && length > _maxBodyBytes) {
     throw const ApiException(413, 'Anfrage zu groß');
   }
-  final bytes = <int>[];
+  final bytes = BytesBuilder(copy: false);
   await for (final chunk in request.read()) {
-    bytes.addAll(chunk);
+    bytes.add(chunk);
     if (bytes.length > _maxBodyBytes) throw const ApiException(413, 'Anfrage zu groß');
   }
-  final decoded = jsonDecode(utf8.decode(bytes));
+  final decoded = jsonDecode(utf8.decode(bytes.takeBytes()));
   if (decoded is! Map<String, dynamic>) throw const ApiException.badRequest('JSON-Objekt erwartet');
   return decoded;
 }

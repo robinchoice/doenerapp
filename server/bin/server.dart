@@ -73,45 +73,26 @@ Future<void> startServer() async {
 
   await importDrafts(deps);
 
+  Future<void> guard(String label, Future<void> Function() job) async {
+    try {
+      await job();
+    } catch (error, stackTrace) {
+      print('$label failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
+  }
+
   // Every instance polls; the claim in runSchedule lets one of them run it.
   Future<void> runJobs() async {
-    try {
+    await guard('Pushes', () async {
       await deleteOldPushEvents(deps);
       await pushPending(deps);
-    } catch (error, stackTrace) {
-      print('Pushes failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-    try {
-      await deliverUpdateMails(deps);
-    } catch (error, stackTrace) {
-      print('News mails failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-    try {
-      await runSchedule(db, 'place_cache', const Duration(hours: 24), () => maintainPlaceCache(deps));
-    } catch (error, stackTrace) {
-      print('Place cache maintenance failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-    try {
-      await runSchedule(db, 'place_prefetch', const Duration(hours: 24), () => prefetchPlaces(deps));
-    } catch (error, stackTrace) {
-      print('Place prefetch failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-    try {
-      await runSchedule(db, 'best_of', const Duration(hours: 24), () => computeDueBestOf(db));
-    } catch (error, stackTrace) {
-      print('Best-of lists failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
-    try {
-      await runSchedule(db, 'photo_metadata', const Duration(days: 1), () => stripStoredPhotos(db));
-    } catch (error, stackTrace) {
-      print('Stripping stored photos failed: $error');
-      await Sentry.captureException(error, stackTrace: stackTrace);
-    }
+    });
+    await guard('News mails', () => deliverUpdateMails(deps));
+    await guard('Place cache maintenance', () => runSchedule(db, 'place_cache', const Duration(hours: 24), () => maintainPlaceCache(deps)));
+    await guard('Place prefetch', () => runSchedule(db, 'place_prefetch', const Duration(hours: 24), () => prefetchPlaces(deps)));
+    await guard('Best-of lists', () => runSchedule(db, 'best_of', const Duration(hours: 24), () => computeDueBestOf(db)));
+    await guard('Stripping stored photos', () => runSchedule(db, 'photo_metadata', const Duration(days: 1), () => stripStoredPhotos(db)));
   }
   // One run at a time, so the shutdown knows which one to wait for.
   Future<void>? running;

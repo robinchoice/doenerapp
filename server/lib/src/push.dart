@@ -55,6 +55,29 @@ class FcmPusher implements Pusher {
   @override
   Future<List<String>> send(List<String> tokens, {String? title, String? body, Map<String, String> data = const {}}) async {
     final gone = <String>[];
+    final message = {
+      if (title != null) 'notification': {'title': title, 'body': body},
+      'data': data,
+      // Android wakes the app for high priority data messages.
+      'android': {'priority': 'high'},
+      // iOS takes a silent signal only as a background push, which it
+      // may delay or drop (low power mode, app swiped away).
+      'apns': title != null
+          ? {
+              'payload': {
+                'aps': {'sound': 'default'},
+              },
+            }
+          : {
+              'headers': {'apns-push-type': 'background', 'apns-priority': '5'},
+              'payload': {
+                'aps': {'content-available': 1},
+              },
+            },
+      'webpush': {
+        'headers': {'Urgency': 'high'},
+      },
+    };
     for (final token in tokens) {
       // Without credentials no device gets its push: fail the whole send once.
       final accessToken = await _token();
@@ -64,30 +87,7 @@ class FcmPusher implements Pusher {
           Uri.parse('https://fcm.googleapis.com/v1/projects/$_projectId/messages:send'),
           headers: {'authorization': 'Bearer $accessToken', 'content-type': 'application/json'},
           body: jsonEncode({
-            'message': {
-              'token': token,
-              if (title != null) 'notification': {'title': title, 'body': body},
-              'data': data,
-              // Android wakes the app for high priority data messages.
-              'android': {'priority': 'high'},
-              // iOS takes a silent signal only as a background push, which it
-              // may delay or drop (low power mode, app swiped away).
-              'apns': title != null
-                  ? {
-                      'payload': {
-                        'aps': {'sound': 'default'},
-                      },
-                    }
-                  : {
-                      'headers': {'apns-push-type': 'background', 'apns-priority': '5'},
-                      'payload': {
-                        'aps': {'content-available': 1},
-                      },
-                    },
-              'webpush': {
-                'headers': {'Urgency': 'high'},
-              },
-            },
+            'message': {'token': token, ...message},
           }),
         );
       } catch (e, st) {

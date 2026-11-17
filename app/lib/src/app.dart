@@ -193,8 +193,7 @@ class _RootState extends State<_Root> {
     final data = context.read<AppData>();
     final location = context.read<LocationService>();
     _lifecycle = AppLifecycleListener(onResume: () {
-      data.sync();
-      data.refreshMine();
+      data.sync().whenComplete(data.refreshMine);
       // Back at the shop? The check-in button needs a fresh position.
       if (_onboardingDone) location.request(ask: false);
     });

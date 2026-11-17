@@ -379,7 +379,7 @@ class AppData extends ChangeNotifier {
           lastSyncError = e.toString();
           break;
         } on ApiException catch (e) {
-          if (e.status == 401 || e.status == 429 || e.status >= 500) {
+          if (e.status == 401 || e.status == 426 || e.status == 429 || e.status >= 500) {
             lastSyncError = e.message;
             break;
           }

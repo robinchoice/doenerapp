@@ -78,9 +78,14 @@ Future<void> startServer() async {
     try {
       await deleteOldPushEvents(deps);
       await pushPending(deps);
+    } catch (error, stackTrace) {
+      print('Pushes failed: $error');
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
+    try {
       await deliverUpdateMails(deps);
     } catch (error, stackTrace) {
-      print('Pushes or news mails failed: $error');
+      print('News mails failed: $error');
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
     try {

@@ -6,7 +6,7 @@ import 'dart:io';
 
 import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
-import 'package:doener_server/src/auth.dart' show hashToken;
+import 'package:doener_server/src/auth.dart' show hashToken, maxCodeAttempts;
 import 'package:doener_server/src/deps.dart' show queryOne;
 import 'package:doener_server/src/google_places.dart' show maxTileSearchesPerDay;
 import 'package:doener_server/src/prefetch.dart' show PrefetchArea;
@@ -297,6 +297,19 @@ void main() {
         await call('POST', '/auth/verify', body: {'email': 'brute@example.org', 'code': wrong});
       }
       expect((await call('POST', '/auth/verify', body: {'email': 'brute@example.org', 'code': code})).$1, 401);
+    });
+
+    test('regression: parallel wrong codes count as attempts, not one', () async {
+      await call('POST', '/auth/login', body: {'email': 'race@example.org'});
+      final code = lastCode();
+      final wrong = code == '000000' ? '111111' : '000000';
+      await Future.wait(List.generate(
+        20,
+        (_) => call('POST', '/auth/verify', body: {'email': 'race@example.org', 'code': wrong}),
+      ));
+      final row = await db.execute("SELECT attempts FROM login_requests WHERE email = 'race@example.org'");
+      expect(row.single[0], maxCodeAttempts);
+      expect((await call('POST', '/auth/verify', body: {'email': 'race@example.org', 'code': code})).$1, 401);
     });
 
     test('link and code checks are limited per IP, a blocked link stays usable', () async {

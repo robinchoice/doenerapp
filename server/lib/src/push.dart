@@ -56,36 +56,44 @@ class FcmPusher implements Pusher {
   Future<List<String>> send(List<String> tokens, {String? title, String? body, Map<String, String> data = const {}}) async {
     final gone = <String>[];
     for (final token in tokens) {
-      final response = await _client.post(
-        Uri.parse('https://fcm.googleapis.com/v1/projects/$_projectId/messages:send'),
-        headers: {'authorization': 'Bearer ${await _token()}', 'content-type': 'application/json'},
-        body: jsonEncode({
-          'message': {
-            'token': token,
-            if (title != null) 'notification': {'title': title, 'body': body},
-            'data': data,
-            // Android wakes the app for high priority data messages.
-            'android': {'priority': 'high'},
-            // iOS takes a silent signal only as a background push, which it
-            // may delay or drop (low power mode, app swiped away).
-            'apns': title != null
-                ? {
-                    'payload': {
-                      'aps': {'sound': 'default'},
+      final http.Response response;
+      try {
+        response = await _client.post(
+          Uri.parse('https://fcm.googleapis.com/v1/projects/$_projectId/messages:send'),
+          headers: {'authorization': 'Bearer ${await _token()}', 'content-type': 'application/json'},
+          body: jsonEncode({
+            'message': {
+              'token': token,
+              if (title != null) 'notification': {'title': title, 'body': body},
+              'data': data,
+              // Android wakes the app for high priority data messages.
+              'android': {'priority': 'high'},
+              // iOS takes a silent signal only as a background push, which it
+              // may delay or drop (low power mode, app swiped away).
+              'apns': title != null
+                  ? {
+                      'payload': {
+                        'aps': {'sound': 'default'},
+                      },
+                    }
+                  : {
+                      'headers': {'apns-push-type': 'background', 'apns-priority': '5'},
+                      'payload': {
+                        'aps': {'content-available': 1},
+                      },
                     },
-                  }
-                : {
-                    'headers': {'apns-push-type': 'background', 'apns-priority': '5'},
-                    'payload': {
-                      'aps': {'content-available': 1},
-                    },
-                  },
-            'webpush': {
-              'headers': {'Urgency': 'high'},
+              'webpush': {
+                'headers': {'Urgency': 'high'},
+              },
             },
-          },
-        }),
-      );
+          }),
+        );
+      } catch (e, st) {
+        // One failing device must not cost the others their push.
+        print('FCM push failed: $e');
+        unawaited(Sentry.captureException(e, stackTrace: st));
+        continue;
+      }
       // An uninstalled app or a reset token: forget it, not an error.
       if (response.statusCode == 404 || response.body.contains('UNREGISTERED')) {
         gone.add(token);

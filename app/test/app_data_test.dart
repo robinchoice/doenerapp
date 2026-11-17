@@ -43,6 +43,7 @@ class FakeServer {
     if (mode == 'offline') throw http.ClientException('offline');
     if (mode == '401') return _json({'error': 'Sitzung abgelaufen'}, 401);
     if (mode == '400') return _json({'error': 'Ungültig'}, 400);
+    if (mode == '426') return _json({'error': 'Bitte aktualisieren', 'url': 'https://example.org'}, 426);
 
     final body = lastBody = jsonDecode(request.body) as Map<String, dynamic>;
     final now = DateTime.now().toUtc();
@@ -140,6 +141,14 @@ void main() {
     expect(data.pendingCount, 0);
     expect(data.reviews, isEmpty);
     expect(data.lastSyncError, contains('verworfen'));
+  });
+
+  test('regression: an outdated build keeps queued entries until updated', () async {
+    server.mode = '426';
+    await data.checkIn(_place);
+    await data.sync();
+    expect(data.pendingCount, 1);
+    expect(data.visits.single.pending, isTrue);
   });
 
   test('a review photo waits with the review, also across a restart', () async {

@@ -368,21 +368,15 @@ Future<(String, String?)> _consumeLoginRequest(Deps deps, VerifyRequest body) as
   if (email == null || code == null) throw const ApiException.badRequest('E-Mail und Code oder Token erforderlich');
 
   const invalid = ApiException.unauthorized('Code ungültig oder abgelaufen.');
+  // Every check counts before the comparison, so parallel guesses can't share one attempt.
   final row = await queryOne(
     deps.db,
-    'SELECT id, code_hash, attempts, invite_code FROM login_requests '
-    'WHERE email = @email AND used_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1',
-    {'email': email},
+    'UPDATE login_requests SET attempts = attempts + 1 '
+    'WHERE id = (SELECT id FROM login_requests WHERE email = @email AND used_at IS NULL AND expires_at > now() '
+    'ORDER BY created_at DESC LIMIT 1) AND attempts < @max:int4 RETURNING id, code_hash, invite_code',
+    {'email': email, 'max': maxCodeAttempts},
   );
-  if (row == null || (row['attempts'] as int) >= maxCodeAttempts) throw invalid;
-
-  if (row['code_hash'] != hashToken(code)) {
-    await deps.db.execute(
-      Sql.named('UPDATE login_requests SET attempts = attempts + 1 WHERE id = @id:uuid'),
-      parameters: {'id': row['id']},
-    );
-    throw invalid;
-  }
+  if (row == null || row['code_hash'] != hashToken(code)) throw invalid;
   final used = await queryOne(
     deps.db,
     'UPDATE login_requests SET used_at = now() WHERE id = @id:uuid AND used_at IS NULL RETURNING id',

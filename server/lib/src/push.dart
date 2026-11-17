@@ -56,11 +56,13 @@ class FcmPusher implements Pusher {
   Future<List<String>> send(List<String> tokens, {String? title, String? body, Map<String, String> data = const {}}) async {
     final gone = <String>[];
     for (final token in tokens) {
+      // Without credentials no device gets its push: fail the whole send once.
+      final accessToken = await _token();
       final http.Response response;
       try {
         response = await _client.post(
           Uri.parse('https://fcm.googleapis.com/v1/projects/$_projectId/messages:send'),
-          headers: {'authorization': 'Bearer ${await _token()}', 'content-type': 'application/json'},
+          headers: {'authorization': 'Bearer $accessToken', 'content-type': 'application/json'},
           body: jsonEncode({
             'message': {
               'token': token,

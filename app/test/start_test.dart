@@ -308,7 +308,7 @@ void main() {
   testWidgets('vegans rank by vegan food and miss the places without any', (tester) async {
     final server = await _pump(tester, const RankingScreen(), position: const LatLng(48, 7.85));
     final session = tester.element(find.byType(RankingScreen)).read<Session>();
-    await tester.runAsync(() => session.updateSettings(diet: Diet.vegan));
+    await tester.runAsync(() => session.updateSettings(const UpdateMeRequest(diet: Diet.vegan)));
     await tester.pumpAndSettle();
 
     expect(server.calls('/ranking').last.queryParameters['by'], 'vegan');

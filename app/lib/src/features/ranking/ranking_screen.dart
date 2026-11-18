@@ -107,7 +107,7 @@ class _RankingScreenState extends State<RankingScreen> {
         // Vegans don't need the places where people found nothing vegan.
         final entries = [
           for (final e in ranking?.entries ?? const <RankingEntryDto>[])
-            if (diet != Diet.vegan || e.place.veganOptions != false) e,
+            if (e.place.suits(diet)) e,
         ];
         return Scaffold(
           appBar: AppBar(

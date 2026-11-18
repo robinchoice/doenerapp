@@ -19,6 +19,39 @@ void main() {
     expect(const UserDto(id: 'u', displayName: 'U', reviewedPlaces: 10).tier, Tier.doenerfan);
   });
 
+  test('vegans skip places where most found nothing vegan, everyone else sees them', () {
+    const nothingVegan = PlaceDto(placeId: 'p', name: 'Laden', latitude: 48, longitude: 7.8, veganOptions: false);
+    const unknown = PlaceDto(placeId: 'q', name: 'Laden', latitude: 48, longitude: 7.8);
+    expect(nothingVegan.suits(Diet.vegan), isFalse);
+    expect(nothingVegan.suits(Diet.vegetarian), isTrue);
+    expect(nothingVegan.suits(Diet.all), isTrue);
+    expect(unknown.suits(Diet.vegan), isTrue);
+  });
+
+  test('a settings change replaces what it sets and keeps the rest of the account', () {
+    final paused = DateTime.utc(2026, 11, 18, 20);
+    const account = AccountDto(id: 'u', displayName: 'Robin', admin: true, expertMode: true, quietStart: 60);
+    final changed = account.applying(UpdateMeRequest(diet: Diet.vegan, pushFriends: false, pushPausedUntil: paused, quietEnd: 420));
+    expect(changed.toJson(), {
+      ...account.toJson(),
+      'diet': 'vegan',
+      'pushFriends': false,
+      'pushPausedUntil': paused.toIso8601String(),
+      'quietEnd': 420,
+    });
+    expect(account.applying(const UpdateMeRequest()).toJson(), account.toJson());
+    // Every field a change can set must reach the account.
+    const all = UpdateMeRequest(
+      displayName: 'Neu', diet: Diet.vegetarian, expertMode: false, pushFriends: false, pushNewPlaces: false,
+      pushFriendRequests: false, pushReactions: false, updateMails: true, quietHours: false, quietDays: 3,
+      quietStart: 120, quietEnd: 300,
+    );
+    final everything = account.applying(all).toJson();
+    for (final MapEntry(:key, :value) in all.toJson().entries) {
+      if (value != null) expect(everything[key], value, reason: key);
+    }
+  });
+
   group('Validation', () {
     test('email', () {
       expect(Validation.isValidEmail(' Robin@Example.org '), isTrue);

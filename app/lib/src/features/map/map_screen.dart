@@ -129,7 +129,7 @@ class _MapScreenState extends State<MapScreen> {
     }
     final places = data.activePlaces
         .where((p) => !_favoritesOnly || data.favorites.contains(p.placeId))
-        .where((p) => diet != Diet.vegan || p.veganOptions != false)
+        .where((p) => p.suits(diet))
         .toList();
     final brightness = Theme.of(context).brightness;
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);

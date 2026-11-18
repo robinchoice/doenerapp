@@ -78,13 +78,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final push = context.read<Push?>();
     final position = context.read<LocationService>().position;
     try {
-      await session.updateSettings(
+      await session.updateSettings(UpdateMeRequest(
         pushFriends: pushFriends,
         pushNewPlaces: pushNewPlaces,
         pushFriendRequests: pushFriendRequests,
         pushReactions: pushReactions,
         pushPausedUntil: pushPausedUntil,
-      );
+      ));
       if (pushFriends == true || pushNewPlaces == true || pushFriendRequests == true || pushReactions == true) {
         await push?.register(session, latitude: position?.latitude, longitude: position?.longitude);
       }
@@ -95,7 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _updateSettings({Diet? diet, bool? expertMode, bool? updateMails}) async {
     try {
-      await context.read<Session>().updateSettings(diet: diet, expertMode: expertMode, updateMails: updateMails);
+      await context.read<Session>().updateSettings(UpdateMeRequest(diet: diet, expertMode: expertMode, updateMails: updateMails));
     } catch (e) {
       if (mounted) showMessage(context, 'Nicht gespeichert: $e');
     }

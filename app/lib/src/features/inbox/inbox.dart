@@ -254,16 +254,16 @@ class _LessSheetState extends State<LessSheet> {
           unawaited(friends.load());
           message = '${widget.userName} ist stumm. Rückgängig unter Kontakte.';
         case _Less.friends:
-          await session.updateSettings(pushFriends: false);
+          await session.updateSettings(const UpdateMeRequest(pushFriends: false));
           message = 'Keine Pushes mehr, wenn Kontakte einchecken.';
         case _Less.requests:
-          await session.updateSettings(pushFriendRequests: false);
+          await session.updateSettings(const UpdateMeRequest(pushFriendRequests: false));
           message = 'Keine Pushes mehr zu Kontaktanfragen.';
         case _Less.reactions:
-          await session.updateSettings(pushReactions: false);
+          await session.updateSettings(const UpdateMeRequest(pushReactions: false));
           message = 'Keine Pushes mehr zu Reaktionen.';
         case _Less.places:
-          await session.updateSettings(pushNewPlaces: false);
+          await session.updateSettings(const UpdateMeRequest(pushNewPlaces: false));
           message = 'Keine Pushes mehr zu neuen Läden.';
       }
       if (!mounted) return;

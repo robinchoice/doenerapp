@@ -98,7 +98,7 @@ class QuietHoursScreen extends StatelessWidget {
     try {
       await context
           .read<Session>()
-          .updateSettings(quietHours: quietHours, quietDays: quietDays, quietStart: quietStart, quietEnd: quietEnd);
+          .updateSettings(UpdateMeRequest(quietHours: quietHours, quietDays: quietDays, quietStart: quietStart, quietEnd: quietEnd));
     } catch (e) {
       if (context.mounted) showMessage(context, 'Nicht gespeichert: $e');
     }

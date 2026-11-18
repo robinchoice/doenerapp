@@ -306,7 +306,7 @@ class _StartScreenState extends State<StartScreen> {
                         ),
                       ),
                     ],
-                    if (_trending.where((p) => diet != Diet.vegan || p.veganOptions != false).toList() case final trending
+                    if (_trending.where((p) => p.suits(diet)).toList() case final trending
                         when trending.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       const SectionTitle(title: 'Gerade im Trend'),

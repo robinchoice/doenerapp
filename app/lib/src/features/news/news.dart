@@ -46,7 +46,7 @@ class _NewsCardState extends State<NewsCard> {
 
   Future<void> _subscribe() async {
     try {
-      await context.read<Session>().updateSettings(updateMails: true);
+      await context.read<Session>().updateSettings(const UpdateMeRequest(updateMails: true));
       if (mounted) showMessage(context, 'Neuigkeiten kommen jetzt auch per Mail.');
     } catch (e) {
       if (mounted) showMessage(context, 'Nicht gespeichert: $e');

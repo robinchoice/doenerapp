@@ -23,11 +23,6 @@ _ItemKey _keyOf(RatingItem item) => RatingItem.newerItems.contains(item)
         ? _ItemKey.newer
         : _ItemKey.classic;
 
-/// Ratings go in half steps. Shipped clients read whole numbers from
-/// `sauceRating`, `fleischRating`, `brotRating` and `items` (sauce, meat and
-/// bread as fields of their own, as before there were other items), so those
-/// carry rounded values and `ratings` the exact ones. [RatingItem.newItems]
-/// go in `newRatings`, [RatingItem.newerItems] in `newerRatings`, see there.
 /// {emoji: count} of [reactionEmojis], absent or empty when nobody reacted.
 Map<String, int> _reactionsFromJson(Object? j) => {
       if (j is Map)
@@ -49,6 +44,11 @@ Map<RatingItem, double> _ratingsFromJson(Json j) => {
       ..._itemMap(j['newerRatings'], (v) => (v as num).toDouble()),
     };
 
+/// Ratings go in half steps. Shipped clients read whole numbers from
+/// `sauceRating`, `fleischRating`, `brotRating` and `items` (sauce, meat and
+/// bread as fields of their own, as before there were other items), so those
+/// carry rounded values and `ratings` the exact ones. [RatingItem.newItems]
+/// go in `newRatings`, [RatingItem.newerItems] in `newerRatings`, see there.
 Json _ratingsToJson(Map<RatingItem, double> ratings) => {
       'sauceRating': ratings[RatingItem.sauce]?.round(),
       'fleischRating': ratings[RatingItem.fleisch]?.round(),
@@ -329,6 +329,26 @@ class AccountDto extends UserDto {
 
   bool get pushPaused => pushPausedUntil?.isAfter(DateTime.now()) ?? false;
 
+  /// The account with [change] applied: what the change sets replaces the old
+  /// value, everything else stays. The app shows this until the server answers.
+  AccountDto applying(UpdateMeRequest change) => AccountDto(
+        id: id,
+        displayName: change.displayName ?? displayName,
+        diet: change.diet ?? diet,
+        expertMode: change.expertMode ?? expertMode,
+        admin: admin,
+        pushFriends: change.pushFriends ?? pushFriends,
+        pushNewPlaces: change.pushNewPlaces ?? pushNewPlaces,
+        pushFriendRequests: change.pushFriendRequests ?? pushFriendRequests,
+        pushReactions: change.pushReactions ?? pushReactions,
+        updateMails: change.updateMails ?? updateMails,
+        pushPausedUntil: change.pushPausedUntil ?? pushPausedUntil,
+        quietHours: change.quietHours ?? quietHours,
+        quietDays: change.quietDays ?? quietDays,
+        quietStart: change.quietStart ?? quietStart,
+        quietEnd: change.quietEnd ?? quietEnd,
+      );
+
   factory AccountDto.fromJson(Json j) => AccountDto(
         id: j['id'] as String,
         displayName: j['displayName'] as String,
@@ -416,6 +436,10 @@ class PlaceDto {
     this.openedOn,
     this.opensOn,
   });
+
+  /// Whether the place belongs in lists for [diet]: vegans skip the places
+  /// where most people found nothing vegan, rated or not.
+  bool suits(Diet diet) => diet != Diet.vegan || veganOptions != false;
 
   /// Average and count of the main score for [diet].
   ({double? average, int count}) score(Diet diet) => switch (diet) {

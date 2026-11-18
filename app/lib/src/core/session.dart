@@ -70,57 +70,12 @@ class Session extends ChangeNotifier {
 
   /// Diet, expert mode, push settings, pause, quiet hours and news by mail
   /// follow the account. The change shows right away and is taken back if
-  /// the server doesn't take it. A [pushPausedUntil] that has passed resumes.
-  Future<void> updateSettings({
-    Diet? diet,
-    bool? expertMode,
-    bool? pushFriends,
-    bool? pushNewPlaces,
-    bool? pushFriendRequests,
-    bool? pushReactions,
-    bool? updateMails,
-    DateTime? pushPausedUntil,
-    bool? quietHours,
-    int? quietDays,
-    int? quietStart,
-    int? quietEnd,
-  }) async {
+  /// the server doesn't take it. A `pushPausedUntil` that has passed resumes.
+  Future<void> updateSettings(UpdateMeRequest change) async {
     final previous = user!;
-    await _setUser(AccountDto(
-      id: previous.id,
-      displayName: previous.displayName,
-      diet: diet ?? previous.diet,
-      expertMode: expertMode ?? previous.expertMode,
-      admin: previous.admin,
-      pushFriends: pushFriends ?? previous.pushFriends,
-      pushNewPlaces: pushNewPlaces ?? previous.pushNewPlaces,
-      pushFriendRequests: pushFriendRequests ?? previous.pushFriendRequests,
-      pushReactions: pushReactions ?? previous.pushReactions,
-      updateMails: updateMails ?? previous.updateMails,
-      pushPausedUntil: pushPausedUntil ?? previous.pushPausedUntil,
-      quietHours: quietHours ?? previous.quietHours,
-      quietDays: quietDays ?? previous.quietDays,
-      quietStart: quietStart ?? previous.quietStart,
-      quietEnd: quietEnd ?? previous.quietEnd,
-    ));
+    await _setUser(previous.applying(change));
     try {
-      final json = await api.patch(
-        '/users/me',
-        UpdateMeRequest(
-          diet: diet,
-          expertMode: expertMode,
-          pushFriends: pushFriends,
-          pushNewPlaces: pushNewPlaces,
-          pushFriendRequests: pushFriendRequests,
-          pushReactions: pushReactions,
-          updateMails: updateMails,
-          pushPausedUntil: pushPausedUntil,
-          quietHours: quietHours,
-          quietDays: quietDays,
-          quietStart: quietStart,
-          quietEnd: quietEnd,
-        ).toJson(),
-      );
+      final json = await api.patch('/users/me', change.toJson());
       await _setUser(AccountDto.fromJson(json as Map<String, dynamic>));
     } catch (_) {
       await _setUser(previous);

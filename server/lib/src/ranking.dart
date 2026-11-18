@@ -32,6 +32,31 @@ String _ratings(RankBy by) {
       : 'SELECT place_id, user_id, $column AS value FROM reviews WHERE $column IS NOT NULL';
 }
 
+/// Best first by [weightedRating]; rows need `avg` and `n` (review count).
+/// The mean is that of all reviews in [rows] — the area or city being ranked.
+/// [perPrice] divides it by the usual price (`price`, cents, never null then).
+List<Map<String, dynamic>> rankByWeight(List<Map<String, dynamic>> rows, {bool perPrice = false}) {
+  var total = 0.0;
+  var count = 0;
+  for (final r in rows) {
+    total += (r['avg'] as double) * (r['n'] as int);
+    count += r['n'] as int;
+  }
+  final score = {
+    for (final r in rows)
+      r['id']: weightedRating(r['avg'] as double, r['n'] as int, total / count) / (perPrice ? r['price'] as int : 1),
+  };
+
+  int compare(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final byScore = score[b['id']]!.compareTo(score[a['id']]!);
+    if (byScore != 0) return byScore;
+    final byCount = (b['n'] as int).compareTo(a['n'] as int);
+    return byCount != 0 ? byCount : (a['name'] as String).compareTo(b['name'] as String);
+  }
+
+  return [...rows]..sort(compare);
+}
+
 /// The city of the nearest known place within 20 km of [lat]/[lon] — "your" city.
 Future<String?> nearestCity(Session db, double lat, double lon) async => (await queryOne(
       db,

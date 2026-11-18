@@ -224,7 +224,8 @@ app/                          Flutter-App (iOS, Android, Web)
 server/                       Dart-API + Auslieferung der Web-App
 ├── lib/src/auth.dart         Magic-Link-Login, Sitzungen, Account
 ├── lib/src/places.dart       Läden, Bewertungen, Besuche, Top, Trend und Neueröffnungen im Umkreis
-├── lib/src/ranking.dart      Ranking pro Stadt
+├── lib/src/place_cache.dart  Google-Places-Cache: Kachelsuche, Tageslimit pro Konto, Pflege nach Googles 30-Tage-Regel
+├── lib/src/ranking.dart      Ranking pro Stadt und die Gewichtung dahinter
 ├── lib/src/social.dart       Feed, Live-Status, Kontakte, Feedback, Ladenmeldungen
 ├── lib/src/google_places.dart
 ├── lib/src/db.dart           SQL-Migrationen (nur anhängen, nie ändern)

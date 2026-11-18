@@ -4,7 +4,7 @@ import 'package:postgres/postgres.dart';
 
 import 'deps.dart';
 import 'google_places.dart';
-import 'places.dart' show storeFoundPlaces;
+import 'place_cache.dart' show storeFoundPlaces;
 
 /// An area whose shops the map shows before anyone has looked there.
 class PrefetchArea {

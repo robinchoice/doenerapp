@@ -6,8 +6,7 @@ import 'package:shelf/shelf.dart';
 
 import 'agents.dart';
 import 'deps.dart';
-import 'places.dart' show rankByWeight;
-import 'ranking.dart' show usualPrice;
+import 'ranking.dart' show rankByWeight, usualPrice;
 
 const _scoreColumns = {BestOfCategory.overall: 'rating', BestOfCategory.vegan: 'vegan_rating'};
 const _escape = HtmlEscape();

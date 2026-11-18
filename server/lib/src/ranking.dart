@@ -5,6 +5,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'auth.dart';
 import 'best_of.dart';
+import 'db.dart' show isActivePlace;
 import 'deps.dart';
 import 'http.dart';
 import 'places.dart';
@@ -190,8 +191,8 @@ void mountRanking(Router router, Deps deps) {
     await requireUser(deps, request);
     final rows = await query(
       deps.db,
-      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM places '
-      "WHERE business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY' AND business_status IS DISTINCT FROM 'FUTURE_OPENING' "
+      'SELECT city, avg(latitude)::float8 AS lat, avg(longitude)::float8 AS lon, count(*)::int AS n FROM places p '
+      'WHERE ${isActivePlace('p')} '
       'AND city IS NOT NULL AND id IN (SELECT place_id FROM reviews) GROUP BY city ORDER BY n DESC, city LIMIT 50',
     );
     return json([

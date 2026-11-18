@@ -39,8 +39,8 @@ class Config {
   final String? feedbackEmail;
 
   /// Sign-up stays closed until Robin opens it (`SIGNUP_OPEN=true`): existing
-  /// accounts log in, new ones only for [signupAllowlist], a friend's invite
-  /// link or an admin's invite.
+  /// accounts log in, new ones only for [signupAllowlist], the admins
+  /// themselves or an admin's invite. A friend's invite link only makes friends.
   final bool signupOpen;
   final Set<String> signupAllowlist;
 

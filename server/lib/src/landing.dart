@@ -31,9 +31,7 @@ void mountTesterRequests(Router router, Deps deps) {
       deps.db,
       "SELECT count(*)::int AS n FROM tester_requests WHERE created_at > now() - interval '1 hour'",
     );
-    if ((recent!['n'] as int) >= maxTesterRequestsPerHour) {
-      throw const ApiException(429, 'Zu viele Anfragen – bitte später erneut versuchen.');
-    }
+    if ((recent!['n'] as int) >= maxTesterRequestsPerHour) throw tooManyRequests;
 
     final normalized = Validation.normalizeEmail(email);
     final inserted = await deps.db.execute(

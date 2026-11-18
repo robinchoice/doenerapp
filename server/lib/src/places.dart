@@ -9,6 +9,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'auth.dart';
 import 'best_of.dart';
+import 'db.dart' show isActivePlace;
 import 'deps.dart';
 import 'http.dart';
 import 'moderation.dart';
@@ -260,7 +261,7 @@ void mountPlaces(Router router, Deps deps) {
       '    UNION ALL'
       '    SELECT place_id FROM visits WHERE visited_at > now() - make_interval(days => @days:int4)'
       '  ) x JOIN places p ON p.id = x.place_id WHERE ${withinRadius('p')}'
-      "    AND p.business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY' AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING'"
+      '    AND ${isActivePlace('p')}'
       '  GROUP BY x.place_id ORDER BY activity DESC LIMIT @limit:int4'
       ') a JOIN place_view pv ON pv.id = a.place_id ORDER BY a.activity DESC, pv.name',
       {...area, 'days': days, 'limit': limit},
@@ -532,13 +533,7 @@ void mountPlaces(Router router, Deps deps) {
     );
     if (user == null) throw const ApiException.notFound('Konto nicht gefunden');
     final close = params['id'] == me.id ||
-        await queryOne(
-              deps.db,
-              "SELECT 1 FROM friendships WHERE status = 'accepted' AND ((requester_id = @me:uuid AND addressee_id = @id:uuid) "
-              'OR (requester_id = @id:uuid AND addressee_id = @me:uuid))',
-              params,
-            ) !=
-            null;
+        await queryOne(deps.db, 'SELECT 1 WHERE ${areFriends('@me:uuid', '@id:uuid')}', params) != null;
     final byId = {'id': params['id']};
     final reviews = await query(deps.db, '$_reviewSelect WHERE r.user_id = @id:uuid ORDER BY r.updated_at DESC LIMIT 200', byId);
     final visits = close

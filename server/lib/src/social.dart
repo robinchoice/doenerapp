@@ -20,6 +20,10 @@ const friendIdsCte = 'WITH friends AS ('
     ' SELECT CASE WHEN requester_id = @me:uuid THEN addressee_id ELSE requester_id END AS id'
     ' FROM friendships WHERE status = \'accepted\' AND (requester_id = @me:uuid OR addressee_id = @me:uuid))';
 
+/// SQL condition: the users [a] and [b] (SQL expressions) are friends.
+String areFriends(String a, String b) => "EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted' AND "
+    '((f.requester_id = $a AND f.addressee_id = $b) OR (f.requester_id = $b AND f.addressee_id = $a)))';
+
 /// Keyset cursor "(timestamp, id)" — stable even when entries share a timestamp.
 String encodeCursor(DateTime timestamp, String id) =>
     base64Url.encode(utf8.encode('${timestamp.toUtc().toIso8601String()}|$id'));

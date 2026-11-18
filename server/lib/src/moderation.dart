@@ -10,9 +10,9 @@ import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
 
-/// SQL condition: neither @me nor the user in [column] has blocked the other.
-String notBlocked(String column) => 'NOT EXISTS (SELECT 1 FROM blocks b WHERE '
-    '(b.blocker_id = @me:uuid AND b.blocked_id = $column) OR (b.blocker_id = $column AND b.blocked_id = @me:uuid))';
+/// SQL condition: neither [me] nor the user in [column] has blocked the other.
+String notBlocked(String column, [String me = '@me:uuid']) => 'NOT EXISTS (SELECT 1 FROM blocks b WHERE '
+    '(b.blocker_id = $me AND b.blocked_id = $column) OR (b.blocker_id = $column AND b.blocked_id = $me))';
 
 Future<bool> isBlocked(Deps deps, String me, String other) async =>
     await queryOne(deps.db, 'SELECT 1 WHERE NOT ${notBlocked('@other:uuid')}', {'me': me, 'other': other}) != null;
@@ -51,8 +51,7 @@ void mountModeration(Router router, Deps deps) {
 
   // DELETE /reviews/<id> — admins take down a reported review.
   router.delete('/reviews/<id>', (Request request, String id) async {
-    final me = await requireUser(deps, request);
-    if (!me.account.admin) throw const ApiException.forbidden('Nur für Admins');
+    await requireAdmin(deps, request);
     final row = await queryOne(deps.db, 'DELETE FROM reviews WHERE id = @id:uuid RETURNING id', {'id': requireUuid(id)});
     if (row == null) throw const ApiException.notFound('Bewertung nicht gefunden');
     return noContent();

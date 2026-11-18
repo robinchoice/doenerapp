@@ -5,6 +5,7 @@ import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 
 import 'agents.dart';
+import 'db.dart' show isActivePlace;
 import 'deps.dart';
 import 'ranking.dart' show rankByWeight, usualPrice;
 
@@ -46,8 +47,7 @@ Future<void> computeBestOf(Pool<void> db, int year) => db.runTx((tx) async {
           tx,
           'SELECT p.id, p.name, p.city, avg(r.$column)::float8 AS avg, count(*)::int AS n '
           'FROM reviews r JOIN places p ON p.id = r.place_id '
-          "WHERE r.$column IS NOT NULL AND p.city IS NOT NULL AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING' "
-          "AND p.business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY' "
+          'WHERE r.$column IS NOT NULL AND p.city IS NOT NULL AND ${isActivePlace('p')} '
           "AND r.updated_at >= make_timestamptz(@year:int4, 1, 1, 0, 0, 0, 'Europe/Berlin') "
           "AND r.updated_at < make_timestamptz(@year:int4 + 1, 1, 1, 0, 0, 0, 'Europe/Berlin') "
           'GROUP BY p.id',

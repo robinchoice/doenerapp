@@ -10,6 +10,11 @@ Pool<void> openPool(Config config) => Pool.withEndpoints(
       ),
     );
 
+/// SQL condition: place [alias] is open for business, neither closed for good
+/// nor only announced. Same rule as `active_place_view`, for queries on `places`.
+String isActivePlace(String alias) =>
+    "$alias.business_status IS DISTINCT FROM 'CLOSED_PERMANENTLY' AND $alias.business_status IS DISTINCT FROM 'FUTURE_OPENING'";
+
 /// Each entry is one migration; statements run in a single transaction.
 /// Append only — never edit an entry that has shipped.
 final migrations = <List<String>>[

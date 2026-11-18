@@ -12,6 +12,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
+import 'moderation.dart';
 import 'ranking.dart';
 import 'social.dart';
 
@@ -226,10 +227,7 @@ Future<void> _pushCheckIn(Deps deps, AuthUser me, Map<String, dynamic> place, St
     "AND actor_id <> @me:uuid AND created_at > now() - interval '30 minutes' ORDER BY user_id, created_at DESC) latest, users a "
     'WHERE e.id = latest.id AND a.id = e.actor_id '
     'AND NOT EXISTS (SELECT 1 FROM friend_mutes m WHERE m.user_id = e.user_id AND m.muted_id = e.actor_id) '
-    'AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = e.user_id AND b.blocked_id = e.actor_id) '
-    'OR (b.blocker_id = e.actor_id AND b.blocked_id = e.user_id)) '
-    "AND EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted' AND ((f.requester_id = e.user_id AND f.addressee_id = e.actor_id) "
-    'OR (f.requester_id = e.actor_id AND f.addressee_id = e.user_id))) '
+    'AND ${notBlocked('e.actor_id', 'e.user_id')} AND ${areFriends('e.user_id', 'e.actor_id')} '
     'RETURNING e.id::text AS id, e.user_id::text AS user_id',
     {'users': users.toList(), 'me': me.id, 'name': me.displayName, 'body': 'zuletzt ${me.displayName} $body', 'place': placeId},
   );
@@ -340,9 +338,7 @@ Future<void> pushPending(Deps deps) async {
     "WHERE f.id = e.source_id AND f.status = 'pending' AND f.requester_id = e.actor_id AND f.addressee_id = e.user_id) "
     "WHEN 'reaction' THEN u.push_reactions AND EXISTS (SELECT 1 FROM reactions r "
     'WHERE r.user_id = e.actor_id AND (r.visit_id = e.source_id OR r.review_id = e.source_id)) '
-    "AND EXISTS (SELECT 1 FROM friendships f WHERE f.status = 'accepted' AND "
-    '((f.requester_id = e.actor_id AND f.addressee_id = e.user_id) OR '
-    '(f.addressee_id = e.actor_id AND f.requester_id = e.user_id))) ELSE false END '
+    'AND ${areFriends('e.actor_id', 'e.user_id')} ELSE false END '
     "AND e.created_at >= now() - interval '1 day' "
     'AND (u.inbox_seen_at IS NULL OR u.inbox_seen_at < e.created_at) AS send',
   );

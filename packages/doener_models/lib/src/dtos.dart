@@ -69,7 +69,10 @@ double? _scoreFromJson(Json j) => _doubleOrNull(j.containsKey('score') ? j['scor
 /// In menu order, which the split into two keys would lose.
 List<Ingredient>? _ingredientsFromJson(Json j) => j['ingredients'] == null && j['newIngredients'] == null
     ? null
-    : ([for (final name in [...?j['ingredients'] as List?, ...?j['newIngredients'] as List?]) Ingredient.values.byName(name as String)]
+    : ([
+          for (final name in j['ingredients'] as List? ?? const []) Ingredient.values.byName(name as String),
+          for (final name in j['newIngredients'] as List? ?? const []) ?Ingredient.values.asNameMap()[name],
+        ]
         ..sort((a, b) => a.index.compareTo(b.index)));
 
 /// Shipped clients fail on ingredients they don't know, see Ingredient.newIngredients.
@@ -515,6 +518,7 @@ class PlaceSummaryDto {
   final List<Ingredient> ingredients;
   final List<Meat> meats;
   final Skewer? skewer;
+  final MeatDistribution? meatDistribution;
   final Bread? bread;
 
   /// Reviews that told what came with "mit allem".
@@ -531,6 +535,7 @@ class PlaceSummaryDto {
     this.ingredients = const [],
     this.meats = const [],
     this.skewer,
+    this.meatDistribution,
     this.bread,
     this.experts = 0,
     this.awards = const [],
@@ -550,6 +555,7 @@ class PlaceSummaryDto {
         ingredients: _ingredientsFromJson(j) ?? const [],
         meats: _meatsFromJson(j) ?? const [],
         skewer: _enumOrNull(Skewer.values, j['skewer']),
+        meatDistribution: _enumOrNull(MeatDistribution.values, j['meatDistribution']),
         bread: _enumOrNull(Bread.values, j['bread']),
         experts: j['experts'] as int,
         awards: [for (final a in (j['awards'] as List?) ?? const []) AwardDto.fromJson(a as Json)],
@@ -566,6 +572,7 @@ class PlaceSummaryDto {
         ..._ingredientsToJson(ingredients),
         ..._meatsToJson(meats),
         'skewer': skewer?.name,
+        'meatDistribution': meatDistribution?.name,
         'bread': bread?.name,
         'experts': experts,
         'awards': [for (final a in awards) a.toJson()],
@@ -601,6 +608,7 @@ class ReviewDto {
   final List<Ingredient>? ingredients;
   final List<Meat>? meats;
   final Skewer? skewer;
+  final MeatDistribution? meatDistribution;
   final Bread? bread;
   final String? text;
 
@@ -633,6 +641,7 @@ class ReviewDto {
     this.ingredients,
     this.meats,
     this.skewer,
+    this.meatDistribution,
     this.bread,
     this.text,
     this.photoId,
@@ -664,6 +673,7 @@ class ReviewDto {
         ingredients: _ingredientsFromJson(j),
         meats: _meatsFromJson(j),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
+        meatDistribution: _enumOrNull(MeatDistribution.values, j['meatDistribution']),
         bread: _enumOrNull(Bread.values, j['bread']),
         text: j['text'] as String?,
         photoId: j['photoId'] as String?,
@@ -692,6 +702,7 @@ class ReviewDto {
         ..._ingredientsToJson(ingredients),
         ..._meatsToJson(meats),
         'skewer': skewer?.name,
+        'meatDistribution': meatDistribution?.name,
         'bread': bread?.name,
         'text': text,
         'photoId': photoId,
@@ -721,6 +732,7 @@ class UpsertReviewRequest {
   final List<Ingredient>? ingredients;
   final List<Meat>? meats;
   final Skewer? skewer;
+  final MeatDistribution? meatDistribution;
   final Bread? bread;
   final String? text;
 
@@ -738,6 +750,7 @@ class UpsertReviewRequest {
     this.ingredients,
     this.meats,
     this.skewer,
+    this.meatDistribution,
     this.bread,
     this.text,
     this.photoBase64,
@@ -753,6 +766,7 @@ class UpsertReviewRequest {
         ingredients: _ingredientsFromJson(j),
         meats: _meatsFromJson(j),
         skewer: _enumOrNull(Skewer.values, j['skewer']),
+        meatDistribution: _enumOrNull(MeatDistribution.values, j['meatDistribution']),
         bread: _enumOrNull(Bread.values, j['bread']),
         text: j['text'] as String?,
         photoBase64: j['photoBase64'] as String?,
@@ -768,6 +782,7 @@ class UpsertReviewRequest {
         ..._ingredientsToJson(ingredients),
         ..._meatsToJson(meats),
         'skewer': skewer?.name,
+        'meatDistribution': meatDistribution?.name,
         'bread': bread?.name,
         'text': text,
         'photoBase64': photoBase64,

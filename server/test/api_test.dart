@@ -8,6 +8,7 @@ import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/auth.dart' show hashToken, maxCodeAttempts;
 import 'package:doener_server/src/deps.dart' show queryOne;
+import 'package:doener_server/src/db.dart' show migrations;
 import 'package:doener_server/src/google_places.dart' show maxTileSearchesPerDay;
 import 'package:doener_server/src/places.dart' show median;
 import 'package:doener_server/src/prefetch.dart' show PrefetchArea;
@@ -178,13 +179,14 @@ void main() {
   // Each call comes from its own address unless [ip] is given, so the limits per IP stay out of the way.
   var calls = 0;
   Future<(int, dynamic)> call(String method, String path,
-      {Object? body, String? token, bool closed = false, String? ip}) async {
+      {Object? body, String? token, bool closed = false, String? ip, bool legacyIngredients = false}) async {
     final response = await (closed ? closedHandler : handler)(Request(
       method,
       Uri.parse('http://localhost/api/v1$path'),
       body: body == null ? null : jsonEncode(body),
       headers: {
         'content-type': 'application/json',
+        if (!legacyIngredients) 'x-ingredient-format': '2',
         'x-forwarded-for': '203.0.113.1, ${ip ?? 'client-${calls++}'}',
         if (token != null) 'authorization': 'Bearer $token',
       },
@@ -1393,6 +1395,25 @@ void main() {
       expect(filtered['entries'], isEmpty);
     });
 
+    test('cheese and meat distribution are expert facts with majority and tie', () async {
+      await place('t-expert', 'Expert Döner', 52.0, 'Expertstadt');
+      await review(ute, 't-expert', {'newIngredients': ['kaese'], 'meatDistribution': 'distributed'});
+      final (_, first) = await call('GET', '/places/t-expert/summary');
+      expect(first['newIngredients'], ['kaese']);
+      expect(first['ingredients'], isNot(contains('kaese')));
+      expect(first['meatDistribution'], 'distributed');
+      final (_, legacy) = await call('GET', '/places/t-expert/summary', legacyIngredients: true);
+      expect(legacy['newIngredients'], isNot(contains('kaese')));
+      final (_, mine) = await call('GET', '/me/reviews', token: ute);
+      expect((mine as List).firstWhere((r) => r['placeId'] == 't-expert')['meatDistribution'], 'distributed');
+      await review(vic, 't-expert', {'meatDistribution': 'clumped'});
+      expect((await call('GET', '/places/t-expert/summary')).$2['meatDistribution'], isNull);
+      await review(wim, 't-expert', {'meatDistribution': 'distributed'});
+      expect((await call('GET', '/places/t-expert/summary')).$2['meatDistribution'], 'distributed');
+      await review(ute, 't-expert', {'meatDistribution': 'clumped'});
+      expect((await call('GET', '/places/t-expert/summary')).$2['meatDistribution'], 'clumped');
+    });
+
     test('ranking by an ingredient most experts got', () async {
       await place('t-onion', 'Zwiebel Kebap', 52.0, 'Zwiebelstadt');
       await place('t-plain', 'Ohne Kebap', 52.0, 'Zwiebelstadt');
@@ -2083,8 +2104,9 @@ void main() {
     await db.execute('UPDATE reviews SET meat = meats[1]');
     await db.execute('ALTER TABLE reviews DROP COLUMN meats');
     await db.execute("DELETE FROM schedules WHERE name = 'photo_metadata'");
-    await db.execute('ALTER TABLE reviews DROP COLUMN halal');
-    await db.execute('DELETE FROM schema_migrations WHERE version >= (SELECT max(version) - 9 FROM schema_migrations)');
+    await db.execute('ALTER TABLE reviews DROP COLUMN halal, DROP COLUMN meat_distribution');
+    final activeViewVersion = migrations.indexWhere((steps) => steps.any((sql) => sql.startsWith('CREATE VIEW active_place_view'))) + 1;
+    await db.execute(Sql.named('DELETE FROM schema_migrations WHERE version >= @version'), parameters: {'version': activeViewVersion});
     await migrate(db);
     await migrate(db);
 

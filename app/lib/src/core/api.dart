@@ -79,6 +79,7 @@ class ApiClient {
       ..headers['accept'] = 'application/json'
       ..headers['content-type'] = 'application/json'
       ..headers.addAll(_appHeaders);
+    request.headers['x-ingredient-format'] = '2';
     if (auth != null) request.headers['authorization'] = 'Bearer $auth';
     if (body != null) request.body = jsonEncode(body);
 

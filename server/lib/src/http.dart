@@ -101,7 +101,7 @@ Middleware cors(String? origin) => (inner) => (request) async {
       if (origin == null) return inner(request);
       const headers = {
         'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'access-control-allow-headers': 'authorization, content-type',
+        'access-control-allow-headers': 'authorization, content-type, x-ingredient-format',
         'access-control-max-age': '600',
       };
       if (request.method == 'OPTIONS') {

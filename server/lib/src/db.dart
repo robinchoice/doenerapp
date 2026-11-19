@@ -457,6 +457,9 @@ final migrations = <List<String>>[
     // Whether the meat is halal, as far as the reviewer knows; per place the majority counts.
     'ALTER TABLE reviews ADD COLUMN halal boolean',
   ],
+  [
+    "ALTER TABLE reviews ADD COLUMN meat_distribution text CHECK (meat_distribution IN ('distributed', 'clumped'))",
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

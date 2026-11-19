@@ -9,6 +9,7 @@ String _line(ReviewDto review) =>
     [
       '${day(review.updatedAt)} ${review.placeName} – ${_score(review.headline(Diet.all))}',
       if (review.price case final price?) euros(price),
+      if (review.meatDistribution case final distribution?) distribution.label,
       if (review.text case final text?) '„$text“',
     ].join(' · ') +
     reactionText(review.reactions);
@@ -44,6 +45,8 @@ final reviews = <String, Command>{
       ('review --place <placeId> --rate <punkt>=<1–5> …', 'Laden bewerten, ändert nur die genannten Angaben'),
       ('  [--price <euro>] [--text <text>]', 'Preis des Döners, Text'),
       ('  [--halal ja|nein|unklar]', 'Ob das Fleisch halal ist, soweit du weißt'),
+      ('  [--ingredient <name>] …', 'Zutaten ersetzen, z. B. kaese oder feta / Replace ingredients, e.g. kaese or feta'),
+      ('  [--meat-distribution distributed|clumped|unknown]', 'Fleisch gut verteilt oder Klumpen / Meat evenly distributed or clumped'),
       ('  Punkte:', RatingItem.values.map((item) => item.name).join(', ')),
     ],
     options: (parser) => parser
@@ -51,6 +54,8 @@ final reviews = <String, Command>{
       ..addMultiOption('rate', splitCommas: false)
       ..addOption('price')
       ..addOption('text')
+      ..addMultiOption('ingredient', allowed: [for (final i in Ingredient.values) i.name])
+      ..addOption('meat-distribution', allowed: [...MeatDistribution.values.map((m) => m.name), 'unknown'])
       ..addOption('halal', allowed: ['ja', 'nein', 'unklar']),
     run: (ctx) async {
       requireLogin(ctx);
@@ -71,9 +76,14 @@ final reviews = <String, Command>{
           _ => previous?.halal,
         },
         price: centsOption(ctx, 'price') ?? previous?.price,
-        ingredients: previous?.ingredients,
+        ingredients: ctx.args.wasParsed('ingredient')
+            ? ctx.args.multiOption('ingredient').map(Ingredient.values.byName).toList()
+            : previous?.ingredients,
         meats: previous?.meats,
         skewer: previous?.skewer,
+        meatDistribution: ctx.args.option('meat-distribution') == 'unknown'
+            ? null
+            : MeatDistribution.values.asNameMap()[ctx.args.option('meat-distribution')] ?? previous?.meatDistribution,
         bread: previous?.bread,
         text: ctx.args.option('text') ?? previous?.text,
       );

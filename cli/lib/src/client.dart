@@ -22,6 +22,7 @@ class Client {
     final request = http.Request(method, Uri.parse('$url/api/v1$path').replace(queryParameters: query));
     // The token never follows a redirect to another address
     request.followRedirects = false;
+    request.headers['x-ingredient-format'] = '2';
     if (token != null) request.headers['authorization'] = 'Bearer $token';
     if (body != null) {
       request.headers['content-type'] = 'application/json';

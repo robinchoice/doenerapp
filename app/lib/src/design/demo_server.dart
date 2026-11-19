@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 /// Made-up API answers for the design studio, so every screen has something
 /// to show without a server or an account.
 class DemoServer {
-  static const me = AccountDto(id: 'u1', displayName: 'Robin');
+  static const me = AccountDto(id: 'u1', displayName: 'Robin', expertMode: true);
   static const _tom = UserDto(id: 'u2', displayName: 'Tom', reviewedPlaces: 14);
   static const _ina = UserDto(id: 'u3', displayName: 'Ina', reviewedPlaces: 3);
   static const _mo = UserDto(id: 'u4', displayName: 'Mo', reviewedPlaces: 31);
@@ -98,7 +98,9 @@ class DemoServer {
         },
         ayranHomemade: true,
         price: 750,
-        experts: 0,
+        experts: 3,
+        ingredients: [Ingredient.feta, Ingredient.kaese],
+        meatDistribution: MeatDistribution.distributed,
         awards: [AwardDto(year: 2025, category: BestOfCategory.overall, rank: 1, average: 4.6, count: 23, city: 'Freiburg im Breisgau', path: '/bestenliste/freiburg-im-breisgau/2025')],
       ).toJson());
     }

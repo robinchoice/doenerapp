@@ -116,6 +116,7 @@ ReviewDto reviewFromRow(Map<String, dynamic> row) => ReviewDto(
       ingredients: (row['ingredients'] as List?)?.map((i) => Ingredient.values.byName(i as String)).toList(),
       meats: (row['meats'] as List?)?.map((m) => Meat.values.byName(m as String)).toList(),
       skewer: Skewer.values.asNameMap()[row['skewer']],
+      meatDistribution: MeatDistribution.values.asNameMap()[row['meat_distribution']],
       bread: Bread.values.asNameMap()[row['bread']],
       text: row['text'] as String?,
       photoId: row['photo_id'] as String?,
@@ -362,6 +363,7 @@ void mountPlaces(Router router, Deps deps) {
         body.ingredients == null &&
         meats.isEmpty &&
         body.skewer == null &&
+        body.meatDistribution == null &&
         body.bread == null &&
         text == null &&
         photo == null) {
@@ -374,9 +376,9 @@ void mountPlaces(Router router, Deps deps) {
       final row = await queryOne(
         tx,
         'INSERT INTO reviews (user_id, place_id, rating, vegetarian_rating, vegan_rating, sauce_rating, fleisch_rating, '
-        'brot_rating, vegan_options, ayran_homemade, halal, price, ingredients, meats, skewer, bread, text) '
+        'brot_rating, vegan_options, ayran_homemade, halal, price, ingredients, meats, skewer, meat_distribution, bread, text) '
         'VALUES (@user:uuid, @place:uuid, @rating:float4, @vegetarian:float4, @vegan:float4, @sauce:float4, @fleisch:float4, '
-        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @halal:boolean, @price:int4, @ingredients:_text, @meats:_text, @skewer:text, @bread:text, @text) '
+        '@brot:float4, @veganOptions:boolean, @ayran:boolean, @halal:boolean, @price:int4, @ingredients:_text, @meats:_text, @skewer:text, @meatDistribution:text, @bread:text, @text) '
         // Older reviews may only have an overall rating, without sauce, meat or
         // bread. It stays until the review rates the Döner itself.
         'ON CONFLICT (user_id, place_id) DO UPDATE SET rating = CASE WHEN num_nonnulls(EXCLUDED.sauce_rating, '
@@ -385,7 +387,7 @@ void mountPlaces(Router router, Deps deps) {
         'vegetarian_rating = EXCLUDED.vegetarian_rating, vegan_rating = EXCLUDED.vegan_rating, '
         'sauce_rating = EXCLUDED.sauce_rating, fleisch_rating = EXCLUDED.fleisch_rating, brot_rating = EXCLUDED.brot_rating, '
         'vegan_options = EXCLUDED.vegan_options, ayran_homemade = EXCLUDED.ayran_homemade, halal = EXCLUDED.halal, price = EXCLUDED.price, '
-        'ingredients = EXCLUDED.ingredients, meats = EXCLUDED.meats, skewer = EXCLUDED.skewer, bread = EXCLUDED.bread, '
+        'ingredients = EXCLUDED.ingredients, meats = EXCLUDED.meats, skewer = EXCLUDED.skewer, meat_distribution = EXCLUDED.meat_distribution, bread = EXCLUDED.bread, '
         'text = EXCLUDED.text, updated_at = now() RETURNING *',
         {
           'user': user.id,
@@ -404,6 +406,7 @@ void mountPlaces(Router router, Deps deps) {
           'ingredients': body.ingredients?.map((i) => i.name).toList(),
           'meats': meats.isEmpty ? null : meats,
           'skewer': body.skewer?.name,
+          'meatDistribution': body.meatDistribution?.name,
           'bread': body.bread?.name,
           'text': text,
         },
@@ -615,6 +618,7 @@ PlaceSummaryDto summarize(List<Map<String, dynamic>> reviews, {List<AwardDto> aw
         if (meats.isNotEmpty && meats.where((list) => list.contains(m.name)).length * 2 >= meats.length) m,
     ],
     skewer: Skewer.values.asNameMap()[plurality([for (final r in reviews) r['skewer'] as String?])],
+    meatDistribution: MeatDistribution.values.asNameMap()[plurality([for (final r in reviews) r['meat_distribution'] as String?])],
     bread: Bread.values.asNameMap()[plurality([for (final r in reviews) r['bread'] as String?])],
     experts: experts.length,
     awards: awards,

@@ -56,6 +56,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
   late final _ingredients = <Ingredient>{...?(_existing?.ingredients ?? widget.summary?.ingredients)};
   late final _meats = <Meat>{...?(_existing?.meats ?? widget.summary?.meats)};
   late Skewer? _skewer = _existing?.skewer ?? widget.summary?.skewer;
+  late MeatDistribution? _meatDistribution = _existing != null ? _existing.meatDistribution : widget.summary?.meatDistribution;
   late Bread? _bread = _existing?.bread ?? widget.summary?.bread;
 
   /// Prefilled from the others, the expert part only counts once it's touched.
@@ -172,6 +173,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
             ingredients: _expertTouched ? (_ingredients.toList()..sort((a, b) => a.index.compareTo(b.index))) : _existing?.ingredients,
             meats: _expertTouched ? (_meats.toList()..sort((a, b) => a.index.compareTo(b.index))) : _existing?.meats,
             skewer: _expertTouched ? _skewer : _existing?.skewer,
+            meatDistribution: _expertTouched ? _meatDistribution : _existing?.meatDistribution,
             bread: _expertTouched ? _bread : _existing?.bread,
             text: Validation.clean(_text.text),
             photoBase64: _photo == null ? null : base64.encode(_photo!),
@@ -272,7 +274,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
               children: [
                 for (final i in Ingredient.values.where((i) => i.group == group))
                   FilterChip(
-                    label: Text(i.label),
+                    label: Text(i == Ingredient.kaese && Localizations.localeOf(context).languageCode == 'en' ? 'Cheese' : i.label),
                     selected: _ingredients.contains(i),
                     onSelected: (on) => _expertChange(() => on ? _ingredients.add(i) : _ingredients.remove(i)),
                   ),
@@ -293,6 +295,9 @@ class _ReviewSheetState extends State<ReviewSheet> {
                   ),
               ],
             ),
+            label(Localizations.localeOf(context).languageCode == 'en' ? 'Meat distribution' : 'Fleischverteilung'),
+            pick(MeatDistribution.values, _meatDistribution,
+                (m) => Localizations.localeOf(context).languageCode == 'en' ? m.labelEn : m.label, (m) => _meatDistribution = m),
             label('Spieß'),
             pick(Skewer.values, _skewer, (s) => s.label, (s) => _skewer = s),
           ],

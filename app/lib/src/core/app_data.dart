@@ -288,6 +288,7 @@ class AppData extends ChangeNotifier {
       ingredients: request.ingredients,
       meats: request.meats,
       skewer: request.skewer,
+      meatDistribution: request.meatDistribution,
       bread: request.bread,
       text: Validation.clean(request.text),
       photoId: request.photoBase64 != null || request.removePhoto ? null : previous?.photoId,

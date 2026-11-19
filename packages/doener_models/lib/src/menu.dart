@@ -150,6 +150,7 @@ enum Ingredient {
   mais('Mais', IngredientGroup.special),
   granatapfel('Granatapfelkerne', IngredientGroup.special),
   feta('Feta', IngredientGroup.special),
+  kaese('Käse', IngredientGroup.special),
   oliven('Oliven', IngredientGroup.special),
   minze('Minze', IngredientGroup.special),
   sumach('Sumach-Zwiebeln', IngredientGroup.special),
@@ -168,9 +169,9 @@ enum Ingredient {
   final IngredientGroup group;
   const Ingredient(this.label, this.group);
 
-  /// Unknown to clients before 1.1, which fail on ingredient names they don't
-  /// know. The JSON carries these in a key of its own (`newIngredients`).
-  static const newIngredients = [roteZwiebel];
+  /// Additional ingredients travel under `newIngredients`. Clients declare
+  /// `x-ingredient-format: 2` before receiving names beyond roteZwiebel.
+  static const newIngredients = [roteZwiebel, kaese];
 
   bool get isSpecial => group == IngredientGroup.special;
 }
@@ -193,6 +194,15 @@ enum Skewer {
 
   final String label;
   const Skewer(this.label);
+}
+
+enum MeatDistribution {
+  distributed('Gut verteilt', 'Evenly distributed'),
+  clumped('Klumpen', 'Clumped');
+
+  final String label;
+  final String labelEn;
+  const MeatDistribution(this.label, this.labelEn);
 }
 
 enum Bread {

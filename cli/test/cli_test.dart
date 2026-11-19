@@ -263,6 +263,18 @@ void main() {
     final kept = await ali.cli(['review', '--place', 'cli-rank', '--rate', 'pizza=4', '--json']);
     expect([kept.json['review']['newerRatings'], kept.json['review']['halal']], [{'groesse': 4.0}, true], reason: 'unnamed answers stay');
 
+    final expert = await ali.cli(['review', '--place', 'cli-rank', '--ingredient', 'feta', '--ingredient', 'kaese',
+        '--meat-distribution', 'distributed', '--json']);
+    expect(expert.code, Exit.ok);
+    expect(expert.json['review']['ingredients'], ['feta']);
+    expect(expert.json['review']['newIngredients'], ['kaese']);
+    expect(expert.json['review']['meatDistribution'], 'distributed');
+    final same = await ali.cli(['review', '--place', 'cli-rank', '--rate', 'pizza=4', '--json']);
+    expect(same.json['review']['meatDistribution'], 'distributed');
+    expect((await ali.cli(['reviews'])).out, contains('Gut verteilt'));
+    final clear = await ali.cli(['review', '--place', 'cli-rank', '--meat-distribution', 'unknown', '--json']);
+    expect(clear.json['review']['meatDistribution'], isNull);
+
     final feed = await ben.cli(['feed', '--json']);
     expect(feed.code, Exit.ok);
     expect([for (final item in feed.json['items']) item['type']], ['review', 'visit']);

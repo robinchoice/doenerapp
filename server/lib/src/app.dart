@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
@@ -56,6 +57,27 @@ const _assetLinks = [
   },
 ];
 
+// Shipped clients parse newIngredients with byName and only know roteZwiebel.
+// Updated clients declare the format before the API sends further names.
+Middleware _ingredientFormat() => (inner) => (request) async {
+  final response = await inner(request);
+  if (request.headers['x-ingredient-format'] == '2' ||
+      !(response.headers['content-type']?.startsWith('application/json') ?? false)) {
+    return response;
+  }
+  Object? compatible(Object? value) => switch (value) {
+    final List items => items.map(compatible).toList(),
+    final Map map => {
+      for (final entry in map.entries)
+        entry.key: entry.key == 'newIngredients'
+            ? (entry.value as List).where((name) => name == 'roteZwiebel').toList()
+            : compatible(entry.value),
+    },
+    _ => value,
+  };
+  return response.change(body: jsonEncode(compatible(jsonDecode(await response.readAsString()))));
+};
+
 /// API under `/api/v1`, the landing page under `/` and `/en`, the Flutter web
 /// build (if present) everywhere else, e.g. `/app`.
 Handler buildHandler(Deps deps) {
@@ -83,7 +105,7 @@ Handler buildHandler(Deps deps) {
   mountTesterRequests(api, deps);
   mountAndroid(api, deps);
 
-  final root = Router()..mount('/api/v1/', const Pipeline().addMiddleware(requireMinimumBuild(deps)).addHandler(api.call));
+  final root = Router()..mount('/api/v1/', const Pipeline().addMiddleware(_ingredientFormat()).addMiddleware(requireMinimumBuild(deps)).addHandler(api.call));
   mountAgents(root, deps);
   root
     ..get('/', (Request request) => landingPage(request, english: false))

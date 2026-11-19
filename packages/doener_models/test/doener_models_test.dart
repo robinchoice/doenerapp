@@ -204,6 +204,19 @@ void main() {
     });
   });
 
+  test('cheese uses newIngredients and meat distribution round-trips without a score', () {
+    const request = UpsertReviewRequest(ingredients: [Ingredient.feta, Ingredient.kaese], meatDistribution: MeatDistribution.distributed);
+    final json = request.toJson();
+    expect(json['ingredients'], ['feta']);
+    expect(json['newIngredients'], ['kaese']);
+    final back = UpsertReviewRequest.fromJson(json);
+    expect(back.ingredients, [Ingredient.feta, Ingredient.kaese]);
+    expect(back.meatDistribution, MeatDistribution.distributed);
+    expect(back.ratings, isEmpty);
+    expect(UpsertReviewRequest.fromJson({...json, 'newIngredients': ['future-ingredient', 'kaese']}).ingredients,
+        [Ingredient.feta, Ingredient.kaese]);
+  });
+
   test('review JSON keeps sauce, meat and bread where older apps read them', () {
     final review = ReviewDto(
       id: 'r',

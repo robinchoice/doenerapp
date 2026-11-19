@@ -12,12 +12,13 @@ import 'package:sembast/sembast_memory.dart' hide Finder;
 const _place = PlaceDto(placeId: 'p1', name: 'Kebap Haus', latitude: 48, longitude: 7.85);
 
 /// The review sheet as the place detail opens it, for [account].
-Future<AppData> _openSheet(WidgetTester tester, AccountDto account, {PlaceSummaryDto? summary}) async {
+Future<AppData> _openSheet(WidgetTester tester, AccountDto account, {PlaceSummaryDto? summary, ReviewDto? existing}) async {
   tester.view.physicalSize = const Size(1170, 6000);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   final data = (await tester.runAsync(_appData))!;
   data.session.user = account;
+  if (existing != null) data.reviews[_place.placeId] = LocalReview(existing);
   await tester.pumpWidget(
     MultiProvider(
       providers: [ChangeNotifierProvider.value(value: data), ChangeNotifierProvider.value(value: data.session)],
@@ -221,6 +222,26 @@ void main() {
     expect(review.ingredients, [Ingredient.tomate, Ingredient.mais, Ingredient.granatapfel]);
     expect(review.meats, [Meat.kalb, Meat.haehnchen]);
     expect(review.skewer, Skewer.homemade);
+  });
+
+  testWidgets('experts save cheese and meat distribution as facts', (tester) async {
+    final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin', expertMode: true));
+    await _tapInSheet(tester, find.widgetWithText(FilterChip, 'Cheese'));
+    await _tapInSheet(tester, find.widgetWithText(ChoiceChip, 'Evenly distributed'));
+    await _tapInSheet(tester, find.text('Speichern'));
+    expect(data.reviews['p1']!.dto.ingredients, [Ingredient.kaese]);
+    expect(data.reviews['p1']!.dto.meatDistribution, MeatDistribution.distributed);
+    expect(data.reviews['p1']!.dto.ratings, isEmpty);
+  });
+
+  testWidgets('regression: editing an expert review keeps unknown meat distribution', (tester) async {
+    final existing = ReviewDto(id: 'r1', userId: 'u1', userName: 'Robin', placeId: 'p1', placeName: 'Kebap Haus',
+        ingredients: const [Ingredient.feta], ratings: const {RatingItem.sauce: 4},
+        createdAt: DateTime.utc(2026), updatedAt: DateTime.utc(2026));
+    final data = await _openSheet(tester, const AccountDto(id: 'u1', displayName: 'Robin', expertMode: true),
+        existing: existing, summary: const PlaceSummaryDto(meatDistribution: MeatDistribution.distributed));
+    await _tapInSheet(tester, find.text('Speichern'));
+    expect(data.reviews['p1']!.dto.meatDistribution, isNull);
   });
 
   testWidgets('experts pick several sauces', (tester) async {

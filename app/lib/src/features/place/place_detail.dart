@@ -413,7 +413,7 @@ class _IngredientsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (summary.experts == 0) {
+    if (summary.experts == 0 && (diet != Diet.all || summary.meatDistribution == null)) {
       return GlassCard(
         child: Text(
           'Noch hat niemand eingetragen, was „mit allem“ hier heißt. Im Detailmodus fragt die Bewertung danach.',
@@ -424,9 +424,12 @@ class _IngredientsCard extends StatelessWidget {
     final lines = [
       for (final group in IngredientGroup.values)
         if (summary.ingredients.where((i) => i.group == group).toList() case final list when list.isNotEmpty)
-          (group.label, list.map((i) => i.isSpecial ? '${i.label} ✨' : i.label).join(' · ')),
+          (group.label, list.map((i) => i == Ingredient.kaese && Localizations.localeOf(context).languageCode == 'en' ? 'Cheese ✨' : i.isSpecial ? '${i.label} ✨' : i.label).join(' · ')),
       if (diet == Diet.all && (summary.meats.isNotEmpty || summary.skewer != null))
         ('Fleisch', [...summary.meats.map((m) => m.label), ?summary.skewer?.label].join(' · ')),
+      if (summary.meatDistribution case final distribution? when diet == Diet.all)
+        (Localizations.localeOf(context).languageCode == 'en' ? 'Meat distribution' : 'Fleischverteilung',
+          Localizations.localeOf(context).languageCode == 'en' ? distribution.labelEn : distribution.label),
       if (summary.bread case final bread?) ('Brot', bread.label),
     ];
     return GlassCard(

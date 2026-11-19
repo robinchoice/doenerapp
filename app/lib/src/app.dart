@@ -488,6 +488,7 @@ class _HomeShellState extends State<HomeShell> {
       index: _tab < _checkInTab ? _tab : _tab - 1,
       children: [
         column(StartScreen(
+          onCheckIn: _checkIn,
           onOpenMap: () => setState(() => _tab = _mapTab),
           onOpenRanking: () => setState(() => _tab = _rankingTab),
         )),

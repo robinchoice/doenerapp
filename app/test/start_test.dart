@@ -129,7 +129,7 @@ void main() {
   setUpAll(() => initializeDateFormatting('de'));
 
   testWidgets('regression: start stays bounded and keeps its filter across window resizing', (tester) async {
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () {}));
+    final server = await _pump(tester, StartScreen(onCheckIn: () {}, onOpenMap: () {}, onOpenRanking: () {}));
     await tester.ensureVisible(find.text('Nur Kontakte'));
     await tester.tap(find.text('Nur Kontakte'));
     await tester.pumpAndSettle();
@@ -193,14 +193,14 @@ void main() {
 
   testWidgets('start shows the best places around, marks friends and helps newcomers', (tester) async {
     var rankingOpened = false;
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () => rankingOpened = true), position: const LatLng(48, 7.85));
+    final server = await _pump(tester, StartScreen(onCheckIn: () {}, onOpenMap: () {}, onOpenRanking: () => rankingOpened = true), position: const LatLng(48, 7.85));
 
-    expect(find.text('Kebap Haus'), findsOneWidget);
+    expect(find.text('Kebap Haus'), findsWidgets);
     expect(find.text('noch unbewertet'), findsOneWidget);
     expect(find.text('Bewerte deinen Stammladen'), findsOneWidget);
     expect(find.text('Hol deine Kontakte per QR-Code'), findsOneWidget);
-    expect(find.text('Dönerneuling · Eingecheckt bei Kebap Haus', findRichText: true), findsOneWidget, reason: 'the tier leads the line');
-    expect(find.text('Dönerneuling · Bewertet: Kebap Haus', findRichText: true), findsOneWidget);
+    expect(find.text('Dönerneuling · Checked in at', findRichText: true), findsOneWidget, reason: 'the tier leads the line');
+    expect(find.text('Dönerneuling · Reviewed', findRichText: true), findsOneWidget);
     expect(find.byIcon(Icons.group), findsOneWidget, reason: 'only Tom is a friend');
     expect(find.text('🎉 Neu in Freiburg'), findsOneWidget);
     expect(find.text('Anatolia Grill hat am 2. Oktober aufgemacht'), findsOneWidget);
@@ -217,7 +217,7 @@ void main() {
   });
 
   testWidgets('news show as a card that offers the mail and goes away when dismissed', (tester) async {
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () {}), position: const LatLng(48, 7.85));
+    final server = await _pump(tester, StartScreen(onCheckIn: () {}, onOpenMap: () {}, onOpenRanking: () {}), position: const LatLng(48, 7.85));
 
     expect(find.text('Neuigkeiten in der App'), findsOneWidget);
     expect(find.text('Eine Karte auf Start'), findsOneWidget);
@@ -239,7 +239,7 @@ void main() {
   });
 
   testWidgets('the bell shows what is new, marks it seen and offers less of it', (tester) async {
-    final server = await _pump(tester, StartScreen(onOpenMap: () {}, onOpenRanking: () {}), position: const LatLng(48, 7.85));
+    final server = await _pump(tester, StartScreen(onCheckIn: () {}, onOpenMap: () {}, onOpenRanking: () {}), position: const LatLng(48, 7.85));
     expect(find.descendant(of: find.byType(InboxButton), matching: find.text('1')), findsOneWidget, reason: 'one since last time');
 
     await tester.runAsync(() async {

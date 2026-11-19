@@ -258,10 +258,12 @@ class RatingChips extends StatelessWidget {
   }
 }
 
-/// A check-in or review in a feed, as a row with a hairline below. [highlight] marks friends. Reviews show
+/// A check-in or review, framed in the feed and compact in profiles. [highlight] marks friends. Reviews show
 /// [score] and the rated items [diet] eats.
 class ActivityCard extends StatelessWidget {
   final FeedItemType type;
+  final bool framed;
+  final String? placeName;
   final String title;
 
   /// The author's tier, in front of [subtitle]. A tap on [title] opens [onTitleTap].
@@ -291,6 +293,8 @@ class ActivityCard extends StatelessWidget {
   const ActivityCard({
     super.key,
     required this.type,
+    this.framed = false,
+    this.placeName,
     required this.title,
     this.tier,
     this.onTitleTap,
@@ -316,17 +320,11 @@ class ActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isVisit = type == FeedItemType.visit;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: theme.dividerColor),
-            left: BorderSide(color: highlight ? context.accent : Colors.transparent, width: 3),
-          ),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 14, 0, 14),
-        child: Column(
+    final food = FoodItem.byId(foodType);
+    final visitLabel = food == null ? 'Check-in' : '${food.emoji} ${food.label}';
+    final body = Padding(
+      padding: framed ? const EdgeInsets.all(16) : const EdgeInsets.fromLTRB(12, 14, 0, 14),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -334,7 +332,7 @@ class ActivityCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.06),
-                  child: isVisit && foodType != null
+                  child: framed ? Text(title.characters.first.toUpperCase()) : isVisit && foodType != null
                       ? Text(foodEmoji(foodType), style: const TextStyle(fontSize: 18))
                       : Icon(isVisit ? Icons.check_circle : Icons.restaurant, size: 18, color: context.accent),
                 ),
@@ -371,6 +369,13 @@ class ActivityCard extends StatelessWidget {
                 ?menu,
               ],
             ),
+            if (placeName != null) ...[
+              const SizedBox(height: 12),
+              Text(placeName!, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(Localizations.localeOf(context).languageCode == 'en'
+                ? (isVisit ? '$visitLabel · Friends only' : highlight ? 'Public review · Contact' : 'Public review · Nearby')
+                : (isVisit ? '$visitLabel · Nur Kontakte' : highlight ? 'Öffentliche Bewertung · Kontakt' : 'Öffentliche Bewertung · Im Umkreis'), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline)),
+            ],
             if (score != null) ...[const SizedBox(height: 8), DoenerRating(value: score!, size: 14)],
             if (ratings.isNotEmpty) ...[const SizedBox(height: 6), RatingChips(ratings: ratings, diet: diet)],
             if (text != null && text!.isNotEmpty) ...[
@@ -381,8 +386,19 @@ class ActivityCard extends StatelessWidget {
             if (footer != null) ...[const SizedBox(height: 10), footer!],
           ],
         ),
-      ),
     );
+    final card = InkWell(onTap: onTap, borderRadius: framed ? BorderRadius.circular(14) : null, child: body);
+    if (!framed) {
+      return DecoratedBox(decoration: BoxDecoration(border: Border(
+        bottom: BorderSide(color: theme.dividerColor),
+        left: BorderSide(color: highlight ? context.accent : Colors.transparent, width: 3),
+      )), child: card);
+    }
+    return Padding(padding: const EdgeInsets.only(bottom: 16), child: Material(
+      color: theme.cardTheme.color, clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: theme.dividerColor)),
+      child: card,
+    ));
   }
 }
 

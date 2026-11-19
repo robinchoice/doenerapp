@@ -20,6 +20,7 @@ import '../place/place_detail.dart';
 import '../place/review_sheet.dart';
 import '../ranking/city_picker.dart';
 import '../social/friends.dart';
+import '../social/comments.dart';
 import '../social/invite.dart';
 import '../social/moderation.dart';
 import '../social/reactions.dart';
@@ -31,9 +32,10 @@ const _reloadDistance = 1000.0;
 /// Best places and trends around, then what friends and people nearby ate.
 /// Until they've done it, new users get two tasks to get going.
 class StartScreen extends StatefulWidget {
+  final VoidCallback onCheckIn;
   final VoidCallback onOpenMap;
   final VoidCallback onOpenRanking;
-  const StartScreen({super.key, required this.onOpenMap, required this.onOpenRanking});
+  const StartScreen({super.key, required this.onCheckIn, required this.onOpenMap, required this.onOpenRanking});
 
   @override
   State<StartScreen> createState() => _StartScreenState();
@@ -253,6 +255,21 @@ class _StartScreenState extends State<StartScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(gradient: actionGradient, borderRadius: BorderRadius.circular(14)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(Localizations.localeOf(context).languageCode == 'en' ? 'Where are you eating today?' : 'Wo isst du heute?',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: ink)),
+                        const SizedBox(height: 6),
+                        Text(Localizations.localeOf(context).languageCode == 'en' ? 'Check in. Let your friends know.' : 'Einchecken. Deine Kontakte wissen Bescheid.',
+                          style: TextStyle(color: ink)),
+                        const SizedBox(height: 12),
+                        TextButton(onPressed: widget.onCheckIn,
+                          style: TextButton.styleFrom(backgroundColor: ink, foregroundColor: Colors.white, minimumSize: const Size(64, 46)),
+                          child: Text(Localizations.localeOf(context).languageCode == 'en' ? 'Check in now' : 'Jetzt einchecken')),
+                      ]),
+                    ),
                     if (_live.isNotEmpty) ...[
                       SizedBox(
                         height: 96,
@@ -332,14 +349,17 @@ class _StartScreenState extends State<StartScreen> {
                         },
                       ),
                     ),
-                    if (_items.isNotEmpty) const Divider(),
                     for (final item in _items)
                       ActivityCard(
                           type: item.type,
+                          framed: true,
+                          placeName: item.place.name,
                           title: item.user.displayName,
                           tier: item.user.tier,
                           onTitleTap: () => showUserProfile(context, item.user),
-                          subtitle: '${item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet:'} ${item.place.name}',
+                          subtitle: Localizations.localeOf(context).languageCode == 'en'
+                            ? (item.type == FeedItemType.visit ? 'Checked in at' : 'Reviewed')
+                            : (item.type == FeedItemType.visit ? 'Eingecheckt bei' : 'Bewertet'),
                           timestamp: item.timestamp,
                           score: item.headline(diet),
                           ratings: item.ratings,
@@ -350,15 +370,17 @@ class _StartScreenState extends State<StartScreen> {
                           onSite: item.onSite,
                           regular: item.regular,
                           highlight: item.fromFriend,
-                          footer: item.fromFriend
-                              ? ReactionBar(
-                                  key: ValueKey(item.id),
-                                  path: '/${item.type == FeedItemType.visit ? 'visits' : 'reviews'}/${item.id}',
-                                  reactions: item.reactions,
-                                  mine: item.myReaction,
-                                  reactors: item.reactors,
-                                )
-                              : null,
+                          footer: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Divider(),
+                            if (item.fromFriend) ReactionBar(
+                              key: ValueKey(item.id),
+                              path: '/${item.type == FeedItemType.visit ? 'visits' : 'reviews'}/${item.id}',
+                              reactions: item.reactions, mine: item.myReaction, reactors: item.reactors,
+                            ),
+                            CommentsButton(type: item.type, postId: item.id, author: item.user.displayName,
+                              placeName: item.place.name, text: item.text, allowed: item.fromFriend,
+                              count: item.fromFriend ? item.commentCount : null),
+                          ]),
                         onTap: () => showPlaceDetail(context, item.place),
                         menu: ContentMenu(
                           user: item.user,

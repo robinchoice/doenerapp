@@ -39,6 +39,18 @@ String encodeCursor(DateTime timestamp, String id) =>
   }
 }
 
+/// A post's author and current friends share its comments; strangers see no thread.
+Future<void> _requireCommentPost(Deps deps, String table, String postId, String me) async {
+  final post = await queryOne(deps.db,
+      'SELECT 1 FROM $table p WHERE p.id = @id:uuid AND '
+      '(p.user_id = @me:uuid OR ${areFriends("p.user_id", "@me:uuid")}) AND ${notBlocked("p.user_id")}',
+      {'id': postId, 'me': me});
+  if (post == null) throw const ApiException.notFound('Unterhaltung nicht gefunden / Conversation not found');
+}
+
+String _commentCount(String column, String postId) => '(SELECT count(*)::int FROM post_comments c '
+    'WHERE c.$column = $postId AND ${notBlocked("c.user_id")})';
+
 void mountSocial(Router router, Deps deps) {
   // GET /feed?cursor[&lat&lon] — friends' check-ins and reviews; with lat/lon
   // also everyone else's reviews around that point. Own activity is not part of it.
@@ -59,14 +71,14 @@ void mountSocial(Router router, Deps deps) {
       '         NULL::real AS rating, NULL::real AS sauce_rating, NULL::real AS fleisch_rating, NULL::real AS brot_rating,'
       '         NULL::jsonb AS items, NULL::uuid AS photo_id, 0 AS visit_count,'
       '         v.food_type, true AS from_friend, ${reactionCounts('visit_id', 'v.id')}, ${myReaction('visit_id', 'v.id')},'
-      '         ${reactorsOf('visit_id', 'v.id')}'
+      '         ${reactorsOf('visit_id', 'v.id')}, ${_commentCount('visit_id', 'v.id')} AS comment_count'
       '  FROM visits v JOIN places p ON p.id = v.place_id WHERE v.user_id IN (SELECT id FROM friends)'
       "    AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING'"
       '  UNION ALL'
       '  SELECT \'review\', r.id, r.user_id, r.place_id, r.updated_at, r.text,'
       '         r.rating, r.sauce_rating, r.fleisch_rating, r.brot_rating, $reviewItemsJson, $reviewPhotoId, $reviewVisitCount, NULL,'
       '         r.user_id IN (SELECT id FROM friends), ${reactionCounts('review_id', 'r.id')}, ${myReaction('review_id', 'r.id')},'
-      '         ${reactorsOf('review_id', 'r.id')}'
+      '         ${reactorsOf('review_id', 'r.id')}, ${_commentCount('review_id', 'r.id')}'
       '  FROM reviews r JOIN places p ON p.id = r.place_id WHERE (r.user_id IN (SELECT id FROM friends)'
       '${around == null ? '' : ' OR (r.user_id <> @me:uuid AND ${withinRadius('p')})'}) AND ${notBlocked('r.user_id')}'
       "    AND p.business_status IS DISTINCT FROM 'FUTURE_OPENING'"
@@ -110,6 +122,7 @@ void mountSocial(Router router, Deps deps) {
             reactions: r['from_friend'] as bool ? reactionsFromRow(r) : const {},
             myReaction: r['from_friend'] as bool ? r['my_reaction'] as String? : null,
             reactors: r['from_friend'] as bool ? reactorsFromRow(r) : const [],
+            commentCount: r['from_friend'] as bool ? r['comment_count'] as int : 0,
           ),
     ];
     final last = page.isEmpty ? null : page.last;
@@ -119,6 +132,52 @@ void mountSocial(Router router, Deps deps) {
       hasMore: hasMore,
     ).toJson());
   });
+
+  for (final (table, column) in [('visits', 'visit_id'), ('reviews', 'review_id')]) {
+    router.get('/$table/<id>/comments', (Request request, String id) async {
+      final me = await requireUser(deps, request);
+      final postId = requireUuid(id);
+      await _requireCommentPost(deps, table, postId, me.id);
+      final cursor = decodeCursor(request.url.queryParameters['cursor']);
+      final limit = queryInt(request, 'limit', fallback: 50, min: 1, max: 50);
+      final rows = await query(deps.db,
+          'SELECT c.id, c.user_id, c.text, c.created_at, u.display_name, ${reviewedPlacesOf("u.id")} AS reviewed_places '
+          'FROM post_comments c JOIN users u ON u.id = c.user_id WHERE c.$column = @id:uuid AND ${notBlocked("c.user_id")} '
+          '${cursor == null ? "" : "AND (c.created_at, c.id) < (@ts:timestamptz, @cursorId:uuid) "}'
+          'ORDER BY c.created_at DESC, c.id DESC LIMIT @limit:int4',
+          {'me': me.id, 'id': postId, 'limit': limit + 1, if (cursor != null) 'ts': cursor.$1, if (cursor != null) 'cursorId': cursor.$2});
+      final page = rows.take(limit).toList();
+      return json(PostCommentsPage(
+          comments: [for (final r in page) PostCommentDto(id: r['id'] as String,
+              user: UserDto(id: r['user_id'] as String, displayName: r['display_name'] as String, reviewedPlaces: r['reviewed_places'] as int),
+              text: r['text'] as String, createdAt: r['created_at'] as DateTime)],
+          hasMore: rows.length > limit,
+          cursor: rows.length > limit ? encodeCursor(page.last['created_at'] as DateTime, page.last['id'] as String) : null).toJson());
+    });
+    router.post('/$table/<id>/comments', (Request request, String id) async {
+      final me = await requireUser(deps, request);
+      final postId = requireUuid(id);
+      await _requireCommentPost(deps, table, postId, me.id);
+      final body = await readJson(request);
+      final text = body['text'] is String ? Validation.clean(body['text'] as String) : null;
+      if (text == null || text.runes.length > maxCommentLength) {
+        throw const ApiException.badRequest('Kommentar: 1–1000 Zeichen / Comment: 1–1000 characters');
+      }
+      if (!await rateLimit(deps, 'comments:${me.id}', 60, const Duration(hours: 1))) throw tooManyRequests;
+      final row = await queryOne(deps.db,
+          'INSERT INTO post_comments (user_id, $column, text) VALUES (@me:uuid, @id:uuid, @text) RETURNING id, created_at',
+          {'me': me.id, 'id': postId, 'text': text});
+      return json(PostCommentDto(id: row!['id'] as String, user: UserDto(id: me.id, displayName: me.displayName, reviewedPlaces: me.account.reviewedPlaces), text: text, createdAt: row['created_at'] as DateTime).toJson(), status: 201);
+    });
+    router.delete('/$table/<id>/comments/<commentId>', (Request request, String id, String commentId) async {
+      final me = await requireUser(deps, request);
+      final deleted = await deps.db.execute(Sql.named(
+          'DELETE FROM post_comments WHERE id = @comment:uuid AND $column = @id:uuid AND user_id = @me:uuid RETURNING id'),
+          parameters: {'comment': requireUuid(commentId), 'id': requireUuid(id), 'me': me.id});
+      if (deleted.isEmpty) throw const ApiException.notFound('Kommentar nicht gefunden / Comment not found');
+      return noContent();
+    });
+  }
 
   // PUT/DELETE /visits/<id>/reaction and /reviews/<id>/reaction — friends react to each
   // other's posts, one emoji per person. The shop page leaves them out.

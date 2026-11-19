@@ -69,7 +69,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: PleasanceFooter())));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('ein Werkzeug von'), findsOneWidget);
+    expect(find.text('a tool by'), findsOneWidget);
   });
 
   test('map cache keeps places the user interacted with', () async {

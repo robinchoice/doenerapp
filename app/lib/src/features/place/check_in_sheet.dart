@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:doener_models/doener_models.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_data.dart';
@@ -61,9 +63,14 @@ class _CheckInSheetState extends State<CheckInSheet> {
                 ],
               ),
             const SizedBox(height: 8),
-            RotaryPicker(items: _foods, selected: _selected, onChanged: (i) => setState(() => _selected = i)),
+            IgnorePointer(ignoring: _done, child: RotaryPicker(items: _foods, selected: _selected, onChanged: (i) => setState(() => _selected = i))),
+            Text(Localizations.localeOf(context).languageCode == 'en'
+              ? 'Turn the ring. Your choice snaps to the top.' : 'Drehe den Ring. Die Auswahl rastet oben ein.',
+              textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 16),
             Center(
-              child: GradientCircle(size: 72, active: !_done, onPressed: _done ? null : _checkIn, child: const Icon(Icons.check)),
+              child: FilledButton.icon(onPressed: _done ? null : _checkIn, icon: const Icon(Icons.check),
+                label: Text('${_foods[_selected].label} · ${Localizations.localeOf(context).languageCode == 'en' ? 'Check in now' : 'Jetzt einchecken'}')),
             ),
           ],
         ),
@@ -73,7 +80,7 @@ class _CheckInSheetState extends State<CheckInSheet> {
   }
 }
 
-/// Food wheel: drag sideways or tap an item to rotate it to the top.
+/// A fixed selection point at the top; the ring follows the finger's angle.
 class RotaryPicker extends StatefulWidget {
   final List<FoodItem> items;
   final int selected;
@@ -85,67 +92,84 @@ class RotaryPicker extends StatefulWidget {
 }
 
 class _RotaryPickerState extends State<RotaryPicker> {
-  double _drag = 0;
-
-  /// More food needs a wider wheel, so neighbours don't overlap.
-  double get _radius => math.max(100, 10.0 * widget.items.length);
+  double _rotation = 0;
+  double _lastAngle = 0;
+  int _base = 0;
+  bool _dragging = false;
   double get _step => 360 / widget.items.length;
-
-  void _settle() {
-    final steps = (-_drag / _step).round();
-    final count = widget.items.length;
-    widget.onChanged(((widget.selected + steps) % count + count) % count);
-    setState(() => _drag = 0);
-  }
+  int _wrap(int index) => (index % widget.items.length + widget.items.length) % widget.items.length;
+  double _angle(Offset point, Offset center) => math.atan2(point.dy - center.dy, point.dx - center.dx) * 180 / math.pi;
 
   @override
-  Widget build(BuildContext context) {
-    final items = widget.items;
-    return GestureDetector(
-      onHorizontalDragUpdate: (d) => setState(() => _drag += d.delta.dx * 0.5),
-      onHorizontalDragEnd: (_) => _settle(),
-      child: SizedBox(
-        height: _radius * 2 + 90,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            for (var i = 0; i < items.length; i++)
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
+    final radius = math.min(math.max(100.0, 10.0 * widget.items.length), (constraints.maxWidth - 60) / 2);
+    final height = radius * 2 + 100;
+    final center = Offset(constraints.maxWidth / 2, height / 2);
+    final theme = Theme.of(context);
+    final en = Localizations.localeOf(context).languageCode == 'en';
+    void start(DragStartDetails d) => setState(() {
+      _base = widget.selected; _rotation = 0; _dragging = true; _lastAngle = _angle(d.localPosition, center);
+    });
+    void update(DragUpdateDetails d) {
+      final angle = _angle(d.localPosition, center);
+      setState(() { _rotation += (angle - _lastAngle + 540) % 360 - 180; _lastAngle = angle; });
+      widget.onChanged(_wrap(_base - (_rotation / _step).round()));
+    }
+    return Focus(
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight || event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          widget.onChanged(_wrap(widget.selected + (event.logicalKey == LogicalKeyboardKey.arrowRight ? 1 : -1)));
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Semantics(label: en ? 'Food wheel' : 'Essensrad', value: widget.items[widget.selected].label,
+        increasedValue: widget.items[_wrap(widget.selected + 1)].label,
+        decreasedValue: widget.items[_wrap(widget.selected - 1)].label,
+        onIncrease: () => widget.onChanged(_wrap(widget.selected + 1)),
+        onDecrease: () => widget.onChanged(_wrap(widget.selected - 1)),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          dragStartBehavior: DragStartBehavior.down,
+          onHorizontalDragStart: start,
+          onVerticalDragStart: start,
+          onHorizontalDragUpdate: update,
+          onVerticalDragUpdate: update,
+          onHorizontalDragEnd: (_) => setState(() => _dragging = false),
+          onVerticalDragEnd: (_) => setState(() => _dragging = false),
+          onHorizontalDragCancel: () => setState(() => _dragging = false),
+          onVerticalDragCancel: () => setState(() => _dragging = false),
+          child: SizedBox(height: height, child: Stack(alignment: Alignment.center, children: [
+            Container(width: radius * 2, height: radius * 2,
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: theme.colorScheme.surfaceContainerHighest, width: 18))),
+            Positioned(top: center.dy - radius - 50, left: center.dx - 16,
+              child: Icon(Icons.arrow_drop_down, size: 32, color: context.accent)),
+            for (var i = 0; i < widget.items.length; i++)
               Builder(builder: (context) {
-                final angle = (i - widget.selected) * _step + _drag;
-                final normalized = (((angle % 360) + 540) % 360 - 180).abs() / 180; // 0 at top, 1 at bottom
-                final radians = angle * math.pi / 180;
-                return AnimatedSlide(
-                  duration: _drag == 0 ? const Duration(milliseconds: 300) : Duration.zero,
-                  curve: Curves.easeOutBack,
-                  offset: Offset(math.sin(radians) * _radius / 60, -math.cos(radians) * _radius / 60),
-                  child: GestureDetector(
-                    onTap: () => widget.onChanged(i),
-                    child: SizedBox(
-                      width: 60,
-                      height: 60,
-                      child: Center(
-                        child: Opacity(
-                          opacity: 1 - normalized * 0.5,
-                          child: Text(items[i].emoji, style: TextStyle(fontSize: 44 * (1.3 - normalized * 0.7))),
-                        ),
-                      ),
-                    ),
-                  ),
+                final angle = ((i - (_dragging ? _base : widget.selected)) * _step + (_dragging ? _rotation : 0)) * math.pi / 180;
+                return AnimatedPositioned(
+                  duration: _dragging || MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  left: center.dx + math.sin(angle) * radius - 24,
+                  top: center.dy - math.cos(angle) * radius - 24,
+                  width: 48, height: 48,
+                  child: Semantics(button: true, selected: widget.selected == i, label: widget.items[i].label,
+                    child: InkWell(onTap: () => widget.onChanged(i), customBorder: const CircleBorder(),
+                      child: Container(alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle,
+                        color: widget.selected == i ? theme.colorScheme.secondaryContainer : theme.colorScheme.surface),
+                        child: Text(widget.items[i].emoji, style: const TextStyle(fontSize: 30))))),
                 );
               }),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: Text(
-                items[widget.selected].label,
-                key: ValueKey(widget.selected),
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-      ),
+            IgnorePointer(child: SizedBox(width: radius * 1.2, child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(widget.items[widget.selected].emoji, style: const TextStyle(fontSize: 40)),
+              Text(widget.items[widget.selected].label, textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            ]))),
+          ])),
+        )),
     );
-  }
+  });
 }
 
 /// Emoji rain after a check-in.

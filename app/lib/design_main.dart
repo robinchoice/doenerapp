@@ -264,8 +264,8 @@ class _DesignStudioState extends State<DesignStudio> {
           theme: buildTheme(Brightness.light),
           darkTheme: buildTheme(Brightness.dark),
           themeMode: _brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-          locale: const Locale('de'),
-          supportedLocales: const [Locale('de')],
+          locale: Locale(Uri.base.queryParameters['lang'] == 'en' ? 'en' : 'de'),
+          supportedLocales: const [Locale('de'), Locale('en')],
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           home: switch (_view) {
             _View.app => const HomeShell(),

@@ -460,6 +460,19 @@ final migrations = <List<String>>[
   [
     "ALTER TABLE reviews ADD COLUMN meat_distribution text CHECK (meat_distribution IN ('distributed', 'clumped'))",
   ],
+  [
+    '''CREATE TABLE post_comments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      visit_id uuid REFERENCES visits(id) ON DELETE CASCADE,
+      review_id uuid REFERENCES reviews(id) ON DELETE CASCADE,
+      text text NOT NULL CHECK (length(text) BETWEEN 1 AND 1000),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CHECK (num_nonnulls(visit_id, review_id) = 1)
+    )''',
+    'CREATE INDEX post_comments_visit ON post_comments (visit_id, created_at DESC, id DESC)',
+    'CREATE INDEX post_comments_review ON post_comments (review_id, created_at DESC, id DESC)',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

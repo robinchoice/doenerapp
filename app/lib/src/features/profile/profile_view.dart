@@ -11,6 +11,7 @@ import '../place/place_detail.dart';
 import '../social/friends.dart';
 import '../social/moderation.dart';
 import '../social/reactions.dart';
+import '../social/comments.dart';
 
 Future<void> showUserProfile(BuildContext context, UserDto user) =>
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserProfileScreen(user: user)));
@@ -227,7 +228,11 @@ class _ProfileTabsState extends State<ProfileTabs> {
             onSite: r.dto.onSite,
             regular: r.dto.regular,
             pending: r.pending,
-            footer: r.dto.reactions.isEmpty ? null : ReactionBar(reactions: r.dto.reactions, reactors: r.dto.reactors),
+            footer: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (r.dto.reactions.isNotEmpty) ReactionBar(reactions: r.dto.reactions, reactors: r.dto.reactors),
+              if (!r.pending) CommentsButton(type: FeedItemType.review, postId: r.dto.id, author: widget.user.displayName,
+                placeName: r.dto.placeName, text: r.dto.text, allowed: widget.own || widget.visits != null),
+            ]),
             onTap: () => _openPlace(context, r.dto.placeId),
             menu: widget.own ? null : ContentMenu(user: widget.user, reviewId: r.dto.id, onBlocked: widget.onBlocked ?? () {}),
           ),
@@ -256,7 +261,11 @@ class _ProfileTabsState extends State<ProfileTabs> {
             timestamp: v.dto.visitedAt,
             foodType: v.dto.foodType,
             pending: v.pending,
-            footer: v.dto.reactions.isEmpty ? null : ReactionBar(reactions: v.dto.reactions, reactors: v.dto.reactors),
+            footer: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (v.dto.reactions.isNotEmpty) ReactionBar(reactions: v.dto.reactions, reactors: v.dto.reactors),
+              if (!v.pending) CommentsButton(type: FeedItemType.visit, postId: v.dto.id, author: widget.user.displayName,
+                placeName: v.dto.placeName, allowed: true),
+            ]),
             onTap: () => _openPlace(context, v.dto.placeId),
           ),
       ],

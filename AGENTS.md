@@ -64,7 +64,6 @@ Die CI kompiliert zusätzlich iOS ohne Signing, Secrets oder Upload auf dem Stan
 
 ## Abweichungen vom Standard
 
-- Das App-Dock der Pleasance-Familie (starter f3aa569, 72884da, e8cb5f0) bleibt bis zur Mockupfreigabe im laufenden Redesign offen: Der bisher seitlich angeordnete Absender müsste sichtbar umgebaut und um einen neuen Interaktionsablauf ergänzt werden.
 - knip wird nicht übernommen, weil es den Dart-/Flutter-Stack nicht prüft.
 
 - Update-Mails heißen hier „Neuigkeiten“ und erscheinen auch als Karte auf Start (Robins Entscheidung vom 22.10.2026). Opt-in auf der Karte und in den Einstellungen statt unter dem Login, ohne Bestätigungsmail, weil die Adresse durch den Login bestätigt ist. Nur Deutsch, ohne Bild, wie die App. Admin-Seite in der App (Profil → Neuigkeiten) statt `/admin/updates`, Entwürfe als `updates/*.md` mit `# Titel`. Der Versand läuft in der API (siehe Zeitpläne unten). Veröffentlichen darf nur ein Admin, kein Agent.

@@ -1511,6 +1511,68 @@ void main() {
         body: {'email': 'other@example.org', 'platform': 'android'}, ip: 'other-ip')).$1, 204);
   });
 
+  test('comments stay with posts and only the author and contacts can read or write', () async {
+    final (owner, ownerUser) = await signUp('comment-owner@example.org', 'CommentOwner');
+    final (friend, friendUser) = await signUp('comment-friend@example.org', 'CommentFriend');
+    final (other, otherUser) = await signUp('comment-other@example.org', 'CommentOther');
+    final (stranger, _) = await signUp('comment-stranger@example.org', 'CommentStranger');
+    for (final (token, user) in [(friend, friendUser), (other, otherUser)]) {
+      await call('POST', '/friends/requests', token: owner, body: {'userId': user.id});
+      await call('POST', '/friends/requests', token: token, body: {'userId': ownerUser.id});
+    }
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, city) VALUES ('comment-place', 'Comment Grill', 48, 7.85, 'Commentstadt')");
+    final (_, review) = await call('PUT', '/places/comment-place/review', token: owner, body: {'sauceRating': 4});
+    final (_, visit) = await call('POST', '/places/comment-place/visits', token: owner,
+        body: {'id': '78900000-0000-4000-8000-000000000001', 'visitedAt': DateTime.now().toUtc().subtract(const Duration(hours: 1)).toIso8601String()});
+    for (final (table, id) in [('reviews', review['id']), ('visits', visit['id'])]) {
+      final path = '/$table/$id/comments';
+      expect((await call('GET', path)).$1, 401);
+      expect((await call('GET', path, token: stranger)).$1, 404);
+      expect((await call('POST', path, token: stranger, body: {'text': 'private'})).$1, 404);
+      for (final text in ['', '  ', 'x' * 1001, 12]) {
+        expect((await call('POST', path, token: friend, body: {'text': text})).$1, 400);
+      }
+      final (status, first) = await call('POST', path, token: friend, body: {'text': '  Guten Appetit!  '});
+      expect(status, 201);
+      expect(first['text'], 'Guten Appetit!');
+      expect(first['user']['id'], friendUser.id);
+      expect((first['user'] as Map).keys, unorderedEquals(['id', 'displayName', 'reviewedPlaces']));
+      final (_, second) = await call('POST', path, token: owner, body: {'text': 'Danke!'});
+      final (_, page) = await call('GET', '$path?limit=1', token: friend);
+      expect(page['hasMore'], isTrue);
+      expect(page['comments'].single['id'], second['id']);
+      final (_, older) = await call('GET', '$path?limit=1&cursor=${Uri.encodeQueryComponent(page['cursor'] as String)}', token: friend);
+      expect(older['comments'].single['id'], first['id']);
+      expect(older['hasMore'], isFalse);
+      expect((await call('DELETE', '$path/${first['id']}', token: owner)).$1, 404);
+      expect((await call('DELETE', '$path/${first['id']}', token: friend)).$1, 204);
+      final (emojiStatus, emojiComment) = await call('POST', path, token: friend, body: {'text': '🥙' * 1000});
+      expect(emojiStatus, 201);
+      expect((await call('DELETE', '$path/${emojiComment['id']}', token: friend)).$1, 204);
+      final (_, postFeed) = await call('GET', '/feed?lat=48&lon=7.85', token: friend);
+      expect((postFeed['items'] as List).firstWhere((p) => p['id'] == id)['commentCount'], 1);
+    }
+    final path = "/reviews/${review['id']}/comments";
+    final (_, hidden) = await call('POST', path, token: other, body: {'text': 'Not visible after blocking'});
+    await call('PUT', '/me/blocks/${otherUser.id}', token: friend);
+    final (_, blocked) = await call('GET', path, token: friend);
+    expect((blocked['comments'] as List).any((c) => c['id'] == hidden['id']), isFalse);
+    final (_, nearby) = await call('GET', '/feed?lat=48&lon=7.85', token: stranger);
+    expect((nearby['items'] as List).firstWhere((p) => p['id'] == review['id'])['commentCount'], 0);
+    final (_, mine) = await call('POST', path, token: friend, body: {'text': 'Mine'});
+    await call('PUT', '/me/blocks/${friendUser.id}', token: owner);
+    expect((await call('GET', path, token: friend)).$1, 404);
+    expect((await call('POST', path, token: friend, body: {'text': 'No access'})).$1, 404);
+    expect((await call('DELETE', "$path/${mine['id']}", token: friend)).$1, 204);
+    final (_, shopReviews) = await call('GET', '/places/comment-place/reviews');
+    expect((shopReviews as List).single.containsKey('comments'), isFalse);
+    final (_, limited) = await call('POST', '/visits/${visit['id']}/comments', token: owner, body: {'text': 'One'});
+    await db.execute(Sql.named("UPDATE rate_limits SET count = 60 WHERE key = @key"), parameters: {'key': 'comments:${ownerUser.id}'});
+    expect((await call('POST', '/visits/${visit['id']}/comments', token: owner, body: {'text': 'Over limit'})).$1, 429);
+    await db.execute(Sql.named('DELETE FROM visits WHERE id = @id:uuid'), parameters: {'id': visit['id']});
+    expect(await queryOne(db, 'SELECT 1 FROM post_comments WHERE id = @id:uuid', {'id': limited['id']}), isNull);
+  });
+
   test('tester requests mail Robin once per address and platform', () async {
     expect((await call('POST', '/tester-requests', body: {'email': 'no-mail', 'platform': 'ios'})).$1, 400);
     expect((await call('POST', '/tester-requests', body: {'email': 'tim@example.org', 'platform': 'windows'})).$1, 400);
@@ -2092,6 +2154,7 @@ void main() {
     await db.execute('DROP TABLE push_events, update_deliveries, update_dismissals, updates');
     await db.execute('ALTER TABLE push_tokens DROP COLUMN fetch_key_hash, DROP COLUMN social_pushes');
     await db.execute('ALTER TABLE users DROP COLUMN updates_consent_at, DROP COLUMN unsubscribe_token');
+    await db.execute('DROP TABLE post_comments');
     await db.execute('DROP TABLE reactions');
     await db.execute('ALTER TABLE users DROP COLUMN push_friend_requests, DROP COLUMN push_reactions');
     await db.execute(

@@ -275,6 +275,16 @@ void main() {
     final clear = await ali.cli(['review', '--place', 'cli-rank', '--meat-distribution', 'unknown', '--json']);
     expect(clear.json['review']['meatDistribution'], isNull);
 
+    final conversation = await ben.cli(['comment', '--type', 'review', '--post', review.json['review']['id'] as String, '--text', 'Guten Appetit!', '--json']);
+    expect(conversation.code, Exit.ok);
+    final commentId = conversation.json['id'] as String;
+    final postId = review.json['review']['id'] as String;
+    final readComments = await ali.cli(['comments', '--type', 'review', '--post', postId, '--json']);
+    expect(readComments.json['comments'].single['text'], 'Guten Appetit!');
+    expect((await ali.cli(['comments', '--type', 'review', '--post', postId])).out, contains('Guten Appetit!'));
+    expect((await ali.cli(['uncomment', '--type', 'review', '--post', postId, '--id', commentId])).code, Exit.error);
+    expect((await ben.cli(['uncomment', '--type', 'review', '--post', postId, '--id', commentId, '--json'])).json, {'deleted': true});
+
     final feed = await ben.cli(['feed', '--json']);
     expect(feed.code, Exit.ok);
     expect([for (final item in feed.json['items']) item['type']], ['review', 'visit']);

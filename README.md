@@ -116,7 +116,7 @@ Der erste Tab, für den Umkreis von 10 km um den Standort (ohne Standort: Freibu
 - „Neu in [Stadt]“: Läden, die in den letzten 30 Tagen aufgemacht haben, und Eröffnungen, die Google angekündigt hat („Bald: … Laut Google am 15. Oktober“)
 - „Top 3 hier“: nach gewichtetem Schnitt der Note zur Ernährung, wie im Ranking. Gibt es zu wenige bewertete Läden, füllen die nächstgelegenen als „noch unbewertet“ auf
 - „Gerade im Trend“: meiste Check-ins und Bewertungen der letzten 7 Tage, Check-ins zählen anonym
-- Feed: Check-ins und Bewertungen der Kontakte (mit Linie in der Akzentfarbe) und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Kontakte. Der Filter „Nur Kontakte“ blendet die anderen aus, die eigene Aktivität steht im Profil
+- Feed: einzelne Karten mit Abstand für Check-ins und Bewertungen der Kontakte und die Bewertungen aller anderen im Umkreis, mit Namen. Check-ins sehen nur Kontakte. Der Filter „Nur Kontakte“ blendet die anderen aus, die eigene Aktivität steht im Profil
 - Reaktionen: Unter Check-ins und Bewertungen von Kontakten reagiert man mit 🤤, 🥙 oder 🙋, eine Reaktion pro Person und Post, ein zweiter Tipp nimmt sie zurück. Angezeigt wird die Zahl je Emoji, darunter, wer reagiert hat: mit Namen nur eigene Kontakte („Tom 🤤, Anna 🥙 und 2 weitere“), so verrät der Post nicht, wer mit wem befreundet ist. Reagieren dürfen nur Kontakte der Person, die Ladenseite zeigt keine Reaktionen. Wer gepostet hat, sieht sie im eigenen Profil und bekommt einen abschaltbaren Push
 
 ### Ranking
@@ -130,6 +130,16 @@ Ranking der Stadt laut Adresse; die Stadt ist die des nächsten bekannten Ladens
 - „Halal“ und „Selbst gesteckter Spieß“ (nur bei „Alles“): nur Läden, bei denen mehr Bewertungen Ja bzw. selbst gesteckt sagen als das Gegenteil
 - Preis-Leistung: der gewichtete Schnitt der Note zur Ernährung geteilt durch den Median-Preis des Ladens, also Note pro Euro. Läden ohne Preisangabe fehlen dort
 - Über der Liste der übliche Preis der Stadt („Ein Döner kostet in Freiburg meist 7,50 €“): Median aller Preisangaben der letzten 365 Tage, ab `cityPriceMinReports` (5) Angaben
+
+### Kommentare am Beitrag
+
+An Check-ins und Bewertungen öffnet „Kommentare“ ein Sheet mit dem Postkontext. Lesen und schreiben können das Konto des Beitrags und seine Kontakte; öffentliche Bewertungen zeigen anderen nur den Hinweis „Unter Kontakten“. Kommentare bleiben am Beitrag, auf Ladenseiten erscheinen sie nicht. Blockierte Konten werden ausgeblendet. Nach einer beendeten Freundschaft entfällt der Zugriff, eigene Kommentare lassen sich weiterhin löschen.
+
+Kommentare brauchen eine Verbindung zur API. Der Entwurf bleibt bei einem Fehler und beim Vergrößern oder Verkleinern des Fensters erhalten. Erlaubt sind bis zu 1000 Zeichen und 60 Kommentare pro Stunde pro Konto. Ältere Kommentare laden seitenweise nach, eigene lassen sich löschen. Es gibt dafür keinen Push.
+
+Das Essensrad folgt einer Kreisgeste. Die gewählte Speise rastet oben ein; Mitte und Bestätigung zeigen dieselbe Auswahl. Antippen, Pfeiltasten und die Bedienungshilfe ändern sie ebenfalls.
+
+Das App-Dock bleibt seitlich neben der Pleasance-Wortmarke. Tippen oder Hover öffnet die Kacheln, Finger oder Zeiger vergrößern sie. Enter und Pfeiltasten bedienen es per Tastatur. Liste und Kacheln kommen erst beim Öffnen von `pleasance.org`, im Web ohne Cookies und Referrer. Ohne Netz bleibt das Farbband stehen.
 
 ### Andere Stadt ansehen
 
@@ -291,6 +301,9 @@ packages/doener_models/       Geteilte DTOs, Validierung, Bewertungspunkte und E
 | POST | `/admin/updates/:id/test`, `/admin/updates/:id/publish` | Testmail an sich, veröffentlichen |
 | DELETE | `/me/push-tokens/:token` | Gerät abmelden |
 | PUT, DELETE | `/me/mutes/:userId` | Freund stummschalten, wieder laut |
+| GET | `/visits/<id>/comments`, `/reviews/<id>/comments` | Kommentare unter Kontakten, neueste zuerst, mit `limit` und `cursor` |
+| POST | `/visits/<id>/comments`, `/reviews/<id>/comments` | Kommentar mit `{text}` schreiben |
+| DELETE | `/visits/<id>/comments/<commentId>`, `/reviews/<id>/comments/<commentId>` | Eigenen Kommentar löschen |
 | POST | `/feedback` | Feedback mit optionalem Screenshot |
 | POST | `/shop-reports` | Fehlenden Laden melden |
 | POST | `/reviews/:id/report` | Bewertung melden |
@@ -437,7 +450,7 @@ Ein Mehrspalten- oder neues Navigationskonzept braucht vorher Mockupfreigabe.
 
 - Bauen: `cd cli && mkdir -p build && dart compile exe bin/doener.dart -o build/doener`, eine einzelne Datei von gut 7 MB für die Plattform, auf der sie gebaut wird. Eingebaut ist die Live-API `https://doener-api.pleasance.org`, `--define=CLI_URL=<url>` beim Bauen nennt eine andere. `--url` wählt sie pro Aufruf, etwa `http://localhost:8080` gegen den lokalen Server, danach gilt die Adresse des letzten Logins. Ohne Bauen: `dart run bin/doener.dart <befehl>`.
 - Anmelden: `doener login` fragt nach der Adresse und dem Code aus der Mail, wie die App. `doener login --link <link>` löst einen Login-Link aus der Mail ein, `--link -` liest ihn von stdin. Danach liegt der Token dieses Geräts mit `0600` in `$XDG_CONFIG_HOME/doener/session.json` (sonst `~/.config`, unter macOS `~/Library/Application Support`, unter Windows `%APPDATA%`), zusammen mit der Adresse, an andere Adressen geht er nie. Er ist eine gewöhnliche Session als Bearer: gehasht in `sessions`, 365 Tage, verlängert sich bei Nutzung, jedes Gerät hat seine eigene. `whoami` zeigt das Konto, `logout` widerruft den Token auf dem Server und löscht die Datei, ein neuer Login widerruft den alten.
-- Befehle: `doener --help`. `nearby --lat <breite> --lon <länge>` zeigt die besten Läden im Umkreis wie auf Start (`/places/top`, mit `--radius`, `--by overall|vegetarian|vegan`, `--limit`). Angemeldet: `search --name <text>` sucht Läden nach Namen (`/places/search`, mit `--lat`/`--lon` die nächsten zuerst), `ranking` die Bestenliste der Stadt (`/ranking`, mit `--city`, `--by` auch `value` für Preis-Leistung, `--max-price`, `--ingredient`, `--halal`, `--skewer`, darunter der übliche Preis der Stadt), `feed` (Seiten über `--cursor`), `inbox` wie die Glocke (`--seen` markiert alles als gesehen), `friends`, `users --search <name>` und `befriend --user <id>`, das eine Anfrage sendet oder eine erhaltene annimmt, `unfriend --user <id>`, das eine Freundschaft beendet oder eine Anfrage zurückzieht oder ablehnt, `mute`/`unmute --user <id>` für Pushes bei Check-ins, die eigenen `reviews` und `visits`. `review --place <placeId> --rate sauce=4,5 …` bewertet und ändert dabei nur die genannten Punkte, Preis, Text und `--halal ja|nein|unklar`, alles andere der bisherigen Bewertung bleibt. `checkin --place <placeId> [--food <essen>]` checkt ein. Die `placeId` steht in `nearby --json` und `ranking --json`, einen unbekannten Laden lädt der Server bei Google nach.
+- Befehle: `doener --help`. `nearby --lat <breite> --lon <länge>` zeigt die besten Läden im Umkreis wie auf Start (`/places/top`, mit `--radius`, `--by overall|vegetarian|vegan`, `--limit`). Angemeldet: `search --name <text>` sucht Läden nach Namen (`/places/search`, mit `--lat`/`--lon` die nächsten zuerst), `ranking` die Bestenliste der Stadt (`/ranking`, mit `--city`, `--by` auch `value` für Preis-Leistung, `--max-price`, `--ingredient`, `--halal`, `--skewer`, darunter der übliche Preis der Stadt), `feed` (Seiten über `--cursor`), `inbox` wie die Glocke (`--seen` markiert alles als gesehen), `friends`, `users --search <name>` und `befriend --user <id>`, das eine Anfrage sendet oder eine erhaltene annimmt, `unfriend --user <id>`, das eine Freundschaft beendet oder eine Anfrage zurückzieht oder ablehnt, `mute`/`unmute --user <id>` für Pushes bei Check-ins, die eigenen `reviews` und `visits`. `review --place <placeId> --rate sauce=4,5 …` bewertet und ändert dabei nur die genannten Punkte, Preis, Text und `--halal ja|nein|unklar`, alles andere der bisherigen Bewertung bleibt. `checkin --place <placeId> [--food <essen>]` checkt ein. `comments --type visit|review --post <id>` liest Kommentare, `comment` schreibt mit `--text`, `uncomment` löscht den eigenen mit `--id <commentId>`; alle drei unterstützen `--json`. Die `placeId` steht in `nearby --json` und `ranking --json`, einen unbekannten Laden lädt der Server bei Google nach.
 - Ausgabe: Text für Menschen, mit `--json` genau ein JSON-Wert auf stdout, auch Fehler als `{"error": "…"}` und die Hilfe als Liste der Befehle. Exit-Codes: 0 erledigt, 1 Fehler (auch Absagen der API wie die geschlossene Registrierung), 2 falscher Aufruf, 3 nicht angemeldet.
 - Eigene Befehle: Datei in `cli/lib/src/commands` nach dem Beispiel `nearby.dart` und in `commands` in `cli/lib/cli.dart` eintragen. Ein Befehl nennt Hilfezeilen, Optionen und `run`. Das ruft über `ctx.api` die API auf, liest die Antwort mit dem `fromJson` des Modells (`parse`) und gibt `(data:, text:)` zurück, `data` für `--json`. `requireLogin(ctx)` verlangt den Login, `currentUser(ctx)` holt dazu das Konto, Fehler enden als `Failure` mit einem Code aus `Exit`. Die Tests in `cli/test/cli_test.dart` rufen die CLI im Prozess gegen den echten Server auf einem freien Port auf, mit eigener Testdatenbank.
 - Agenten: nur mit dem Testkonto admin@pleasance.org, nie mit Kundenkonten. Den Token holen sie über den Login-Link aus dem Kontor, per Pipe, so steht der Link nicht in ihrem Kontext: `login-link doener | cli/build/doener login --link -`. Danach bleibt die CLI auf diesem Rechner angemeldet.
@@ -512,8 +525,8 @@ Beschlossen, aber noch nicht gebaut. Was fertig ist, wandert in die Abschnitte o
 Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit diesem Release an die externen Tester, vorher kein Release-Tag `v*`.
 
 1. Look: Workshop mit der Designerin in der Design-Werkstatt (Farben, Radien, eventuell Icon und Wortmarke), danach die Werte fest einbauen.
-2. Aufbau: Erst danach Mockups für den größeren Umbau („Start als Aktionsfläche“), schon im neuen Look, Bau nach Robins Freigabe. Mit hinein gehört das Tester-Feedback vom 12.11.2026: Posts im Feed klarer voneinander trennen, Feed auf Start näher an X oder Instagram, und das Essensrad beim Einchecken wie einen Regler im Kreis drehen statt nur seitlich wischen. Die Mockups planen ganz Phase 2 mit ein, damit der Feed nicht zweimal umgebaut wird. Gebaut werden mit diesem Release aber nur die Kommentare (Robins Entscheidung vom 12.11.2026).
-3. Ausliefern: Store-Screenshots neu (siehe „App Store und Play“), als Update der schon geprüften Store-Version, dann der Release-Tag.
+
+2. Ausliefern: Store-Screenshots neu (siehe „App Store und Play“), als Update der schon geprüften Store-Version, dann der Release-Tag.
 
 ### Leitlinie
 
@@ -528,7 +541,6 @@ Robins Entscheidung vom 09.11.2026: Der neue Name Lieblingsdöner geht erst mit 
 ### Phase 2 – Community
 
 - Fragen an den Umkreis, Antworten mit verlinktem Laden
-- Kommentare unter Kontakten an Check-ins und Bewertungen im Feed, wie bei Instagram, schon mit dem Release Redesign und Rebrand. Sie bleiben am Post und erscheinen nicht auf der Ladenseite, damit sie Laden und Bewertungen nicht überfluten (Tester-Feedback vom 23.10. und 12.11.2026)
 - Up- und Downvotes, ab −5 ausgeblendet, Upvotes neben dem Namen
 - Kenner des Monats 👑 (meiste Upvotes in der Stadt)
 - Favoriten werden zur Merkliste „Will ich probieren“

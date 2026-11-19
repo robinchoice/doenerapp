@@ -58,6 +58,8 @@ class DemoServer {
   ];
 
   final _start = DateTime.now().toUtc();
+  final _comments = <String, List<PostCommentDto>>{};
+  int _commentId = 0;
 
   Future<http.Response> handle(http.Request request) async {
     http.Response json(Object? body) =>
@@ -66,6 +68,23 @@ class DemoServer {
     final now = _start;
     final segments = path.split('/').where((s) => s.isNotEmpty).toList();
     PlaceDto place(String id) => places.firstWhere((p) => p.placeId == id, orElse: () => places.first);
+
+    if (segments.length >= 3 && ['visits', 'reviews'].contains(segments[0]) && segments[2] == 'comments') {
+      final key = '${segments[0]}/${segments[1]}';
+      final comments = _comments.putIfAbsent(key, () => [PostCommentDto(id: 'demo-first', user: _ina,
+        text: 'Guten Appetit! / Enjoy your meal!', createdAt: now.subtract(const Duration(minutes: 4)))]);
+      if (request.method == 'POST') {
+        final text = (jsonDecode(request.body) as Map<String, dynamic>)['text'] as String;
+        final comment = PostCommentDto(id: 'demo-${++_commentId}', user: me, text: text, createdAt: DateTime.now().toUtc());
+        comments.insert(0, comment);
+        return json(comment.toJson());
+      }
+      if (request.method == 'DELETE') {
+        comments.removeWhere((c) => c.id == segments.last);
+        return http.Response('', 204);
+      }
+      return json(PostCommentsPage(comments: comments).toJson());
+    }
 
     final reviews = [
       _review('r1', _tom, places[0], 4.8, 'Die Soße ist der Wahnsinn, Brot frisch aus dem Ofen.', now.subtract(const Duration(hours: 3))),
@@ -132,8 +151,8 @@ class DemoServer {
         ).toJson()),
       '/places/top' || '/places/trending' || '/places' || '/me/places' || '/places/search' => json([for (final p in places) p.toJson()]),
       '/feed' => json(FeedPage(hasMore: false, items: [
-          FeedItem(id: 'f1', type: FeedItemType.visit, user: _tom, place: places[0], timestamp: now.subtract(const Duration(minutes: 20)), fromFriend: true, foodType: 'yufka'),
-          FeedItem(id: 'f2', type: FeedItemType.review, user: _ina, place: places[0], timestamp: now.subtract(const Duration(hours: 5)), fromFriend: true, rating: 4.4, ratings: const {RatingItem.sauce: 4.5, RatingItem.brot: 5}, text: 'Viel Salat, faire Preise.'),
+          FeedItem(id: 'f1', commentCount: _comments['visits/f1']?.length ?? 1, type: FeedItemType.visit, user: _tom, place: places[0], timestamp: now.subtract(const Duration(minutes: 20)), fromFriend: true, foodType: 'yufka'),
+          FeedItem(id: 'f2', commentCount: _comments['reviews/f2']?.length ?? 1, type: FeedItemType.review, user: _ina, place: places[0], timestamp: now.subtract(const Duration(hours: 5)), fromFriend: true, rating: 4.4, ratings: const {RatingItem.sauce: 4.5, RatingItem.brot: 5}, text: 'Viel Salat, faire Preise.'),
           FeedItem(id: 'f3', type: FeedItemType.review, user: _mo, place: places[1], timestamp: now.subtract(const Duration(days: 1)), fromFriend: false, rating: 4.1, ratings: const {RatingItem.fleisch: 4}),
         ]).toJson()),
       '/feed/live' => json([LiveStatusDto(user: _tom, placeId: 'p1', placeName: places[0].name, foodType: 'yufka', until: now.add(const Duration(minutes: 40))).toJson()]),

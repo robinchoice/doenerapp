@@ -2,6 +2,16 @@ import 'package:doener_models/doener_models.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('post comments round-trip independently of shop reviews', () {
+    final comment = PostCommentDto(id: 'c', user: const UserDto(id: 'u', displayName: 'Robin'),
+        text: 'Guten Appetit!', createdAt: DateTime.utc(2026, 11, 19));
+    final page = PostCommentsPage(comments: [comment], cursor: 'next', hasMore: true);
+    final back = PostCommentsPage.fromJson(page.toJson());
+    expect(back.comments.single.text, comment.text);
+    expect(back.comments.single.createdAt, comment.createdAt);
+    expect((back.cursor, back.hasMore), ('next', true));
+  });
+
   test('place closures round-trip while older place JSON remains readable', () {
     const closed = PlaceDto(placeId: 'closed', name: 'Closed', latitude: 48, longitude: 7.85, isClosed: true);
     expect(PlaceDto.fromJson(closed.toJson()).isClosed, isTrue);

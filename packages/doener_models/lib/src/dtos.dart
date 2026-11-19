@@ -891,6 +891,32 @@ class ReactionRequest {
   Json toJson() => {'emoji': emoji};
 }
 
+const maxCommentLength = 1000;
+
+class PostCommentDto {
+  final String id;
+  final UserDto user;
+  final String text;
+  final DateTime createdAt;
+  const PostCommentDto({required this.id, required this.user, required this.text, required this.createdAt});
+
+  factory PostCommentDto.fromJson(Json j) => PostCommentDto(
+      id: j['id'] as String, user: UserDto.fromJson(j['user'] as Json), text: j['text'] as String, createdAt: _date(j['createdAt']));
+  Json toJson() => {'id': id, 'user': user.toJson(), 'text': text, 'createdAt': createdAt.toUtc().toIso8601String()};
+}
+
+class PostCommentsPage {
+  final List<PostCommentDto> comments;
+  final String? cursor;
+  final bool hasMore;
+  const PostCommentsPage({required this.comments, this.cursor, this.hasMore = false});
+
+  factory PostCommentsPage.fromJson(Json j) => PostCommentsPage(
+      comments: [for (final c in j['comments'] as List) PostCommentDto.fromJson(c as Json)],
+      cursor: j['cursor'] as String?, hasMore: j['hasMore'] as bool);
+  Json toJson() => {'comments': [for (final c in comments) c.toJson()], 'cursor': cursor, 'hasMore': hasMore};
+}
+
 /// Check-ins come from friends only; reviews from friends and from everyone
 /// around — [fromFriend] tells them apart.
 class FeedItem {
@@ -916,6 +942,7 @@ class FeedItem {
   final Map<String, int> reactions;
   final String? myReaction;
   final List<Reactor> reactors;
+  final int commentCount;
 
   const FeedItem({
     required this.id,
@@ -934,6 +961,7 @@ class FeedItem {
     this.reactions = const {},
     this.myReaction,
     this.reactors = const [],
+    this.commentCount = 0,
   });
 
   /// See [ReviewDto.headline].
@@ -956,6 +984,7 @@ class FeedItem {
         reactions: _reactionsFromJson(j['reactions']),
         myReaction: j['myReaction'] as String?,
         reactors: _reactorsFromJson(j['reactors']),
+        commentCount: j['commentCount'] as int? ?? 0,
       );
 
   Json toJson() => {
@@ -976,6 +1005,7 @@ class FeedItem {
         'reactions': reactions,
         'myReaction': myReaction,
         'reactors': [for (final r in reactors) r.toJson()],
+        'commentCount': commentCount,
       };
 }
 

@@ -7,6 +7,7 @@ import 'src/client.dart';
 import 'src/command.dart';
 import 'src/commands/auth.dart';
 import 'src/commands/feed.dart';
+import 'src/commands/comments.dart';
 import 'src/commands/friends.dart';
 import 'src/commands/inbox.dart';
 import 'src/commands/nearby.dart';
@@ -26,6 +27,7 @@ final commands = <String, Command>{
   'search': search,
   'ranking': ranking,
   'feed': feed,
+  ...comments,
   'inbox': inbox,
   ...friends,
   ...reviews,

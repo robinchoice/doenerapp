@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'app_dock.dart';
 
 // Pleasance family band: glow for gradient
 // surfaces and dark backgrounds, deep for text on light ones.
@@ -240,9 +243,7 @@ class GradientProgress extends StatelessWidget {
       );
 }
 
-/// Sender line at the bottom of a screen: made by Pleasance and where this app
-/// sits on the family band. The app speaks German only, so there's no
-/// language button.
+/// The sender and wordmark link to Pleasance; the app dock stays beside them.
 class PleasanceFooter extends StatelessWidget {
   const PleasanceFooter({super.key});
 
@@ -250,70 +251,19 @@ class PleasanceFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.colorScheme.outline;
+    final en = Localizations.localeOf(context).languageCode == 'en';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(border: Border(top: BorderSide(color: theme.dividerColor))),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          Text('ein Werkzeug von', style: theme.textTheme.bodySmall?.copyWith(color: color)),
-          SvgPicture.asset(
-            'assets/pleasance-wordmark.svg',
-            height: 13,
-            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-            semanticsLabel: 'Pleasance',
-          ),
-          const _BandLine(),
-        ],
-      ),
-    );
-  }
-}
-
-class _BandLine extends StatelessWidget {
-  const _BandLine();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dim = theme.brightness == Brightness.dark ? Colors.black.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.6);
-    // 120 wide, narrower when the footer runs out of room
-    return SizedBox(
-      width: 120,
-      height: 9,
-      child: LayoutBuilder(
-        builder: (context, constraints) => Stack(
-          children: [
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 3,
-              height: 3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(2)),
-                  gradient: LinearGradient(colors: [for (final c in glow) Color.alphaBlend(dim, c)]),
-                ),
-              ),
-            ),
-            Positioned(
-              left: constraints.maxWidth * (appBand.from - 1) / 6,
-              top: 0,
-              width: math.max(9, constraints.maxWidth * (appBand.to - appBand.from) / 6),
-              height: 9,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: actionGradient,
-                  borderRadius: const BorderRadius.all(Radius.circular(5)),
-                  boxShadow: [BoxShadow(color: theme.scaffoldBackgroundColor, spreadRadius: 2)],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 8, children: [
+        InkWell(onTap: () => launchUrl(Uri.parse('https://pleasance.org'), mode: LaunchMode.externalApplication),
+          child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+            Text(en ? 'a tool by' : 'ein Werkzeug von', style: theme.textTheme.bodySmall?.copyWith(color: color)),
+            SvgPicture.asset('assets/pleasance-wordmark.svg', height: 13,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn), semanticsLabel: 'Pleasance'),
+          ])),
+        const AppDock(),
+      ]),
     );
   }
 }

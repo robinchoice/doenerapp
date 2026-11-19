@@ -42,6 +42,26 @@ void main() {
     await draining.timeout(const Duration(seconds: 2));
   });
 
+  for (final badEnv in [
+    {'DB_HOST': '127.0.0.1', 'DB_PORT': '1'},
+    {'PORT': 'invalid'},
+    {'APP_ENV': 'production', 'SMTP_HOST': ''},
+  ]) {
+    test('regression: boot failure exits with code 1 ($badEnv)', () async {
+      final server = await Process.start(
+        Platform.resolvedExecutable,
+        ['bin/server.dart'],
+        environment: {'APP_ENV': 'development', 'SENTRY_DSN': '', ...badEnv},
+      );
+      addTearDown(() => server.kill(ProcessSignal.sigkill));
+      final output = server.stdout.transform(utf8.decoder).join();
+      final errors = server.stderr.transform(utf8.decoder).join();
+      expect(await server.exitCode.timeout(const Duration(seconds: 90)), 1);
+      expect(await output, isNot(contains('Listening on :')));
+      expect(await errors, contains('Server failed:'));
+    }, timeout: const Timeout(Duration(minutes: 2)));
+  }
+
   final env = Platform.environment;
   final port = int.tryParse(env['TEST_DB_PORT'] ?? '');
   if (port == null) {

@@ -172,9 +172,9 @@ Future<void> maintainPlaceCache(Deps deps) async {
         if (place != null) {
           await _upsertPlace(deps, place, withHours: true);
         } else {
-          // An announcement Google withdrew.
           await deps.db.execute(
-            Sql.named("DELETE FROM places WHERE google_place_id = @id AND business_status = 'FUTURE_OPENING'"),
+            Sql.named("UPDATE places SET business_status = 'CLOSED_PERMANENTLY', opening_hours = NULL, "
+                'hours_synced_at = now(), synced_at = now() WHERE google_place_id = @id'),
             parameters: {'id': id},
           );
         }

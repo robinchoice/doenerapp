@@ -27,11 +27,9 @@ void mountTesterRequests(Router router, Deps deps) {
     if (platform != 'ios' && platform != 'android') throw const ApiException.badRequest('Ungültige Plattform');
 
     await deps.db.execute("DELETE FROM tester_requests WHERE created_at < now() - interval '90 days'");
-    final recent = await queryOne(
-      deps.db,
-      "SELECT count(*)::int AS n FROM tester_requests WHERE created_at > now() - interval '1 hour'",
-    );
-    if ((recent!['n'] as int) >= maxTesterRequestsPerHour) throw tooManyRequests;
+    if (!await rateLimit(deps, 'tester-requests-per-ip:${clientIp(request)}', maxTesterRequestsPerHour, const Duration(hours: 1))) {
+      throw tooManyRequests;
+    }
 
     final normalized = Validation.normalizeEmail(email);
     final inserted = await deps.db.execute(

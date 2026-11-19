@@ -36,6 +36,17 @@ Future<void> printLoginLink(List<String> args) async {
 }
 
 Future<void> startServer() async {
+  try {
+    await serve();
+  } catch (error, stackTrace) {
+    stderr.writeln('Server failed: $error');
+    await Sentry.captureException(error, stackTrace: stackTrace);
+    await Sentry.close();
+    exit(1);
+  }
+}
+
+Future<void> serve() async {
   // Coolify stops the container with SIGTERM, Ctrl+C sends SIGINT. Watching
   // them before the boot lets it finish first, then the server shuts down.
   final stop = Completer<void>();

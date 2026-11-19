@@ -9,7 +9,9 @@ import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/auth.dart' show hashToken, maxCodeAttempts;
 import 'package:doener_server/src/deps.dart' show queryOne;
 import 'package:doener_server/src/google_places.dart' show maxTileSearchesPerDay;
+import 'package:doener_server/src/places.dart' show median;
 import 'package:doener_server/src/prefetch.dart' show PrefetchArea;
+import 'package:doener_server/src/ranking.dart' show usualPrice;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:postgres/postgres.dart';
@@ -1375,6 +1377,22 @@ void main() {
       expect((enough.cityPrice, enough.cityPriceReports), (600, 5), reason: 'median of 5, 5, 6, 9 and 10 €');
     });
 
+    test('regression: ranking and place summary agree on half-cent medians', () async {
+      await place('half-cent', 'Half Cent Döner', 52.0, 'Rundstadt');
+      for (var i = 0; i < 6; i++) {
+        final (token, _) = await signUp('round$i@example.org', 'Round$i');
+        await review(token, 'half-cent', {'price': i < 3 ? 750 : 751, 'sauceRating': 4});
+      }
+      expect((await usualPrice(db, 'Rundstadt')).$1, median([750, 750, 750, 751, 751, 751]));
+      expect((await usualPrice(db, 'Rundstadt')).$1, 751);
+      final (_, summary) = await call('GET', '/places/half-cent/summary');
+      expect(summary['price'], 751);
+      final (_, ranking) = await call('GET', '/ranking?lat=52&lon=8&city=Rundstadt&by=value', token: ute);
+      expect(ranking['entries'].single['price'], 751);
+      final (_, filtered) = await call('GET', '/ranking?lat=52&lon=8&city=Rundstadt&maxPrice=750', token: ute);
+      expect(filtered['entries'], isEmpty);
+    });
+
     test('ranking by an ingredient most experts got', () async {
       await place('t-onion', 'Zwiebel Kebap', 52.0, 'Zwiebelstadt');
       await place('t-plain', 'Ohne Kebap', 52.0, 'Zwiebelstadt');
@@ -1459,6 +1477,17 @@ void main() {
     expect((download.statusCode, download.headers['location']),
         (302, 'https://github.com/robinchoice/doenerapp/releases/download/android-latest/doener.apk'));
     expect((await call('GET', '/android')).$2, {'build': 42, 'url': 'https://doener.test/android'});
+  });
+
+  test('regression: tester request limit isolates IPs and counts duplicates', () async {
+    for (var i = 0; i < 30; i++) {
+      expect((await call('POST', '/tester-requests',
+          body: {'email': 'limit@example.org', 'platform': 'android'}, ip: 'limit-ip')).$1, 204);
+    }
+    expect((await call('POST', '/tester-requests',
+        body: {'email': 'limit@example.org', 'platform': 'android'}, ip: 'limit-ip')).$1, 429);
+    expect((await call('POST', '/tester-requests',
+        body: {'email': 'other@example.org', 'platform': 'android'}, ip: 'other-ip')).$1, 204);
   });
 
   test('tester requests mail Robin once per address and platform', () async {
@@ -1707,6 +1736,30 @@ void main() {
     final (_, kept) = await call('GET', '/places/place-kebap');
     expect(kept['name'], 'Kebap Haus', reason: 'visited place is refreshed from Google');
     expect((await call('GET', '/places/place-unused')).$1, 404, reason: 'unused stale place is dropped');
+  });
+
+  test('regression: vanished Google places close without losing visits or daily retries', () async {
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude) VALUES ('place-vanished', 'Alt', 48, 7.85)");
+    final (_, visitor) = await signUp('vanished@example.org', 'Vanished');
+    await db.execute(Sql.named("INSERT INTO visits (id, user_id, place_id, visited_at) "
+        "SELECT gen_random_uuid(), @user:uuid, id, now() FROM places WHERE google_place_id = 'place-vanished'"),
+        parameters: {'user': visitor.id});
+    var requests = 0;
+    final gone = Deps(db: db, config: deps.config, mailer: mailer, httpClient: MockClient((_) async {
+      requests++;
+      return http.Response('{"error":{"status":"NOT_FOUND"}}', 404);
+    }));
+    await db.execute("UPDATE places SET synced_at = now() - interval '26 days' WHERE google_place_id = 'place-vanished'");
+    await maintainPlaceCache(gone);
+    final row = await queryOne(db, "SELECT id, business_status, opening_hours FROM places WHERE google_place_id = 'place-vanished'");
+    expect(row!['business_status'], 'CLOSED_PERMANENTLY');
+    expect(row['opening_hours'], isNull);
+    expect((await db.execute(Sql.named('SELECT 1 FROM visits WHERE place_id = @id:uuid'), parameters: {'id': row['id']})), isNotEmpty);
+    expect(await queryOne(db, "SELECT 1 FROM active_place_view WHERE google_place_id = 'place-vanished'"), isNull);
+    final afterFirst = requests;
+    await maintainPlaceCache(gone);
+    expect(requests, afterFirst);
+    await maintainPlaceCache(deps);
   });
 
   test('the prefetch searches areas block by block and splits full blocks', () async {

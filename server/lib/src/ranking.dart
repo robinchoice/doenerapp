@@ -84,7 +84,7 @@ Future<(int, String)?> cityRank(Session db, Map<String, dynamic> place) async {
 Future<(int?, int)> usualPrice(Session db, String city, {int? year}) async {
   final row = await queryOne(
     db,
-    'SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY r.price))::int AS price, count(*)::int AS n '
+    'SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY r.price)::numeric)::int AS price, count(*)::int AS n '
     'FROM reviews r JOIN active_place_view pv ON pv.id = r.place_id WHERE pv.city = @city AND r.price IS NOT NULL AND '
     "${year == null ? "r.updated_at > now() - interval '365 days'" : "extract(year FROM r.updated_at AT TIME ZONE 'Europe/Berlin') = @year"}",
     {'city': city, 'year': ?year},
@@ -133,7 +133,7 @@ void mountRanking(Router router, Deps deps) {
       'SELECT pv.*, s.avg, s.n, pr.price FROM active_place_view pv JOIN ('
       '  SELECT place_id, avg(value)::float8 AS avg, count(*)::int AS n FROM ($ratings) x GROUP BY place_id'
       ') s ON s.place_id = pv.id LEFT JOIN ('
-      '  SELECT place_id, round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::int AS price FROM reviews '
+      '  SELECT place_id, round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price)::numeric)::int AS price FROM reviews '
       '  WHERE price IS NOT NULL GROUP BY place_id'
       ') pr ON pr.place_id = pv.id${ingredient == null ? '' : ' JOIN ('
           '  SELECT place_id FROM reviews WHERE ingredients IS NOT NULL GROUP BY place_id '

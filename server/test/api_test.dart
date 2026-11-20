@@ -10,6 +10,7 @@ import 'package:doener_server/src/auth.dart' show hashToken, maxCodeAttempts;
 import 'package:doener_server/src/deps.dart' show queryOne;
 import 'package:doener_server/src/db.dart' show migrations;
 import 'package:doener_server/src/google_places.dart' show maxTileSearchesPerDay;
+import 'package:doener_server/src/landing.dart' show maxTesterRequestsPerHour, maxTesterRequestsPerIp;
 import 'package:doener_server/src/places.dart' show median;
 import 'package:doener_server/src/prefetch.dart' show PrefetchArea;
 import 'package:doener_server/src/ranking.dart' show usualPrice;
@@ -1501,7 +1502,7 @@ void main() {
   });
 
   test('regression: tester request limit isolates IPs and counts duplicates', () async {
-    for (var i = 0; i < 30; i++) {
+    for (var i = 0; i < maxTesterRequestsPerIp; i++) {
       expect((await call('POST', '/tester-requests',
           body: {'email': 'limit@example.org', 'platform': 'android'}, ip: 'limit-ip')).$1, 204);
     }
@@ -1509,6 +1510,18 @@ void main() {
         body: {'email': 'limit@example.org', 'platform': 'android'}, ip: 'limit-ip')).$1, 429);
     expect((await call('POST', '/tester-requests',
         body: {'email': 'other@example.org', 'platform': 'android'}, ip: 'other-ip')).$1, 204);
+  });
+
+  test('regression: new tester requests stay capped across IPs, so many addresses can not flood the mailbox', () async {
+    final sent = mailer.sent.length;
+    await db.execute('INSERT INTO tester_requests (email, platform) '
+        "SELECT 'flood' || n || '@example.org', 'ios' FROM generate_series(1, $maxTesterRequestsPerHour) n");
+    addTearDown(() => db.execute("DELETE FROM tester_requests WHERE email LIKE 'flood%@example.org'"));
+    expect((await call('POST', '/tester-requests', body: {'email': 'spaeter@example.org', 'platform': 'ios'})).$1, 429);
+    expect(mailer.sent.length, sent);
+    await db.execute("DELETE FROM tester_requests WHERE email LIKE 'flood%@example.org'");
+    expect((await call('POST', '/tester-requests', body: {'email': 'spaeter@example.org', 'platform': 'ios'})).$1, 204);
+    await db.execute("DELETE FROM tester_requests WHERE email = 'spaeter@example.org'");
   });
 
   test('comments stay with posts and only the author and contacts can read or write', () async {
@@ -1843,6 +1856,19 @@ void main() {
     await maintainPlaceCache(gone);
     expect(requests, afterFirst);
     await maintainPlaceCache(deps);
+  });
+
+  test('regression: an announcement Google withdrew is dropped, not kept as a closed shop', () async {
+    await db.execute("INSERT INTO places (google_place_id, name, latitude, longitude, business_status) "
+        "VALUES ('place-withdrawn', 'Nie eröffnet', 48, 7.85, 'FUTURE_OPENING')");
+    // Google only lost this one; every other shop stays as it is.
+    final gone = Deps(db: db, config: deps.config, mailer: mailer, httpClient: MockClient((request) async {
+      return request.url.path.endsWith('/place-withdrawn')
+          ? http.Response('{"error":{"status":"NOT_FOUND"}}', 404)
+          : http.Response('unavailable', 503);
+    }));
+    await maintainPlaceCache(gone);
+    expect(await queryOne(db, "SELECT 1 FROM places WHERE google_place_id = 'place-withdrawn'"), isNull);
   });
 
   test('the prefetch searches areas block by block and splits full blocks', () async {

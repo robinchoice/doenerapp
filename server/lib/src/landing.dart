@@ -10,6 +10,10 @@ import 'auth.dart';
 import 'deps.dart';
 import 'http.dart';
 
+/// Tester requests per hour: from one address ([clientIp]), duplicates
+/// included, and new ones from everyone together — each of those mails Robin.
+/// The first stays below the second, so one address can't use up the form.
+const maxTesterRequestsPerIp = 10;
 const maxTesterRequestsPerHour = 30;
 
 void mountTesterRequests(Router router, Deps deps) {
@@ -27,9 +31,14 @@ void mountTesterRequests(Router router, Deps deps) {
     if (platform != 'ios' && platform != 'android') throw const ApiException.badRequest('Ungültige Plattform');
 
     await deps.db.execute("DELETE FROM tester_requests WHERE created_at < now() - interval '90 days'");
-    if (!await rateLimit(deps, 'tester-requests-per-ip:${clientIp(request)}', maxTesterRequestsPerHour, const Duration(hours: 1))) {
+    if (!await rateLimit(deps, 'tester-requests-per-ip:${clientIp(request)}', maxTesterRequestsPerIp, const Duration(hours: 1))) {
       throw tooManyRequests;
     }
+    final recent = await queryOne(
+      deps.db,
+      "SELECT count(*)::int AS n FROM tester_requests WHERE created_at > now() - interval '1 hour'",
+    );
+    if ((recent!['n'] as int) >= maxTesterRequestsPerHour) throw tooManyRequests;
 
     final normalized = Validation.normalizeEmail(email);
     final inserted = await deps.db.execute(

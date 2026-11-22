@@ -52,11 +52,12 @@ class _AppDockState extends State<AppDock> with SingleTickerProviderStateMixin, 
     super.dispose();
   }
 
-  // Rotation or a resized window moves the band: place the dock again once the new layout is done
+  // Rotation or a resized window moves the band: place the dock again once the new layout is done.
+  // A finger held through it no longer points where it did, lifting it must not launch that app.
   @override
   void didChangeMetrics() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _portal.isShowing) setState(() {});
+      if (mounted && _portal.isShowing) _cancel();
     });
   }
 
@@ -75,8 +76,8 @@ class _AppDockState extends State<AppDock> with SingleTickerProviderStateMixin, 
   Future<void> _key(KeyEvent event) async {
     if (event is! KeyDownEvent) return;
     if (event.logicalKey == LogicalKeyboardKey.escape) { _close(); return; }
-    if (event.logicalKey == LogicalKeyboardKey.enter && _portal.isShowing && _hotSlot?.app != null) {
-      _launch(_hotSlot!.app!); return;
+    if (_slotAt(_hot)?.app case final app? when event.logicalKey == LogicalKeyboardKey.enter && _portal.isShowing) {
+      _launch(app); return;
     }
     await _show();
     if (!mounted || !_portal.isShowing) return;
@@ -191,7 +192,7 @@ class _AppDockState extends State<AppDock> with SingleTickerProviderStateMixin, 
     if (!bounds.contains(overlay.globalToLocal(global))) _close();
   }
 
-  DockSlot? get _hotSlot => _hot >= 0 && _hot < _slots.length ? _slots[_hot] : null;
+  DockSlot? _slotAt(int i) => i >= 0 && i < _slots.length ? _slots[i] : null;
 
   void _cancel() {
     // A slow first load must not open the dock after the finger has lifted
@@ -203,7 +204,7 @@ class _AppDockState extends State<AppDock> with SingleTickerProviderStateMixin, 
   }
 
   void _release() {
-    final app = _hotSlot?.app;
+    final app = _slotAt(_hot)?.app;
     if (app != null) {
       _launch(app);
     } else {
@@ -259,7 +260,7 @@ class _AppDockState extends State<AppDock> with SingleTickerProviderStateMixin, 
     final row = _layout(geometry.band, geometry.area);
     final bottom = _row(geometry.band);
     final markerStage = (appBand.from + appBand.to) / 2;
-    final hot = _hotSlot;
+    final hot = _slotAt(_hot);
     return MouseRegion(onHover: (event) => _hover(event.position), onExit: (_) => _close(), child: Stack(
       children: [
         // Sliding grows the icons, a tap on one opens it, a tap anywhere else closes the dock
@@ -276,7 +277,7 @@ class _AppDockState extends State<AppDock> with SingleTickerProviderStateMixin, 
               final overlay = _overlay;
               if (overlay == null) return _close();
               final index = _hit(overlay.globalToLocal(details.globalPosition), geometry.band, row);
-              final app = index >= 0 ? _slots[index].app : null;
+              final app = _slotAt(index)?.app;
               if (app != null) {
                 _launch(app);
               } else if (index < 0) {

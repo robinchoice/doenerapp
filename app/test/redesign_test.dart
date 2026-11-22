@@ -171,4 +171,29 @@ void main() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+
+  testWidgets('regression: lifting a finger held through a resize launches nothing', (tester) async {
+    final semantics = tester.ensureSemantics();
+    Uri? opened;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(bottomNavigationBar: AppDock(loadApps: () async => [
+      PleasanceApp(name: 'Music Hub', url: Uri.parse('https://hub.pleasance.org'), from: 1.35, to: 2.2),
+      PleasanceApp(name: 'Savor', url: Uri.parse('https://savor.pleasance.org'), from: 3.5, to: 4.2),
+    ], openUrl: (uri) => opened = uri))));
+    await tester.tap(find.byType(AppDock));
+    await tester.pumpAndSettle();
+    final hub = tester.getCenter(find.bySemanticsLabel('Music Hub'));
+    final gesture = await tester.startGesture(hub + const Offset(0, 30));
+    await gesture.moveTo(hub);
+    await tester.pump();
+    expect(find.text('Music Hub', findRichText: true), findsOneWidget);
+    tester.view.physicalSize = Size(400 * tester.view.devicePixelRatio, tester.view.physicalSize.height);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpAndSettle();
+    expect(find.text('Music Hub', findRichText: true), findsNothing);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(opened, isNull);
+    expect(find.bySemanticsLabel('Music Hub'), findsOneWidget, reason: 'the dock stays open');
+    semantics.dispose();
+  });
 }

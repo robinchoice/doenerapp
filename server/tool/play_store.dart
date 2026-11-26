@@ -8,7 +8,8 @@
 //
 // status                  tracks with their releases
 // listing                 name, texts, contact, icon, feature graphic, screenshots (de-DE, en-US)
-// release <versionCode>   that bundle as production draft, Robin sends it for review in the Play Console
+// release <versionCode>   that bundle as production draft with docs/store/<locale>/release-notes.txt,
+//                         Robin sends it for review in the Play Console
 import 'dart:convert';
 import 'dart:io';
 
@@ -21,7 +22,6 @@ const _upload = 'https://androidpublisher.googleapis.com/upload/androidpublisher
 
 /// Play language → folder in docs/store and feature graphic in docs/play.
 const _languages = {'de-DE': 'de', 'en-US': 'en'};
-const _releaseNotes = {'de-DE': 'Erste Version.', 'en-US': 'First release.'};
 
 final _client = http.Client();
 late String _accessToken;
@@ -109,7 +109,7 @@ Future<void> release(String versionCode) => edit((id) async {
             // Play accepts only draft releases until the app is published.
             'status': 'draft',
             'releaseNotes': [
-              for (final MapEntry(key: language, value: text) in _releaseNotes.entries) {'language': language, 'text': text},
+              for (final language in _languages.keys) {'language': language, 'text': text(language, 'release-notes')},
             ],
           },
         ],

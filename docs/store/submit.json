@@ -29,14 +29,17 @@
     "violenceRealisticProlongedGraphicOrSadistic": "NONE",
     "advertising": false,
     "ageAssurance": false,
+    "datingAndRelationships": false,
     "gambling": false,
     "healthOrWellnessTopics": false,
     "lootBox": false,
     "messagingAndChat": false,
     "parentalControls": false,
+    "sharedLocation": true,
     "unrestrictedWebAccess": false,
     "userGeneratedContent": true,
-    "socialMedia": true
+    "socialMedia": true,
+    "socialMediaAgeRestricted": false
   },
   "screenshots": {
     "APP_IPHONE_67": "docs/store/ios/{locale}/iphone",

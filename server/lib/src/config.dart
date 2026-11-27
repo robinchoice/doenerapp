@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:doener_models/discover.dart' show OprfServer;
 import 'package:postgres/postgres.dart';
 
 class SmtpConfig {
@@ -70,6 +71,17 @@ class Config {
   final String? reviewEmail;
   final String? reviewCode;
 
+  /// Server key of the contact search by phone number (`OPRF_KEY`, 64 hex).
+  /// Every stored phone key depends on it: never change it once numbers are
+  /// confirmed. Without it there is no contact search.
+  final OprfServer? oprf;
+
+  /// seven.io for the SMS that confirm phone numbers (`SEVEN_API_KEY`).
+  final String? sevenApiKey;
+
+  /// `APP_ENV=production`, set by the image.
+  final bool production;
+
   const Config({
     required this.database,
     this.databaseTls = false,
@@ -93,6 +105,9 @@ class Config {
     this.minBuildAndroid = 0,
     this.reviewEmail,
     this.reviewCode,
+    this.oprf,
+    this.sevenApiKey,
+    this.production = false,
   });
 
   String publicBase(Uri requestedUri) => publicUrl ?? requestedUri.origin;
@@ -165,6 +180,12 @@ class Config {
       minBuildAndroid: int.parse(get('MIN_BUILD_ANDROID') ?? '0'),
       reviewEmail: review ? reviewEmail : null,
       reviewCode: review ? reviewCode : null,
+      oprf: switch (get('OPRF_KEY')) {
+        final key? => OprfServer.fromHex(key),
+        null => null,
+      },
+      sevenApiKey: get('SEVEN_API_KEY'),
+      production: get('APP_ENV') == 'production',
     );
   }
 }

@@ -74,12 +74,23 @@ Future<void> serve() async {
   final httpClient = http.Client();
   final fcm = config.fcmServiceAccount;
   if (fcm == null) print('WARNING: FCM_SERVICE_ACCOUNT not set — pushes are printed to the log instead of sent.');
+  final SmsSender? sms;
+  if (config.sevenApiKey != null) {
+    sms = SevenSms(config.sevenApiKey!, httpClient);
+  } else if (config.production) {
+    print('WARNING: SEVEN_API_KEY not set — nobody can confirm a phone number.');
+    sms = null;
+  } else {
+    sms = const LogSms();
+  }
+  if (config.oprf == null) print('WARNING: OPRF_KEY not set — no contact search by phone number.');
   final deps = Deps(
     db: db,
     config: config,
     mailer: mailer,
     httpClient: httpClient,
     pusher: fcm == null ? const LogPusher() : FcmPusher(fcm, httpClient),
+    sms: sms,
   );
 
   await importDrafts(deps);

@@ -309,6 +309,10 @@ class AccountDto extends UserDto {
   final int quietStart;
   final int quietEnd;
 
+  /// Confirmed a phone number by SMS: people who have it find this account
+  /// and may search their own address book (`package:doener_models/discover.dart`).
+  final bool discoverable;
+
   const AccountDto({
     required super.id,
     required super.displayName,
@@ -325,6 +329,7 @@ class AccountDto extends UserDto {
     this.quietDays = allDays,
     this.quietStart = 22 * 60,
     this.quietEnd = 8 * 60,
+    this.discoverable = false,
   });
 
   /// [quietDays] with every day of the week.
@@ -350,6 +355,7 @@ class AccountDto extends UserDto {
         quietDays: change.quietDays ?? quietDays,
         quietStart: change.quietStart ?? quietStart,
         quietEnd: change.quietEnd ?? quietEnd,
+        discoverable: discoverable,
       );
 
   factory AccountDto.fromJson(Json j) => AccountDto(
@@ -368,6 +374,7 @@ class AccountDto extends UserDto {
         quietDays: j['quietDays'] as int? ?? allDays,
         quietStart: j['quietStart'] as int? ?? 22 * 60,
         quietEnd: j['quietEnd'] as int? ?? 8 * 60,
+        discoverable: j['discoverable'] as bool? ?? false,
       );
   @override
   Json toJson() => {
@@ -385,6 +392,7 @@ class AccountDto extends UserDto {
         'quietDays': quietDays,
         'quietStart': quietStart,
         'quietEnd': quietEnd,
+        'discoverable': discoverable,
       };
 }
 

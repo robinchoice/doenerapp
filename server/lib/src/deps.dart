@@ -4,6 +4,7 @@ import 'package:postgres/postgres.dart';
 import 'config.dart';
 import 'mailer.dart';
 import 'push.dart';
+import 'sms.dart';
 
 class Deps {
   final Pool<void> db;
@@ -12,7 +13,17 @@ class Deps {
   final http.Client httpClient;
   final Pusher pusher;
 
-  const Deps({required this.db, required this.config, required this.mailer, required this.httpClient, this.pusher = const LogPusher()});
+  /// Null in production without `SEVEN_API_KEY`: then nobody can confirm a number.
+  final SmsSender? sms;
+
+  const Deps({
+    required this.db,
+    required this.config,
+    required this.mailer,
+    required this.httpClient,
+    this.pusher = const LogPusher(),
+    this.sms,
+  });
 }
 
 /// Rows as column maps — the only way handlers read query results.

@@ -473,6 +473,19 @@ final migrations = <List<String>>[
     'CREATE INDEX post_comments_visit ON post_comments (visit_id, created_at DESC, id DESC)',
     'CREATE INDEX post_comments_review ON post_comments (review_id, created_at DESC, id DESC)',
   ],
+  [
+    // Contact search by phone number (discover.dart): the OPRF output of a
+    // confirmed number, never the number itself.
+    'ALTER TABLE users ADD COLUMN phone_key text UNIQUE',
+    '''CREATE TABLE phone_codes (
+      user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+      phone_key text NOT NULL,
+      code_hash text NOT NULL,
+      attempts int NOT NULL DEFAULT 0,
+      expires_at timestamptz NOT NULL
+    )''',
+    'CREATE INDEX phone_codes_user ON phone_codes (user_id)',
+  ],
 ];
 
 Future<void> migrate(Pool<void> db) async {

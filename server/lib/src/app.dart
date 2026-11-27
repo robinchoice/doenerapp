@@ -10,6 +10,7 @@ import 'android.dart';
 import 'auth.dart';
 import 'best_of.dart';
 import 'deps.dart';
+import 'discover.dart';
 import 'http.dart';
 import 'inbox.dart';
 import 'landing.dart';
@@ -98,6 +99,7 @@ Handler buildHandler(Deps deps) {
   mountPlaces(api, deps);
   mountRanking(api, deps);
   mountSocial(api, deps);
+  mountDiscover(api, deps);
   mountModeration(api, deps);
   mountPush(api, deps);
   mountInbox(api, deps);

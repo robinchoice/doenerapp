@@ -7,6 +7,7 @@ import 'package:sembast/sembast.dart';
 import 'api.dart';
 
 final settingsStore = StoreRef<String, Object?>('settings');
+final _discoverCache = settingsStore.record('discoverOutputs');
 
 /// Login state. The token lives in the platform keychain / keystore; the
 /// user profile is cached so the app works offline after a restart.
@@ -83,6 +84,25 @@ class Session extends ChangeNotifier {
     }
   }
 
+  /// Sends a code by SMS to [phone] (E.164) that confirms it.
+  Future<void> requestPhoneCode(String phone) => api.post('/me/phone', {'phone': phone});
+
+  /// Afterwards the account is [AccountDto.discoverable]. The cached outputs
+  /// go, so they follow a new server key that made everyone confirm again.
+  Future<void> verifyPhone(String phone, String code) async {
+    await _setUser(AccountDto.fromJson(await api.post('/me/phone/verify', {'phone': phone, 'code': code}) as Map<String, dynamic>));
+    await _discoverCache.delete(_db);
+  }
+
+  /// The server forgets the key of the number at once.
+  Future<void> removePhone() async => _setUser(AccountDto.fromJson(await api.delete('/me/phone') as Map<String, dynamic>));
+
+  /// OPRF output by number of the address book, so a later search only checks new numbers.
+  Future<Map<String, String>> readDiscoverCache() async =>
+      ((await _discoverCache.get(_db) as Map<String, Object?>?) ?? const {}).cast<String, String>();
+
+  Future<void> writeDiscoverCache(Map<String, String> outputs) => _discoverCache.put(_db, outputs);
+
   Future<void> logout() async {
     try {
       await api.post('/auth/logout');
@@ -126,5 +146,6 @@ class Session extends ChangeNotifier {
     notifyListeners();
     await _secure.delete(key: 'session_token');
     await settingsStore.record('user').delete(_db);
+    await _discoverCache.delete(_db);
   }
 }

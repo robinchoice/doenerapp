@@ -14,6 +14,8 @@
 	<string>Lieblingsdöner braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Lieblingsdöner braucht deinen Standort, um Döner-Läden in der Nähe anzuzeigen.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Findet Leute aus deinem Adressbuch, die Lieblingsdöner nutzen. Die Nummern verlassen dein Handy nur verschleiert.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>An Bewertungen und Feedback kannst du Fotos anhängen.</string>
 	<key>NSCameraUsageDescription</key>

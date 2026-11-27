@@ -21,6 +21,7 @@ import '../place/review_sheet.dart';
 import '../ranking/city_picker.dart';
 import '../social/friends.dart';
 import '../social/comments.dart';
+import '../social/discover.dart';
 import '../social/invite.dart';
 import '../social/moderation.dart';
 import '../social/reactions.dart';
@@ -228,12 +229,19 @@ class _StartScreenState extends State<StartScreen> {
           onTap: widget.onOpenMap,
         ),
       if (friends.accepted.isEmpty)
-        _Task(
-          icon: Icons.qr_code_2,
-          title: 'Hol deine Kontakte per QR-Code',
-          message: 'Dann siehst du, wo sie gerade Döner essen.',
-          onTap: () => showAppSheet(context, (_) => const InviteSheet()),
-        ),
+        canSearchContacts
+            ? _Task(
+                icon: Icons.contacts_outlined,
+                title: 'Finde deine Kontakte',
+                message: 'Wer aus deinem Adressbuch ist schon dabei? Dann siehst du, wo sie gerade Döner essen.',
+                onTap: () => openContactSearch(context),
+              )
+            : _Task(
+                icon: Icons.qr_code_2,
+                title: 'Hol deine Kontakte per QR-Code',
+                message: 'Dann siehst du, wo sie gerade Döner essen.',
+                onTap: () => showAppSheet(context, (_) => const InviteSheet()),
+              ),
     ];
 
     return Scaffold(

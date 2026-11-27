@@ -319,8 +319,16 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
-  pointycastle:
+  phone_numbers_parser:
     dependency: transitive
+    description:
+      name: phone_numbers_parser
+      sha256: f5b5761e694388ebf5f59f3764fb62887c849d5ad30db6a8aeea5aef8df2a759
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.2.3"
+  pointycastle:
+    dependency: "direct main"
     description:
       name: pointycastle
       sha256: "92aa3841d083cc4b0f4709b5c74fd6409a3e6ba833ffc7dc6a8fee096366acf5"

@@ -15,6 +15,7 @@ dependencies:
   http: ^1.4.0
   mailer: ^7.2.0
   mime: ^2.0.0
+  pointycastle: ^4.0.0
   postgres: ^3.5.6
   qr: ^4.0.0
   sentry: ^9.30.1

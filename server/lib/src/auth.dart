@@ -40,10 +40,10 @@ const signupClosed = ApiException.forbidden(
   'Sign-up is still closed, there is no account for this address yet. Apply as a tester.',
 );
 
-const _accountColumns =
+const accountColumns =
     'id, email, display_name, diet, expert_mode, push_friends, push_new_places, push_friend_requests, push_reactions, updates_consent_at IS NOT NULL AS update_mails, '
     'CASE WHEN push_paused_until > now() THEN push_paused_until END AS push_paused_until, '
-    'quiet_hours, quiet_days, quiet_start, quiet_end';
+    'quiet_hours, quiet_days, quiet_start, quiet_end, phone_key IS NOT NULL AS discoverable';
 
 AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       id: row['id'] as String,
@@ -61,6 +61,7 @@ AccountDto accountFromRow(Deps deps, Map<String, dynamic> row) => AccountDto(
       quietDays: row['quiet_days'] as int,
       quietStart: row['quiet_start'] as int,
       quietEnd: row['quiet_end'] as int,
+      discoverable: row['discoverable'] as bool,
     );
 
 class AuthUser {
@@ -76,7 +77,7 @@ Future<AuthUser> requireUser(Deps deps, Request request) async {
   final tokenHash = hashToken(header.substring(7).trim());
   final row = await queryOne(
     deps.db,
-    'SELECT $_accountColumns, s.expires_at AS session_expires_at FROM sessions s '
+    'SELECT $accountColumns, s.expires_at AS session_expires_at FROM sessions s '
     'JOIN users u ON u.id = s.user_id '
     'WHERE s.token_hash = @hash AND s.expires_at > now()',
     {'hash': tokenHash},
@@ -124,7 +125,7 @@ void mountAuth(Router router, Deps deps) {
     if (!allowed) throw tooManyRequests;
     final (email, storedInvite) = await _consumeLoginRequest(deps, body);
 
-    var user = await queryOne(deps.db, 'SELECT $_accountColumns FROM users WHERE email = @email', {'email': email});
+    var user = await queryOne(deps.db, 'SELECT $accountColumns FROM users WHERE email = @email', {'email': email});
     final isNewUser = user == null;
     if (isNewUser) {
       final inviteCode = Validation.clean(body.inviteCode) ?? storedInvite;
@@ -181,7 +182,7 @@ void mountAuth(Router router, Deps deps) {
         'quiet_days = coalesce(@days:int2, quiet_days), quiet_start = coalesce(@start:int2, quiet_start), '
         'quiet_end = coalesce(@end:int2, quiet_end) '
         'WHERE id = @id:uuid '
-        'RETURNING $_accountColumns',
+        'RETURNING $accountColumns',
         {
           'name': body.displayName?.trim(),
           'diet': body.diet?.name,
@@ -328,9 +329,9 @@ Future<void> _mailLoginCode(Deps deps, String email,
 
 var _nextRateLimitSweep = DateTime(0);
 
-/// Counts a hit for [key] in Postgres, so all instances share it; false once
-/// it goes over [limit] within [window]. An expired window starts over at 1.
-Future<bool> rateLimit(Deps deps, String key, int limit, Duration window) async {
+/// Counts [cost] hits for [key] in Postgres, so all instances share it; false
+/// once it goes over [limit] within [window]. An expired window starts over.
+Future<bool> rateLimit(Deps deps, String key, int limit, Duration window, {int cost = 1}) async {
   if (DateTime.now().isAfter(_nextRateLimitSweep)) {
     _nextRateLimitSweep = DateTime.now().add(window);
     await deps.db.execute('DELETE FROM rate_limits WHERE reset_at < now()');
@@ -338,12 +339,12 @@ Future<bool> rateLimit(Deps deps, String key, int limit, Duration window) async 
   // Both CASEs see the old row.
   final row = await queryOne(
     deps.db,
-    "INSERT INTO rate_limits (key, count, reset_at) VALUES (@key, 1, now() + @seconds:int4 * interval '1 second') "
+    "INSERT INTO rate_limits (key, count, reset_at) VALUES (@key, @cost:int4, now() + @seconds:int4 * interval '1 second') "
     'ON CONFLICT (key) DO UPDATE SET '
-    'count = CASE WHEN rate_limits.reset_at <= now() THEN 1 ELSE rate_limits.count + 1 END, '
+    'count = CASE WHEN rate_limits.reset_at <= now() THEN @cost:int4 ELSE rate_limits.count + @cost:int4 END, '
     'reset_at = CASE WHEN rate_limits.reset_at <= now() THEN excluded.reset_at ELSE rate_limits.reset_at END '
     'RETURNING count',
-    {'key': key, 'seconds': window.inSeconds},
+    {'key': key, 'seconds': window.inSeconds, 'cost': cost},
   );
   return (row!['count'] as int) <= limit;
 }
@@ -418,7 +419,7 @@ Future<Map<String, dynamic>> _createUser(Deps deps, String email, String? invite
         deps.db,
         'INSERT INTO users (email, display_name, invited_by) '
         'VALUES (@email, @name, (SELECT id FROM users WHERE invite_code = @invite:text)) '
-        'RETURNING $_accountColumns',
+        'RETURNING $accountColumns',
         {'email': email, 'name': name, 'invite': inviteCode},
       ))!;
     } on UniqueViolationException catch (e) {

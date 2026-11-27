@@ -198,7 +198,7 @@ void main() {
     expect(find.text('Kebap Haus'), findsWidgets);
     expect(find.text('noch unbewertet'), findsOneWidget);
     expect(find.text('Bewerte deinen Stammladen'), findsOneWidget);
-    expect(find.text('Hol deine Kontakte per QR-Code'), findsOneWidget);
+    expect(find.text('Finde deine Kontakte'), findsOneWidget);
     expect(find.text('Dönerneuling · Checked in at', findRichText: true), findsOneWidget, reason: 'the tier leads the line');
     expect(find.text('Dönerneuling · Reviewed', findRichText: true), findsOneWidget);
     expect(find.byIcon(Icons.group), findsOneWidget, reason: 'only Tom is a friend');

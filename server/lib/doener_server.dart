@@ -12,5 +12,6 @@ export 'src/photo_metadata.dart' show stripStoredPhotos;
 export 'src/place_cache.dart' show maintainPlaceCache;
 export 'src/prefetch.dart' show prefetchPlaces;
 export 'src/testflight.dart' show TestFlight;
+export 'src/sms.dart';
 export 'src/push.dart' show Pusher, LogPusher, FcmPusher, deleteOldPushEvents, pushPending;
 export 'src/updates.dart' show importDrafts, deliverUpdateMails, parseDraft, readDrafts, updateMail;

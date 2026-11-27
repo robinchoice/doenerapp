@@ -3,7 +3,9 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:doener_models/discover.dart';
 import 'package:doener_models/doener_models.dart';
 import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/auth.dart' show hashToken, maxCodeAttempts;
@@ -16,6 +18,7 @@ import 'package:doener_server/src/prefetch.dart' show PrefetchArea;
 import 'package:doener_server/src/ranking.dart' show usualPrice;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:pointycastle/export.dart' show AEADParameters, AESEngine, GCMBlockCipher, InvalidCipherTextException, KeyParameter;
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
@@ -58,6 +61,24 @@ class CapturingPusher implements Pusher {
   }
 }
 
+class CapturingSms implements SmsSender {
+  final sent = <({String to, String text})>[];
+  @override
+  Future<void> send(String to, String text) async => sent.add((to: to, text: text));
+}
+
+/// Opens a directory box as the app does, null if [output] is the wrong key.
+Map<String, dynamic>? openBox(List<int> output, String box) {
+  final bytes = base64Decode(box);
+  final cipher = GCMBlockCipher(AESEngine())
+    ..init(false, AEADParameters(KeyParameter(discoverBoxKey(output)), 128, bytes.sublist(0, 12), Uint8List(0)));
+  try {
+    return jsonDecode(utf8.decode(cipher.process(bytes.sublist(12)))) as Map<String, dynamic>;
+  } on InvalidCipherTextException {
+    return null;
+  }
+}
+
 void main() {
   final env = Platform.environment;
   final port = int.tryParse(env['TEST_DB_PORT'] ?? '');
@@ -68,6 +89,8 @@ void main() {
 
   late Handler handler;
   late Handler closedHandler;
+  late Handler phoneHandler;
+  final sms = CapturingSms();
   late Deps deps;
   late Pool<void> db;
   final mailer = CapturingMailer();
@@ -173,6 +196,14 @@ void main() {
       reviewCode: '424242',
     );
     closedHandler = buildHandler(Deps(db: db, config: closed, mailer: mailer, httpClient: google));
+    final withPhones = Config(
+      database: config.database,
+      publicUrl: config.publicUrl,
+      webDir: config.webDir,
+      signupOpen: true,
+      oprf: OprfServer.fromHex('2a' * 32),
+    );
+    phoneHandler = buildHandler(Deps(db: db, config: withPhones, mailer: mailer, httpClient: google, sms: sms));
   });
 
   tearDownAll(() => db.close());
@@ -180,8 +211,8 @@ void main() {
   // Each call comes from its own address unless [ip] is given, so the limits per IP stay out of the way.
   var calls = 0;
   Future<(int, dynamic)> call(String method, String path,
-      {Object? body, String? token, bool closed = false, String? ip, bool legacyIngredients = false}) async {
-    final response = await (closed ? closedHandler : handler)(Request(
+      {Object? body, String? token, bool closed = false, bool phones = false, String? ip, bool legacyIngredients = false}) async {
+    final response = await (closed ? closedHandler : phones ? phoneHandler : handler)(Request(
       method,
       Uri.parse('http://localhost/api/v1$path'),
       body: body == null ? null : jsonEncode(body),
@@ -2194,6 +2225,8 @@ void main() {
     await db.execute('ALTER TABLE reviews DROP COLUMN meats');
     await db.execute("DELETE FROM schedules WHERE name = 'photo_metadata'");
     await db.execute('ALTER TABLE reviews DROP COLUMN halal, DROP COLUMN meat_distribution');
+    await db.execute('DROP TABLE phone_codes');
+    await db.execute('ALTER TABLE users DROP COLUMN phone_key');
     final activeViewVersion = migrations.indexWhere((steps) => steps.any((sql) => sql.startsWith('CREATE VIEW active_place_view'))) + 1;
     await db.execute(Sql.named('DELETE FROM schema_migrations WHERE version >= @version'), parameters: {'version': activeViewVersion});
     await migrate(db);
@@ -2313,5 +2346,109 @@ void main() {
     expect(mailer.sent.length, mails + 1);
     final skipped = await db.execute(Sql.named('SELECT status FROM update_deliveries WHERE update_id = @id:uuid'), parameters: {'id': second['id']});
     expect(skipped.single.single, 'skipped');
+  });
+  group('contacts by phone number', () {
+    String lastSmsCode() => RegExp(r'Lieblingsdöner: (\d{6})').firstMatch(sms.sent.last.text)!.group(1)!;
+
+    Future<void> confirm(String token, String phone) async {
+      expect((await call('POST', '/me/phone', body: {'phone': phone}, token: token, phones: true)).$1, 204);
+      expect(sms.sent.last.to, phone);
+      final (status, account) =
+          await call('POST', '/me/phone/verify', body: {'phone': phone, 'code': lastSmsCode()}, token: token, phones: true);
+      expect(status, 200);
+      expect(account['discoverable'], isTrue);
+    }
+
+    /// What the app does: blind, let the server evaluate, unblind, look up the tags and open the boxes.
+    Future<List<Map<String, dynamic>>> search(String token, List<String> numbers) async {
+      final client = OprfClient();
+      final blinded = [for (final n in numbers) client.blind(utf8.encode(n))];
+      final (status, answer) = await call('POST', '/discover/evaluate',
+          body: {'blinded': [for (final b in blinded) base64Encode(b.element)]}, token: token, phones: true);
+      expect(status, 200);
+      final evaluated = (answer['evaluated'] as List).cast<String>();
+      final (_, directory) = await call('GET', '/discover/directory', token: token, phones: true);
+      final boxes = {for (final e in directory['entries'] as List) e['tag']: e['box'] as String};
+      return [
+        for (var i = 0; i < numbers.length; i++)
+          if (client.finalize(blinded[i], base64Decode(evaluated[i])) case final output when boxes[discoverTag(output)] != null)
+            openBox(output, boxes[discoverTag(output)]!)!,
+      ];
+    }
+
+    test('confirmed numbers find each other without the server storing a number', () async {
+      final (anna, _) = await signUp('telefon-anna@example.org', 'Telefon-Anna');
+      final (ben, benUser) = await signUp('telefon-ben@example.org', 'Telefon-Ben');
+      final (cem, cemUser) = await signUp('telefon-cem@example.org', 'Telefon-Cem');
+
+      expect((await call('GET', '/discover/directory', token: anna, phones: true)).$1, 403, reason: 'own number first');
+      expect((await call('POST', '/me/phone', body: {'phone': '0151 kaputt'}, token: anna, phones: true)).$1, 400);
+      expect((await call('POST', '/me/phone', body: {'phone': '+4915100000001'}, token: anna, phones: true)).$1, 204);
+      final code = lastSmsCode();
+      final wrong = code == '000000' ? '111111' : '000000';
+      expect((await call('POST', '/me/phone/verify', body: {'phone': '+4915100000001', 'code': wrong}, token: anna, phones: true)).$1, 400);
+      expect((await call('POST', '/me/phone/verify', body: {'phone': '+4915100000009', 'code': code}, token: anna, phones: true)).$1, 400,
+          reason: 'the code counts only for its number');
+      expect((await call('POST', '/me/phone/verify', body: {'phone': '+4915100000001', 'code': code}, token: anna, phones: true)).$1, 200);
+      await confirm(ben, '+4915100000002');
+      await confirm(cem, '+4915100000003');
+
+      final stored = await db.execute("SELECT phone_key FROM users WHERE email LIKE 'telefon-%' ORDER BY email");
+      expect(stored.map((r) => r.single as String), everyElement(matches(RegExp(r'^[0-9a-f]{64}$'))));
+
+      final found = await search(anna, ['+4915100000002', '+4915100000003', '+4915100000009', '+4915100000001']);
+      expect(found, [
+        {'id': benUser.id, 'name': 'Telefon-Ben'},
+        {'id': cemUser.id, 'name': 'Telefon-Cem'},
+      ]);
+
+      // Blocked people don't find each other.
+      expect((await call('PUT', '/me/blocks/${cemUser.id}', token: anna)).$1, 204);
+      expect(await search(anna, ['+4915100000002', '+4915100000003']), [
+        {'id': benUser.id, 'name': 'Telefon-Ben'},
+      ]);
+      expect(await search(cem, ['+4915100000001']), isEmpty);
+
+      // A number confirmed again moves to the newer account.
+      await confirm(cem, '+4915100000002');
+      expect((await call('GET', '/auth/me', token: ben)).$2['discoverable'], isFalse);
+      expect(await search(anna, ['+4915100000002']), isEmpty);
+
+      final (removed, account) = await call('DELETE', '/me/phone', token: anna, phones: true);
+      expect((removed, account['discoverable']), (200, false));
+      expect((await call('GET', '/discover/directory', token: anna, phones: true)).$1, 403);
+    });
+
+    test('evaluate refuses invalid points, too many numbers and more than the daily quota', () async {
+      final (token, _) = await signUp('telefon-dora@example.org', 'Telefon-Dora');
+      await confirm(token, '+4915100000004');
+      final element = base64Encode(OprfClient().blind(utf8.encode('+4915100000005')).element);
+      Future<int> evaluate(List<String> blinded) async =>
+          (await call('POST', '/discover/evaluate', body: {'blinded': blinded}, token: token, phones: true)).$1;
+      expect(await evaluate([]), 400);
+      expect(await evaluate([base64Encode(Uint8List(33))]), 400);
+      expect(await evaluate(['kein base64']), 400);
+      expect(await evaluate(List.filled(evaluateChunk + 1, element)), 400);
+      expect(await evaluate([element]), 200);
+
+      final (fresh, _) = await signUp('telefon-fritz@example.org', 'Telefon-Fritz');
+      await confirm(fresh, '+4915100000006');
+      Future<int> evaluateFresh(List<String> blinded) async =>
+          (await call('POST', '/discover/evaluate', body: {'blinded': blinded}, token: fresh, phones: true)).$1;
+      for (var sent = 0; sent < maxDiscoverNumbersPerDay; sent += evaluateChunk) {
+        expect(await evaluateFresh(List.filled(evaluateChunk, element)), 200);
+      }
+      expect(await evaluateFresh([element]), 429);
+    });
+
+    test('SMS per account are limited, and without a sender or key there is no search', () async {
+      final (token, _) = await signUp('telefon-emil@example.org', 'Telefon-Emil');
+      for (var i = 0; i < 3; i++) {
+        expect((await call('POST', '/me/phone', body: {'phone': '+491510000001$i'}, token: token, phones: true)).$1, 204);
+      }
+      expect((await call('POST', '/me/phone', body: {'phone': '+4915100000019'}, token: token, phones: true)).$1, 429);
+      expect((await call('POST', '/me/phone', body: {'phone': '+4915100000020'}, token: token)).$1, 503);
+      expect((await call('GET', '/auth/me', token: token)).$2['discoverable'], isFalse);
+    });
   });
 }

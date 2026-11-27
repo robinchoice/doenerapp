@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:doener_cli/cli.dart';
+import 'package:doener_models/discover.dart' show OprfServer;
 import 'package:doener_server/doener_server.dart';
 import 'package:doener_server/src/auth.dart' show hashToken;
 import 'package:http/http.dart' as http;
@@ -30,6 +31,12 @@ class CapturingMailer implements Mailer {
       sent.add((to: to, text: text));
 }
 
+class CapturingSms implements SmsSender {
+  final sent = <({String to, String text})>[];
+  @override
+  Future<void> send(String to, String text) async => sent.add((to: to, text: text));
+}
+
 void main() {
   final env = Platform.environment;
   final port = int.tryParse(env['TEST_DB_PORT'] ?? '');
@@ -45,6 +52,7 @@ void main() {
   late String url;
   late String closedUrl;
   final mailer = CapturingMailer();
+  final sms = CapturingSms();
 
   setUpAll(() async {
     Endpoint endpoint(String database) => Endpoint(
@@ -64,10 +72,11 @@ void main() {
       publicUrl: 'https://doener.test',
       webDir: '/nonexistent',
       signupOpen: true,
+      oprf: OprfServer.fromHex('2a' * 32),
     );
     db = openPool(config);
     await migrate(db);
-    deps = Deps(db: db, config: config, mailer: mailer, httpClient: http.Client());
+    deps = Deps(db: db, config: config, mailer: mailer, httpClient: http.Client(), sms: sms);
     final closed = Config(database: config.database, publicUrl: config.publicUrl, webDir: config.webDir);
     server = await shelf_io.serve(buildHandler(deps).call, InternetAddress.loopbackIPv4, 0);
     closedServer = await shelf_io.serve(
@@ -92,7 +101,9 @@ void main() {
   /// One device: its own config folder, so its own token. Answers the code
   /// question from the last mail, the email question with [email]. Adds
   /// --url of the test server unless the call names one.
-  Future<Device> device() async => Device((await Directory.systemTemp.createTemp('doener-cli-')).path, () => url, lastCode);
+  String lastSmsCode() => RegExp(r'Lieblingsdöner: (\d{6})').firstMatch(sms.sent.last.text)!.group(1)!;
+  Future<Device> device() async => Device(
+      (await Directory.systemTemp.createTemp('doener-cli-')).path, () => url, (question) => question.contains('SMS') ? lastSmsCode() : lastCode());
 
   Future<int> sessionCount(String token) async =>
       (await db.execute(Sql.named('SELECT count(*)::int FROM sessions WHERE token_hash = @hash'), parameters: {'hash': hashToken(token)}))
@@ -195,6 +206,31 @@ void main() {
 
     expect((await phone.cli(['nearby', '--lat', '48'])).code, Exit.usage);
     expect((await phone.cli(['nearby', '--lat', '48', '--lon', '7', '--by', 'fleisch'])).code, Exit.usage);
+  });
+
+  test('confirmed numbers find each other, the numbers stay on the machine', () async {
+    final ali = await device();
+    final ben = await device();
+    await ali.cli(['login', '--email', freshEmail()]);
+    final benUser = (await ben.cli(['login', '--email', freshEmail(), '--json'])).json['user'];
+    final (benName, benId) = (benUser['displayName'], benUser['id']);
+
+    expect((await ali.cli(['discover', '--number', '0151 00000002'])).code, Exit.error, reason: 'own number first');
+    expect((await ali.cli(['phone'])).code, Exit.usage);
+    expect((await ali.cli(['phone', '--number', 'kaputt'])).code, Exit.usage);
+    final confirmed = await ali.cli(['phone', '--number', '0151 00000001']);
+    expect((confirmed.code, confirmed.out), (Exit.ok, 'Über deine Nummer auffindbar.'));
+    expect(confirmed.err, contains('+49 151 •••• 001'));
+    expect(sms.sent.last.to, '+4915100000001');
+    expect((await ben.cli(['phone', '--number', '+49 151 00000002', '--json'])).json, {'discoverable': true});
+
+    expect((await ali.cli(['discover', '--number', '0151 00000002', '--number', '0151 00000009'])).out,
+        '+4915100000002 · $benName · $benId');
+    final json = await ali.cli(['discover', '--number', '0151 00000009', '--json']);
+    expect(json.json, {'matches': []});
+
+    expect((await ben.cli(['phone', '--remove'])).out, 'Nicht mehr über deine Nummer auffindbar.');
+    expect((await ali.cli(['discover', '--number', '0151 00000002'])).out, 'Niemand mit diesen Nummern ist auffindbar.');
   });
 
   test('search finds known shops by name, nearest first', () async {
@@ -367,7 +403,8 @@ void main() {
 class Device {
   final Map<String, String> env;
   final String Function() _url;
-  final String Function() _lastCode;
+  /// The code for a question: from the last mail or, for the SMS question, the last SMS.
+  final String Function(String question) _lastCode;
   Device(String configHome, this._url, this._lastCode) : env = {'XDG_CONFIG_HOME': configHome};
 
   String get token => (jsonDecode(File(sessionFile(env)).readAsStringSync()) as Map)['token'] as String;
@@ -382,7 +419,7 @@ class Device {
         env: env,
         out: out.add,
         err: err.add,
-        ask: (question) async => question.startsWith('Code') ? _lastCode() : email,
+        ask: (question) async => question.startsWith('Code') ? _lastCode(question) : email,
         stdin: () async => stdin,
       ),
     );

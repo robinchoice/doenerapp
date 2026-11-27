@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../ui/widgets.dart';
+import 'discover.dart';
 import 'friends.dart';
 
 /// Opens the system share sheet with the invite link. [context] should belong
@@ -137,6 +138,14 @@ class InviteStepScreen extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
                 ),
                 const SizedBox(height: 24),
+                if (canSearchContacts) ...[
+                  FilledButton.icon(
+                    icon: const Icon(Icons.contacts_outlined),
+                    label: const Text('Kontakte aus dem Adressbuch finden'),
+                    onPressed: () => openContactSearch(context),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 const InvitePanel(),
                 const SizedBox(height: 8),
                 TextButton(onPressed: onDone, child: const Text('Weiter')),

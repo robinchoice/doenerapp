@@ -9,6 +9,7 @@ import '../../core/push.dart';
 import '../../core/session.dart';
 import '../../ui/widgets.dart';
 import '../profile/profile_view.dart';
+import 'discover.dart';
 import 'invite.dart';
 
 /// Invite code from a link opened before the user was signed in — accepted
@@ -141,6 +142,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         child: ListView(
           children: [
             if (friends.error != null) ListTile(leading: const Icon(Icons.error_outline), title: Text(friends.error!)),
+            if (canSearchContacts) const ContactSearchTile(),
             ListTile(
               leading: const CircleAvatar(child: Icon(Icons.qr_code_2)),
               title: const Text('Kontakte einladen'),
